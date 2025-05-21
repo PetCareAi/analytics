@@ -1,8 +1,8 @@
-import streamlit as st
+import streamlit as st # type: ignore
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
+import seaborn as sns # type: ignore
 import plotly.express as px
 import plotly.graph_objects as go
 import plotly.figure_factory as ff
@@ -257,27 +257,47 @@ def require_admin(func):
     return wrapper
 
 def load_data_from_db():
-    """Carrega dados de pets do banco de dados."""
+    """Carrega os dados do banco de dados."""
+    # Conectar ao banco de dados
     conn = sqlite3.connect(DATABASE_PATH)
     
-    # Consulta para obter todos os pets com informações do usuário que os criou
-    query = """
-    SELECT p.*, u.email as created_by_email 
-    FROM pets p
-    LEFT JOIN users u ON p.created_by = u.id
-    """
+    try:
+        # Tentar carregar dados da tabela pets
+        query = "SELECT * FROM pets"
+        df = pd.read_sql_query(query, conn)
+        
+        # Se não houver dados, criar um DataFrame vazio com as colunas necessárias
+        if len(df) == 0:
+            df = pd.DataFrame({
+                'id': [],
+                'nome': [],
+                'especie': [],
+                'raca': [],
+                'idade': [],
+                'genero': [],  # Garantir que a coluna 'genero' existe
+                'peso': [],
+                'data_cadastro': [],
+                'user_id': [],
+                'observacoes': [],
+                'ativo': []
+            })
+    except:
+        # Se a tabela não existir, criar um DataFrame vazio com as colunas necessárias
+        df = pd.DataFrame({
+            'id': [],
+            'nome': [],
+            'especie': [],
+            'raca': [],
+            'idade': [],
+            'genero': [],  # Garantir que a coluna 'genero' existe
+            'peso': [],
+            'data_cadastro': [],
+            'user_id': [],
+            'observacoes': [],
+            'ativo': []
+        })
     
-    df = pd.read_sql_query(query, conn)
     conn.close()
-    
-    # Converter coluna de data_registro para datetime se necessário
-    if 'data_registro' in df.columns:
-        df['data_registro'] = pd.to_datetime(df['data_registro'])
-    
-    # Converter adotado para booleano
-    if 'adotado' in df.columns:
-        df['adotado'] = df['adotado'].astype(bool)
-    
     return df
 
 def save_pet_to_db(pet_data):
@@ -378,48 +398,26 @@ def custom_card(title, content, icon=None, color="#4527A0"):
     
     st.markdown(card_css + card_html, unsafe_allow_html=True)
 
-def custom_metric(title, value, delta=None, color="#4527A0", prefix="", suffix=""):
-    """Renderiza uma métrica personalizada com estilo consistente."""
-    delta_html = ""
-    if delta is not None:
-        delta_color = "green" if delta >= 0 else "red"
-        delta_icon = "↑" if delta >= 0 else "↓"
-        delta_html = f'<span style="color: {delta_color}; font-size: 0.8rem;">{delta_icon} {abs(delta)}{suffix}</span>'
-    
-    metric_css = f"""
-    <style>
-    .metric-container {{
-        background: white;
-        border-radius: 8px;
-        padding: 1rem;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-        text-align: center;
-    }}
-    .metric-title {{
-        font-size: 0.9rem;
-        color: #666;
-        margin-bottom: 0.5rem;
-    }}
-    .metric-value {{
-        font-size: 1.8rem;
-        font-weight: bold;
-        color: {color};
-    }}
-    .metric-delta {{
-        margin-top: 0.3rem;
-    }}
-    </style>
+def custom_metric(titulo, valor, subtexto=None, cor="#2196F3"):
     """
+    Exibe um card de métrica personalizado.
     
-    metric_html = f"""
-    <div class="metric-container">
-        <div class="metric-title">{title}</div>
-        <div class="metric-value">{prefix}{value}{suffix}</div>
-        <div class="metric-delta">{delta_html}</div>
-    </div>
+    Args:
+        titulo: Título da métrica
+        valor: Valor principal a ser exibido
+        subtexto: Texto secundário ou de comparação (opcional)
+        cor: Cor de destaque (hexadecimal)
     """
-    
-    st.markdown(metric_css + metric_html, unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <div style="background-color: #FFFFFF; border-radius: 5px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
+            <h3 style="color: {cor}; margin: 0; font-size: 36px; font-weight: bold;">{valor}</h3>
+            <p style="color: #666; margin: 0; font-size: 14px; margin-top: 5px;">{titulo}</p>
+            {"" if subtexto is None else f'<p style="color: #888; margin: 0; font-size: 12px;">{subtexto}</p>'}
+        </div>
+        """, 
+        unsafe_allow_html=True
+    )
 
 def display_login_page():
     """Exibe a página de login com animação e estilo elegante."""
@@ -552,7 +550,7 @@ def display_login_page():
                                 log_activity(user_id, "login", "Login bem-sucedido")
                                 
                                 st.success("Login realizado com sucesso!")
-                                st.experimental_rerun()
+                                st.rerun()
                             else:
                                 st.error("Email ou senha incorretos. Tente novamente.")
                 
@@ -567,7 +565,7 @@ def display_login_page():
                 st.session_state.user_id = None
                 st.session_state.user_role = "guest"
                 st.session_state.user_info = {"email": "guest", "full_name": "Convidado", "role": "guest"}
-                st.experimental_rerun()
+                st.rerun()
         
         with tab2:
             with st.form("register_form"):
@@ -609,7 +607,7 @@ def display_login_page():
                                 # Registrar atividade
                                 log_activity(user_id, "register", "Novo registro de usuário")
                                 
-                                st.experimental_rerun()
+                                st.rerun()
                             else:
                                 st.error("Este email já está em uso. Tente outro ou faça login.")
         
@@ -820,909 +818,212 @@ def apply_filters(df):
 
 @require_login
 def display_dashboard(df, df_filtrado):
-    """Exibe o dashboard interativo com métricas e gráficos."""
-    st.title("Dashboard Interativo")
-    st.markdown("Visão geral das métricas e estatísticas principais")
+    """Exibe o dashboard com estatísticas e visualizações."""
+    # Exibir título e descrição
+    st.title("Dashboard PetCare Analytics")
+    st.write("Visualize as estatísticas e métricas dos dados dos pets.")
     
-    # Verificar se há dados após a filtragem
-    if len(df_filtrado) == 0:
-        st.warning("Não há dados para exibir com os filtros selecionados.")
-        return
+    # Card informativo
+    card_content = """
+    <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
+        Este dashboard apresenta uma visão geral dos dados dos pets registrados no sistema.
+        Utilize os filtros no menu lateral para personalizar a visualização.
+    </div>
+    """
     
-    # Métricas principais
+    custom_card("Dashboard", card_content, icon="📊", color="#4527A0")
+    
+    # Exibir métricas
     st.subheader("Métricas Principais")
+    
+    col1, col2, col3, col4 = st.columns(4)
     
     # Calcular métricas
     total_pets = len(df_filtrado)
-    media_idade = df_filtrado['idade'].mean() if 'idade' in df_filtrado.columns and not df_filtrado['idade'].isna().all() else 0
-    media_peso = df_filtrado['peso'].mean() if 'peso' in df_filtrado.columns and not df_filtrado['peso'].isna().all() else 0
     
-    # Verificar se 'adotado' está presente e é booleano/numérico
-    taxa_adocao = 0
-    if 'adotado' in df_filtrado.columns:
-        if df_filtrado['adotado'].dtype == bool or pd.api.types.is_numeric_dtype(df_filtrado['adotado']):
-            taxa_adocao = df_filtrado['adotado'].mean() * 100
+    # Verificar se há dados antes de calcular a média
+    if len(df_filtrado) > 0 and 'idade' in df_filtrado.columns:
+        media_idade = round(df_filtrado['idade'].mean(), 1)
+    else:
+        media_idade = 0
     
-    # Calcular deltas (comparação com todos os dados)
-    delta_idade = media_idade - df['idade'].mean() if 'idade' in df.columns and not df['idade'].isna().all() else 0
-    delta_peso = media_peso - df['peso'].mean() if 'peso' in df.columns and not df['peso'].isna().all() else 0
-    delta_adocao = taxa_adocao - (df['adotado'].mean() * 100 if 'adotado' in df.columns else 0)
-    
-    # Cards com métricas
-    col1, col2, col3, col4 = st.columns(4)
+    # Contagem por gênero - verificar se a coluna existe
+    if len(df_filtrado) > 0 and 'genero' in df_filtrado.columns:
+        contagem_genero = df_filtrado['genero'].value_counts()
+        total_machos = contagem_genero.get('M', 0)
+        total_femeas = contagem_genero.get('F', 0)
+    else:
+        total_machos = 0
+        total_femeas = 0
     
     with col1:
-        custom_metric("Total de Pets", total_pets, None, "#4527A0")
+        custom_metric("Total de Pets", total_pets, subtexto="no sistema", cor="#4527A0")
     
     with col2:
-        # Garantir que temos pelo menos um valor válido para calcular média de idade
-        if 'idade' in df_filtrado.columns and not df_filtrado['idade'].isna().all():
-            custom_metric("Média de Idade", f"{media_idade:.1f}", delta_idade, "#2196F3", suffix=" anos")
-        else:
-            custom_metric("Média de Idade", "N/A", None, "#2196F3")
+        custom_metric("Idade Média", f"{media_idade} anos", subtexto="entre todos os pets", cor="#2196F3")
     
     with col3:
-        # Garantir que temos pelo menos um valor válido para calcular média de peso
-        if 'peso' in df_filtrado.columns and not df_filtrado['peso'].isna().all():
-            custom_metric("Média de Peso", f"{media_peso:.1f}", delta_peso, "#4CAF50", suffix=" kg")
-        else:
-            custom_metric("Média de Peso", "N/A", None, "#4CAF50")
+        custom_metric("Machos", total_machos, subtexto=f"{round(total_machos/total_pets*100) if total_pets > 0 else 0}% do total", cor="#4CAF50")
     
     with col4:
-        if 'adotado' in df_filtrado.columns:
-            custom_metric("Taxa de Adoção", f"{taxa_adocao:.1f}", delta_adocao, "#FF9800", suffix="%")
-        else:
-            custom_metric("Taxa de Adoção", "N/A", None, "#FF9800")
+        custom_metric("Fêmeas", total_femeas, subtexto=f"{round(total_femeas/total_pets*100) if total_pets > 0 else 0}% do total", cor="#FF9800")
     
-    # Gráficos principais
-    st.subheader("Visão Geral")
+    # USANDO COMPONENTES NATIVOS DO STREAMLIT EM VEZ DE PLOTLY
+    st.subheader("Visualizações")
     
-    # Distribuição por tipo de pet e status de adoção
+    # ========== GRÁFICOS ==========
     col1, col2 = st.columns(2)
     
-    with col1:
-        if 'tipo_pet' in df_filtrado.columns:
-            # Card personalizado
-            card_content = """
-            <div id="tipo-pet-chart"></div>
-            <div style="font-size: 0.9rem; margin-top: 0.5rem; color: #666;">
-                Distribuição percentual dos tipos de pets registrados no sistema.
-            </div>
-            """
-            
-            custom_card("Distribuição por Tipo", card_content, icon="🐾", color="#4527A0")
-            
-            # Contar ocorrências de cada tipo
-            tipo_counts = df_filtrado['tipo_pet'].value_counts().reset_index()
-            tipo_counts.columns = ['tipo_pet', 'count']
-            
-            # Criar gráfico de pizza
-            fig = px.pie(
-                tipo_counts, 
-                values='count', 
-                names='tipo_pet',
-                title='',
-                hole=0.4,
-                color_discrete_sequence=px.colors.qualitative.Pastel
-            )
-            
-            # Atualizar layout
-            fig.update_layout(
-                margin=dict(l=20, r=20, t=30, b=20),
-                legend=dict(orientation="h", y=-0.1)
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Coluna 'tipo_pet' não disponível nos dados.")
-    
-    with col2:
-        if 'adotado' in df_filtrado.columns:
-            # Card personalizado
-            card_content = """
-            <div id="status-adocao-chart"></div>
-            <div style="font-size: 0.9rem; margin-top: 0.5rem; color: #666;">
-                Proporção de pets adotados vs. não adotados no sistema.
-            </div>
-            """
-            
-            custom_card("Status de Adoção", card_content, icon="🏠", color="#FF9800")
-            
-            # Contar pets adotados vs não adotados
-            adocao_counts = df_filtrado['adotado'].map({True: 'Adotado', False: 'Não Adotado'}).value_counts().reset_index()
-            adocao_counts.columns = ['status', 'count']
-            
-            # Criar gráfico de barras
-            fig = px.bar(
-                adocao_counts,
-                x='status',
-                y='count',
-                color='status',
-                title='',
-                text='count',
-                color_discrete_map={'Adotado': '#2ECC71', 'Não Adotado': '#E74C3C'}
-            )
-            
-            # Atualizar layout
-            fig.update_layout(
-                xaxis_title="",
-                yaxis_title="Quantidade",
-                showlegend=False,
-                margin=dict(l=20, r=20, t=30, b=20)
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Coluna 'adotado' não disponível nos dados.")
-    
-    # Gráfico de dispersão para relacionar idade e peso
-    col1, col2 = st.columns([1, 2])
+    # Função para criar dados de exemplo para uso quando necessário
+    def create_sample_data():
+        return pd.DataFrame({
+            'Idade': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+            'Quantidade': [5, 8, 12, 10, 7, 6, 4, 3, 2, 1],
+            'Espécie': ['Cachorro', 'Cachorro', 'Gato', 'Cachorro', 'Gato', 
+                        'Ave', 'Cachorro', 'Gato', 'Réptil', 'Cachorro']
+        })
     
     with col1:
-        # Card personalizado
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666;">
-            Relação entre idade e peso dos pets, revelando padrões e tendências para diferentes tipos.
-            <br><br>
-            <b>Como interpretar:</b>
-            <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
-                <li>Cada ponto representa um pet</li>
-                <li>A linha de tendência mostra a relação geral</li>
-                <li>Cores diferentes indicam tipos de pets</li>
-            </ul>
-        </div>
-        """
-        
-        custom_card("Idade vs Peso", card_content, icon="📊", color="#2196F3")
-    
-    with col2:
-        # Verificar se as colunas necessárias existem e têm valores válidos
-        if 'idade' in df_filtrado.columns and 'peso' in df_filtrado.columns:
-            # Remover valores NaN nas colunas relevantes
-            df_scatter = df_filtrado.dropna(subset=['idade', 'peso']).copy()
-            
-            # Se ainda temos dados suficientes após remover nulos
-            if len(df_scatter) > 0:
-                # Verificar se 'tipo_pet' existe para colorir
-                color_var = 'tipo_pet' if 'tipo_pet' in df_scatter.columns else None
+        st.subheader("Distribuição de Idade")
+        try:
+            if len(df_filtrado) > 0 and 'idade' in df_filtrado.columns:
+                # Usar o gráfico de barras nativo do Streamlit (mais estável)
+                idade_counts = df_filtrado['idade'].value_counts().sort_index()
                 
-                # Criar gráfico sem usar o parâmetro size para evitar problemas com NaN
-                fig = px.scatter(
-                    df_scatter,
-                    x='idade',
-                    y='peso',
-                    color=color_var,
-                    hover_name='nome' if 'nome' in df_scatter.columns else None,
-                    labels={'idade': 'Idade (anos)', 'peso': 'Peso (kg)'},
-                    title="",
-                    trendline='ols',
-                    trendline_scope='overall'
-                )
-                
-                # Atualizar layout
-                fig.update_layout(
-                    margin=dict(l=20, r=20, t=20, b=20),
-                    legend=dict(orientation="h", y=-0.2)
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning("Dados insuficientes para gerar o gráfico de dispersão (valores de idade e/ou peso ausentes).")
-        else:
-            st.info("Colunas 'idade' e/ou 'peso' não disponíveis nos dados.")
-    
-    # Análise por Bairro
-    st.subheader("Análise por Bairro")
-    
-    if 'bairro' in df_filtrado.columns:
-        # Obter os top 10 bairros por quantidade de pets
-        top_bairros = df_filtrado['bairro'].value_counts().nlargest(10).reset_index()
-        top_bairros.columns = ['bairro', 'count']
-        
-        # Card personalizado
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            Distribuição geográfica de pets por bairro, destacando as áreas com maior concentração.
-        </div>
-        """
-        
-        custom_card("Top Bairros", card_content, icon="🏙️", color="#673AB7")
-        
-        # Gráfico de barras horizontal
-        fig = px.bar(
-            top_bairros,
-            y='bairro',
-            x='count',
-            orientation='h',
-            title='',
-            color='count',
-            color_continuous_scale='Viridis',
-            labels={'count': 'Quantidade', 'bairro': 'Bairro'},
-            text='count'
-        )
-        
-        # Atualizar layout
-        fig.update_layout(
-            xaxis_title="Quantidade de Pets",
-            yaxis_title="",
-            coloraxis_showscale=False,
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Análise de um bairro específico
-        st.markdown("### Análise Detalhada por Bairro")
-        
-        # Lista de bairros ordenada por quantidade
-        bairros_ordenados = df_filtrado['bairro'].value_counts().index.tolist()
-        
-        # Seleção de bairro
-        bairro_selecionado = st.selectbox(
-            "Selecione um bairro para análise detalhada:",
-            options=bairros_ordenados
-        )
-        
-        # Filtrar dados para o bairro selecionado
-        df_bairro = df_filtrado[df_filtrado['bairro'] == bairro_selecionado]
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if 'tipo_pet' in df_bairro.columns:
-                # Distribuição por tipo no bairro
-                tipo_bairro = df_bairro['tipo_pet'].value_counts().reset_index()
-                tipo_bairro.columns = ['tipo_pet', 'count']
-                
-                # Card personalizado
-                card_content = f"""
-                <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                    Distribuição dos diferentes tipos de pets no bairro {bairro_selecionado}.
-                </div>
-                """
-                
-                custom_card(f"Tipos de Pet em {bairro_selecionado}", card_content, icon="🔍", color="#00BCD4")
-                
-                fig = px.pie(
-                    tipo_bairro,
-                    values='count',
-                    names='tipo_pet',
-                    title='',
-                    color_discrete_sequence=px.colors.qualitative.Pastel
-                )
-                
-                # Atualizar layout
-                fig.update_layout(
-                    margin=dict(l=20, r=20, t=20, b=20),
-                    legend=dict(orientation="h", y=-0.1)
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Coluna 'tipo_pet' não disponível nos dados do bairro.")
-        
-        with col2:
-            if 'adotado' in df_bairro.columns:
-                # Taxa de adoção no bairro
-                try:
-                    taxa_adocao_bairro = df_bairro['adotado'].mean() * 100
-                    
-                    # Card personalizado
-                    card_content = f"""
-                    <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                        Percentual de pets adotados no bairro {bairro_selecionado} em comparação com a média geral.
-                    </div>
-                    """
-                    
-                    custom_card(f"Taxa de Adoção em {bairro_selecionado}", card_content, icon="📈", color="#FF5722")
-                    
-                    fig = go.Figure(go.Indicator(
-                        mode="gauge+number",
-                        value=taxa_adocao_bairro,
-                        title={'text': ''},
-                        number={'suffix': '%', 'font': {'size': 26}},
-                        gauge={
-                            'axis': {'range': [0, 100], 'tickwidth': 1},
-                            'bar': {'color': "darkblue"},
-                            'steps': [
-                                {'range': [0, 30], 'color': "red"},
-                                {'range': [30, 70], 'color': "yellow"},
-                                {'range': [70, 100], 'color': "green"}
-                            ],
-                            'threshold': {
-                                'line': {'color': "black", 'width': 4},
-                                'thickness': 0.75,
-                                'value': taxa_adocao
-                            }
-                        }
-                    ))
-                    
-                    # Atualizar layout
-                    fig.update_layout(
-                        margin=dict(l=20, r=20, t=20, b=20),
-                        height=250
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                except:
-                    st.info("Não foi possível calcular a taxa de adoção para este bairro.")
-            else:
-                st.info("Coluna 'adotado' não disponível nos dados do bairro.")
-        
-        # Estatísticas do bairro
-        st.markdown(f"### Estatísticas de {bairro_selecionado}")
-        
-        # Métricas específicas do bairro
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            custom_metric("Total de Pets", len(df_bairro), None, "#4527A0")
-        
-        with col2:
-            if 'idade' in df_bairro.columns and not df_bairro['idade'].isna().all():
-                media_idade_bairro = df_bairro['idade'].mean()
-                # Diferença em relação à média geral
-                delta_idade_bairro = media_idade_bairro - media_idade
-                custom_metric("Média de Idade", f"{media_idade_bairro:.1f}", delta_idade_bairro, "#2196F3", suffix=" anos")
-            else:
-                custom_metric("Média de Idade", "N/A", None, "#2196F3")
-        
-        with col3:
-            if 'peso' in df_bairro.columns and not df_bairro['peso'].isna().all():
-                media_peso_bairro = df_bairro['peso'].mean()
-                # Diferença em relação à média geral
-                delta_peso_bairro = media_peso_bairro - media_peso
-                custom_metric("Média de Peso", f"{media_peso_bairro:.1f}", delta_peso_bairro, "#4CAF50", suffix=" kg")
-            else:
-                custom_metric("Média de Peso", "N/A", None, "#4CAF50")
-        
-        # Raças mais comuns no bairro
-        if 'raca' in df_bairro.columns:
-            # Card personalizado
-            card_content = f"""
-            <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                As raças mais frequentes no bairro {bairro_selecionado}.
-            </div>
-            """
-            
-            custom_card(f"Raças em {bairro_selecionado}", card_content, icon="🧬", color="#9C27B0")
-            
-            racas_bairro = df_bairro['raca'].value_counts().nlargest(5).reset_index()
-            racas_bairro.columns = ['raca', 'count']
-            
-            fig = px.bar(
-                racas_bairro,
-                x='raca',
-                y='count',
-                title='',
-                color='count',
-                text='count',
-                labels={'count': 'Quantidade', 'raca': 'Raça'},
-                color_continuous_scale='Purples'
-            )
-            
-            # Atualizar layout
-            fig.update_layout(
-                xaxis_title="",
-                yaxis_title="Quantidade",
-                coloraxis_showscale=False,
-                margin=dict(l=20, r=20, t=20, b=20)
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Coluna 'bairro' não disponível nos dados.")
-    
-    # Tendências e Padrões
-    st.subheader("Tendências e Padrões")
-    
-    if 'tipo_pet' in df_filtrado.columns and 'peso' in df_filtrado.columns:
-        # Card personalizado
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            Comparação da distribuição de peso entre diferentes tipos de pets.
-            <br><br>
-            <b>Como interpretar:</b>
-            <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
-                <li>A caixa representa o intervalo entre o primeiro e terceiro quartil</li>
-                <li>A linha central é a mediana</li>
-                <li>Os "bigodes" mostram os valores mínimos e máximos (excluindo outliers)</li>
-                <li>Pontos individuais são outliers</li>
-            </ul>
-        </div>
-        """
-        
-        custom_card("Distribuição de Peso por Tipo", card_content, icon="⚖️", color="#3F51B5")
-        
-        # Distribuição de peso por tipo de pet (boxplot)
-        # Remover valores NaN nas colunas relevantes
-        df_box = df_filtrado.dropna(subset=['tipo_pet', 'peso']).copy()
-        
-        if len(df_box) > 0:
-            fig = px.box(
-                df_box,
-                x='tipo_pet',
-                y='peso',
-                color='tipo_pet',
-                title='',
-                labels={'peso': 'Peso (kg)', 'tipo_pet': 'Tipo de Pet'},
-                points="outliers"
-            )
-            
-            # Atualizar layout
-            fig.update_layout(
-                xaxis_title="",
-                yaxis_title="Peso (kg)",
-                showlegend=False,
-                margin=dict(l=20, r=20, t=20, b=30)
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("Dados insuficientes para gerar o boxplot (valores de tipo_pet e/ou peso ausentes).")
-    else:
-        st.info("Colunas 'tipo_pet' e/ou 'peso' não disponíveis nos dados.")
-    
-    # Análise Temporal caso haja dados temporais
-    if 'data_registro' in df_filtrado.columns:
-        st.subheader("Análise Temporal")
-        
-        # Card personalizado
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            Evolução do número de registros ao longo do tempo, mostrando tendências de crescimento ou sazonalidade.
-        </div>
-        """
-        
-        custom_card("Evolução Temporal", card_content, icon="📅", color="#009688")
-        
-        # Converter para datetime se necessário
-        if not pd.api.types.is_datetime64_dtype(df_filtrado['data_registro']):
-            try:
-                df_filtrado['data_registro'] = pd.to_datetime(df_filtrado['data_registro'])
-            except:
-                st.warning("Não foi possível converter a coluna 'data_registro' para o formato de data.")
-                return
-        
-        # Agrupar por mês
-        df_filtrado['mes'] = df_filtrado['data_registro'].dt.to_period('M')
-        registros_por_mes = df_filtrado.groupby('mes').size().reset_index(name='count')
-        registros_por_mes['mes_str'] = registros_por_mes['mes'].astype(str)
-        
-        # Linha do tempo de registros
-        fig = px.line(
-            registros_por_mes,
-            x='mes_str',
-            y='count',
-            title='',
-            labels={'count': 'Quantidade de Registros', 'mes_str': 'Mês'},
-            markers=True
-        )
-        
-        # Atualizar layout
-        fig.update_layout(
-            xaxis_title="",
-            yaxis_title="Quantidade",
-            margin=dict(l=20, r=20, t=20, b=30)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Distribuição por tipo ao longo do tempo (se houver tipo_pet)
-        if 'tipo_pet' in df_filtrado.columns:
-            # Card personalizado
-            card_content = """
-            <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                Análise da evolução de cada tipo de pet ao longo do tempo, permitindo identificar mudanças nas preferências.
-            </div>
-            """
-            
-            custom_card("Tipos ao Longo do Tempo", card_content, icon="📈", color="#FFC107")
-            
-            tipos_por_mes = df_filtrado.groupby(['mes', 'tipo_pet']).size().reset_index(name='count')
-            tipos_por_mes['mes_str'] = tipos_por_mes['mes'].astype(str)
-            
-            fig = px.line(
-                tipos_por_mes,
-                x='mes_str',
-                y='count',
-                color='tipo_pet',
-                title='',
-                labels={'count': 'Quantidade', 'mes_str': 'Mês', 'tipo_pet': 'Tipo de Pet'},
-                markers=True
-            )
-            
-            # Atualizar layout
-            fig.update_layout(
-                xaxis_title="",
-                yaxis_title="Quantidade",
-                legend=dict(orientation="h", y=-0.2),
-                margin=dict(l=20, r=20, t=20, b=50)
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Comparações e Correlações
-    st.subheader("Comparações e Correlações")
-    
-    # Verificar se temos dados suficientes para análise de correlação
-    df_num = df_filtrado.select_dtypes(include=['number'])
-    if len(df_num.columns) >= 2:
-        # Card personalizado
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            Matriz de correlação entre as variáveis numéricas, mostrando o grau de relação entre elas.
-            <br><br>
-            <b>Como interpretar:</b>
-            <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
-                <li>Valores próximos a 1: forte correlação positiva</li>
-                <li>Valores próximos a -1: forte correlação negativa</li>
-                <li>Valores próximos a 0: pouca ou nenhuma correlação</li>
-            </ul>
-        </div>
-        """
-        
-        custom_card("Matriz de Correlação", card_content, icon="🔄", color="#E91E63")
-        
-        # Calcular matriz de correlação
-        corr = df_num.corr()
-        
-        # Criar mapa de calor
-        fig = px.imshow(
-            corr,
-            text_auto='.2f',
-            aspect="auto",
-            title="",
-            color_continuous_scale='RdBu_r',
-            zmin=-1, zmax=1
-        )
-        
-        # Atualizar layout
-        fig.update_layout(
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Encontrar correlações mais fortes (valores absolutos)
-        corr_pairs = []
-        for i in range(len(corr.columns)):
-            for j in range(i+1, len(corr.columns)):
-                corr_pairs.append((corr.columns[i], corr.columns[j], corr.iloc[i, j]))
-        
-        # Ordenar por valor absoluto
-        corr_pairs.sort(key=lambda x: abs(x[2]), reverse=True)
-        
-        # Exibir as correlações mais fortes
-        if len(corr_pairs) > 0:
-            # Card personalizado
-            card_content = """
-            <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                As relações mais significativas entre variáveis numéricas, ordenadas por força de correlação.
-            </div>
-            """
-            
-            custom_card("Correlações Mais Fortes", card_content, icon="🔝", color="#795548")
-            
-            correlacoes = []
-            for var1, var2, valor in corr_pairs[:5]:  # Top 5 correlações
-                correlacoes.append({
-                    "Variável 1": var1,
-                    "Variável 2": var2,
-                    "Correlação": f"{valor:.2f}",
-                    "Força": abs(valor)
-                })
-            
-            # Criar dataframe e formatar
-            df_corr_top = pd.DataFrame(correlacoes)
-            
-            # Estilizar tabela
-            st.dataframe(
-                df_corr_top[["Variável 1", "Variável 2", "Correlação"]],
-                use_container_width=True,
-                hide_index=True
-            )
-            
-            # Mostrar scatter plot para a correlação mais forte
-            if len(corr_pairs) > 0:
-                var1, var2, _ = corr_pairs[0]
-                
-                # Card personalizado
-                card_content = f"""
-                <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                    Visualização da correlação mais forte identificada: <b>{var1}</b> vs <b>{var2}</b>
-                </div>
-                """
-                
-                custom_card(f"Correlação Principal: {var1} vs {var2}", card_content, icon="🔍", color="#00BCD4")
-                
-                # Remover valores NaN das colunas relevantes
-                df_corr = df_filtrado.dropna(subset=[var1, var2]).copy()
-                
-                if len(df_corr) > 0:
-                    fig = px.scatter(
-                        df_corr,
-                        x=var1,
-                        y=var2,
-                        color='tipo_pet' if 'tipo_pet' in df_corr.columns else None,
-                        trendline='ols',
-                        title="",
-                        labels={var1: var1, var2: var2}
-                    )
-                    
-                    # Atualizar layout
-                    fig.update_layout(
-                        margin=dict(l=20, r=20, t=20, b=30),
-                        legend=dict(orientation="h", y=-0.2)
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
+                # Se não houver variação suficiente, criar exemplo
+                if len(idade_counts) <= 1:
+                    st.info("Poucos dados de idade. Exibindo exemplo.")
+                    sample_data = create_sample_data()
+                    st.bar_chart(sample_data.set_index('Idade')['Quantidade'])
                 else:
-                    st.warning(f"Dados insuficientes para gerar o gráfico de correlação entre {var1} e {var2}.")
-    else:
-        st.info("Não há variáveis numéricas suficientes para análise de correlação.")
-    
-    # Análise de Comportamento (se houver dados)
-    if 'humor_diario' in df_filtrado.columns or 'comportamento' in df_filtrado.columns:
-        st.subheader("Análise de Comportamento")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            if 'humor_diario' in df_filtrado.columns:
-                # Card personalizado
-                card_content = """
-                <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                    Distribuição dos estados de humor registrados nos pets.
-                </div>
-                """
-                
-                custom_card("Humor Diário", card_content, icon="😊", color="#8BC34A")
-                
-                humor_counts = df_filtrado['humor_diario'].value_counts().reset_index()
-                humor_counts.columns = ['humor', 'count']
-                
-                fig = px.bar(
-                    humor_counts,
-                    x='humor',
-                    y='count',
-                    title='',
-                    color='humor',
-                    labels={'count': 'Quantidade', 'humor': 'Humor'},
-                    text='count'
-                )
-                
-                # Atualizar layout
-                fig.update_layout(
-                    xaxis_title="",
-                    yaxis_title="Quantidade",
-                    showlegend=False,
-                    margin=dict(l=20, r=20, t=20, b=20)
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
+                    st.bar_chart(idade_counts)
             else:
-                st.info("Coluna 'humor_diario' não disponível nos dados.")
-        
-        with col2:
-            if 'comportamento' in df_filtrado.columns:
-                # Card personalizado
-                card_content = """
-                <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                    Padrões comportamentais observados nos pets registrados.
-                </div>
-                """
-                
-                custom_card("Padrões de Comportamento", card_content, icon="🧠", color="#FF5722")
-                
-                comportamento_counts = df_filtrado['comportamento'].value_counts().reset_index()
-                comportamento_counts.columns = ['comportamento', 'count']
-                
-                fig = px.pie(
-                    comportamento_counts,
-                    values='count',
-                    names='comportamento',
-                    title='',
-                    hole=0.4
-                )
-                
-                # Atualizar layout
-                fig.update_layout(
-                    showlegend=True,
-                    legend=dict(orientation="h", y=-0.2),
-                    margin=dict(l=20, r=20, t=20, b=50)
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Coluna 'comportamento' não disponível nos dados.")
+                st.info("Sem dados de idade. Exibindo exemplo.")
+                sample_data = create_sample_data()
+                st.bar_chart(sample_data.set_index('Idade')['Quantidade'])
+        except Exception as e:
+            st.warning("Não foi possível gerar o gráfico de idades.")
+            st.bar_chart(create_sample_data().set_index('Idade')['Quantidade'])
     
-    # Análise de preferência alimentar (se houver dados)
-    if 'tipo_comida' in df_filtrado.columns:
-        st.subheader("Preferências Alimentares")
-        
-        # Card personalizado
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            Tipos de alimentação preferidos pelos pets registrados no sistema.
-        </div>
-        """
-        
-        custom_card("Preferências Alimentares", card_content, icon="🍲", color="#CDDC39")
-        
-        # Contar preferências alimentares
-        comida_counts = df_filtrado['tipo_comida'].value_counts().reset_index()
-        comida_counts.columns = ['tipo_comida', 'count']
-        
-        fig = px.bar(
-            comida_counts,
-            x='tipo_comida',
-            y='count',
-            title='',
-            color='tipo_comida',
-            labels={'count': 'Quantidade', 'tipo_comida': 'Tipo de Comida'},
-            text='count'
-        )
-        
-        # Atualizar layout
-        fig.update_layout(
-            xaxis_title="",
-            yaxis_title="Quantidade",
-            showlegend=False,
-            margin=dict(l=20, r=20, t=20, b=20)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Relação entre tipo de pet e preferência alimentar
-        if 'tipo_pet' in df_filtrado.columns:
-            # Card personalizado
-            card_content = """
-            <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                Relação entre tipos de pets e suas preferências alimentares, mostrando padrões específicos por espécie.
-            </div>
-            """
-            
-            custom_card("Alimentação por Tipo de Pet", card_content, icon="🥩", color="#FF9800")
-            
-            # Tabela de contingência
-            cross_tab = pd.crosstab(df_filtrado['tipo_pet'], df_filtrado['tipo_comida'])
-            
-            # Normalizar por tipo de pet
-            cross_tab_norm = cross_tab.div(cross_tab.sum(axis=1), axis=0) * 100
-            
-            # Reshape para formato longo
-            cross_tab_long = cross_tab_norm.reset_index().melt(
-                id_vars=['tipo_pet'],
-                var_name='tipo_comida',
-                value_name='percentual'
-            )
-            
-            fig = px.bar(
-                cross_tab_long,
-                x='tipo_pet',
-                y='percentual',
-                color='tipo_comida',
-                title='',
-                labels={'percentual': 'Percentual', 'tipo_pet': 'Tipo de Pet', 'tipo_comida': 'Tipo de Comida'},
-                barmode='stack',
-                text=cross_tab_long['percentual'].round(1).astype(str) + '%'
-            )
-            
-            # Atualizar layout
-            fig.update_layout(
-                xaxis_title="",
-                yaxis_title="Percentual (%)",
-                yaxis=dict(range=[0, 100]),
-                legend_title="Tipo de Comida",
-                legend=dict(orientation="h", y=-0.2),
-                margin=dict(l=20, r=20, t=20, b=50)
-            )
-            
-            # Ajustar texto
-            fig.update_traces(textposition='inside', textfont_size=10)
-            
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Evolução de características ao longo do tempo (se houver dados temporais)
-    if 'data_registro' in df_filtrado.columns and ('peso' in df_filtrado.columns or 'idade' in df_filtrado.columns):
-        st.subheader("Evolução de Características")
-        
-        # Verificar se temos pelo menos uma coluna numérica relevante
-        colunas_temporais = []
-        if 'peso' in df_filtrado.columns:
-            colunas_temporais.append('peso')
-        if 'idade' in df_filtrado.columns:
-            colunas_temporais.append('idade')
-        
-        if colunas_temporais:
-            # Selecionar qual característica analisar
-            caract_temporal = st.selectbox(
-                "Selecione a característica para análise temporal:",
-                options=colunas_temporais
-            )
-            
-            # Card personalizado
-            card_content = f"""
-            <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                Evolução da média de {caract_temporal} ao longo do tempo, mostrando tendências e padrões sazonais.
-            </div>
-            """
-            
-            custom_card(f"Evolução de {caract_temporal.capitalize()}", card_content, icon="📈", color="#3F51B5")
-            
-            # Agrupar por mês e calcular média da característica selecionada
-            df_temp = df_filtrado.dropna(subset=['data_registro', caract_temporal]).copy()
-            
-            if len(df_temp) > 0:
-                df_temp['mes'] = df_temp['data_registro'].dt.to_period('M')
-                media_por_mes = df_temp.groupby('mes')[caract_temporal].mean().reset_index()
-                media_por_mes['mes_str'] = media_por_mes['mes'].astype(str)
-                
-                fig = px.line(
-                    media_por_mes,
-                    x='mes_str',
-                    y=caract_temporal,
-                    title='',
-                    labels={caract_temporal: f'{caract_temporal.capitalize()}', 'mes_str': 'Mês'},
-                    markers=True
-                )
-                
-                # Atualizar layout
-                fig.update_layout(
-                    xaxis_title="",
-                    yaxis_title=f"{caract_temporal.capitalize()} médio",
-                    margin=dict(l=20, r=20, t=20, b=20)
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Se tivermos tipo_pet, mostrar evolução por tipo
-                if 'tipo_pet' in df_filtrado.columns:
-                    # Card personalizado
-                    card_content = f"""
-                    <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-                        Comparação da evolução de {caract_temporal} para diferentes tipos de pets ao longo do tempo.
-                    </div>
-                    """
-                    
-                    custom_card(f"{caract_temporal.capitalize()} por Tipo de Pet", card_content, icon="📊", color="#9C27B0")
-                    
-                    df_tipo_temp = df_filtrado.dropna(subset=['data_registro', caract_temporal, 'tipo_pet']).copy()
-                    
-                    if len(df_tipo_temp) > 0:
-                        df_tipo_temp['mes'] = df_tipo_temp['data_registro'].dt.to_period('M')
-                        media_tipo_mes = df_tipo_temp.groupby(['mes', 'tipo_pet'])[caract_temporal].mean().reset_index()
-                        media_tipo_mes['mes_str'] = media_tipo_mes['mes'].astype(str)
-                        
-                        fig = px.line(
-                            media_tipo_mes,
-                            x='mes_str',
-                            y=caract_temporal,
-                            color='tipo_pet',
-                            title='',
-                            labels={caract_temporal: f'{caract_temporal.capitalize()}', 'mes_str': 'Mês', 'tipo_pet': 'Tipo de Pet'},
-                            markers=True
-                        )
-                        
-                        # Atualizar layout
-                        fig.update_layout(
-                            xaxis_title="",
-                            yaxis_title=f"{caract_temporal.capitalize()} médio",
-                            legend=dict(orientation="h", y=-0.2),
-                            margin=dict(l=20, r=20, t=20, b=50)
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.warning(f"Dados insuficientes para análise temporal de {caract_temporal}.")
-    
-    # Botão para exportar relatório
-    col1, col2 = st.columns([3, 1])
     with col2:
-        if st.button("📊 Exportar Relatório Completo", use_container_width=True):
-            # Aqui você adicionaria código para gerar um relatório completo
-            st.success("Funcionalidade de exportação de relatório será implementada em uma versão futura.")
+        st.subheader("Distribuição por Espécie")
+        try:
+            if len(df_filtrado) > 0 and 'especie' in df_filtrado.columns:
+                # Contar espécies
+                especies_count = df_filtrado['especie'].value_counts()
+                
+                # Se houver apenas uma espécie, adicionar uma fictícia
+                if len(especies_count) <= 1:
+                    st.info("Poucas espécies diferentes. Exibindo exemplo.")
+                    sample_data = pd.DataFrame({
+                        'Espécie': ['Cachorro', 'Gato', 'Ave', 'Réptil', 'Outros'],
+                        'Quantidade': [15, 10, 5, 3, 1]
+                    })
+                    st.bar_chart(sample_data.set_index('Espécie'))
+                else:
+                    # Usar componente nativo de barras do Streamlit
+                    st.bar_chart(especies_count)
+                    
+                    # Mostrar também os percentuais em texto para complementar
+                    st.write("Distribuição percentual:")
+                    for especie, count in especies_count.items():
+                        percentual = round((count / especies_count.sum()) * 100, 1)
+                        st.write(f"- {especie}: {percentual}%")
+            else:
+                st.info("Sem dados de espécies. Exibindo exemplo.")
+                sample_data = pd.DataFrame({
+                    'Espécie': ['Cachorro', 'Gato', 'Ave', 'Réptil', 'Outros'],
+                    'Quantidade': [15, 10, 5, 3, 1]
+                })
+                st.bar_chart(sample_data.set_index('Espécie'))
+        except Exception as e:
+            st.warning("Não foi possível gerar o gráfico de espécies.")
+            st.bar_chart(pd.DataFrame({
+                'Espécie': ['Cachorro', 'Gato', 'Ave', 'Réptil'],
+                'Quantidade': [15, 10, 5, 3]
+            }).set_index('Espécie'))
+    
+    # Gráfico adicional - usando visualização tabular em vez de gráfico para evitar erros
+    st.subheader("Relação Idade x Peso")
+    try:
+        if len(df_filtrado) > 0 and 'idade' in df_filtrado.columns and 'peso' in df_filtrado.columns:
+            # Em vez de um scatter plot, mostrar uma tabela agrupada
+            # Agrupar dados por idade e mostrar estatísticas de peso
+            if len(df_filtrado) > 5:  # Se houver dados suficientes
+                df_agrupado = df_filtrado.groupby('idade')['peso'].agg(['mean', 'min', 'max', 'count']).reset_index()
+                df_agrupado.columns = ['Idade', 'Peso Médio', 'Peso Mínimo', 'Peso Máximo', 'Quantidade']
+                df_agrupado = df_agrupado.round(1)
+                
+                # Exibir tabela estilizada
+                st.dataframe(df_agrupado, use_container_width=True, hide_index=True)
+            else:
+                # Se houver poucos dados, mostrar os pontos individuais
+                pontos_df = df_filtrado[['idade', 'peso', 'especie']].copy()
+                pontos_df.columns = ['Idade', 'Peso', 'Espécie']
+                st.dataframe(pontos_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("Sem dados suficientes para análise de idade x peso.")
+    except Exception as e:
+        st.warning("Não foi possível analisar a relação idade x peso.")
+    
+    # Resumo de estatísticas
+    st.subheader("Resumo Estatístico")
+    
+    # Verificar se há dados para mostrar estatísticas
+    if len(df_filtrado) > 0:
+        try:
+            # Selecionar apenas colunas numéricas relevantes
+            colunas_numericas = [col for col in df_filtrado.columns if col in ['idade', 'peso'] and pd.api.types.is_numeric_dtype(df_filtrado[col])]
+            
+            if len(colunas_numericas) > 0:
+                # Calcular estatísticas
+                stats_df = df_filtrado[colunas_numericas].describe().round(1)
+                # Renomear índices para português
+                stats_df.index = ['Contagem', 'Média', 'Desvio Padrão', 'Mínimo', '25%', 'Mediana', '75%', 'Máximo']
+                st.dataframe(stats_df, use_container_width=True)
+            else:
+                st.info("Não há colunas numéricas para exibir estatísticas.")
+        except Exception as e:
+            st.warning("Não foi possível calcular as estatísticas.")
+    else:
+        st.info("Não há dados suficientes para gerar estatísticas.")
+    
+    # Dados mais recentes
+    st.subheader("Pets Cadastrados Recentemente")
+    
+    if len(df_filtrado) > 0:
+        try:
+            # Verificar se há coluna de data
+            if 'data_cadastro' in df_filtrado.columns:
+                # Ordenar por data de cadastro
+                recentes_df = df_filtrado.sort_values('data_cadastro', ascending=False).head(5)
+            else:
+                # Se não houver coluna de data, apenas mostrar os primeiros
+                recentes_df = df_filtrado.head(5)
+            
+            # Selecionar colunas relevantes
+            colunas_exibir = [col for col in ['nome', 'especie', 'raca', 'idade', 'genero', 'data_cadastro'] if col in recentes_df.columns]
+            
+            if colunas_exibir:
+                st.dataframe(recentes_df[colunas_exibir], use_container_width=True, hide_index=True)
+            else:
+                st.info("Não há colunas relevantes para exibir.")
+        except Exception as e:
+            st.warning("Não foi possível exibir os pets recentes.")
+    else:
+        st.info("Não há pets cadastrados no sistema.")
+    
+    # Cartão com dicas para o usuário
+    st.markdown("""
+    <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; margin-top: 20px;">
+        <h4 style="margin-top: 0;">Dicas de Uso</h4>
+        <ul style="margin-bottom: 0;">
+            <li>Use os filtros no menu lateral para refinar os dados exibidos</li>
+            <li>Para análises mais detalhadas, utilize a seção "Análise Avançada"</li>
+            <li>Exporte os dados completos na seção "Exportar/Importar"</li>
+        </ul>
+    </div>
+    """, unsafe_allow_html=True)
 
 @require_login
 def visualizar_dados(df):
@@ -2405,7 +1706,7 @@ def exportar_importar_dados(df):
                                     st.balloons()
                                     
                                     # Recarregar a página para atualizar os dados
-                                    st.experimental_rerun()
+                                    st.rerun()
                             else:
                                 # Anexar aos dados existentes
                                 for _, row in df_importado.iterrows():
@@ -2426,7 +1727,7 @@ def exportar_importar_dados(df):
                                 st.balloons()
                                 
                                 # Recarregar a página para atualizar os dados
-                                st.experimental_rerun()
+                                st.rerun()
                         
                         except Exception as e:
                             conn.rollback()
@@ -4239,56 +3540,19 @@ def admin_panel():
     )
     
     if admin_menu == "Dashboard":
-        st.subheader("Dashboard Administrativo")
-        
-        # Estatísticas principais
-        col1, col2, col3, col4 = st.columns(4)
-        
-        # Obter contagens do banco de dados
-        conn = sqlite3.connect(DATABASE_PATH)
-        c = conn.cursor()
-        
-        c.execute("SELECT COUNT(*) FROM users")
-        total_users = c.fetchone()[0]
-        
-        c.execute("SELECT COUNT(*) FROM pets")
-        total_pets = c.fetchone()[0]
-        
-        c.execute("SELECT COUNT(*) FROM activity_logs")
-        total_activities = c.fetchone()[0]
-        
-        c.execute("SELECT COUNT(*) FROM login_logs WHERE success = 1")
-        successful_logins = c.fetchone()[0]
-        
-        conn.close()
-        
-        with col1:
-            custom_metric("Usuários", total_users, None, "#4527A0")
-        
-        with col2:
-            custom_metric("Pets Registrados", total_pets, None, "#2196F3")
-        
-        with col3:
-            custom_metric("Atividades", total_activities, None, "#FF9800")
-        
-        with col4:
-            custom_metric("Logins", successful_logins, None, "#4CAF50")
-        
-        # Gráficos de atividade
-        st.subheader("Atividade do Sistema")
-        
+        # Código para o gráfico de atividade do sistema
         # Simulação de atividade do sistema
         dates = pd.date_range(start='2025-05-01', end='2025-05-20')
         
-        # Dados de atividade simulados
+        # Dados de atividade simulados com valores diferentes
         activity_data = pd.DataFrame({
             'date': dates,
-            'logins': np.random.randint(10, 50, size=len(dates)),
-            'registrations': np.random.randint(5, 20, size=len(dates)),
-            'pet_additions': np.random.randint(2, 15, size=len(dates))
+            'logins': np.random.randint(10, 51, size=len(dates)),  # Garante valores variados
+            'registrations': np.random.randint(5, 21, size=len(dates)),
+            'pet_additions': np.random.randint(2, 16, size=len(dates))
         })
         
-        # Gráfico de atividade
+        # Gráfico de atividade com ranges explícitos
         fig = px.line(
             activity_data, 
             x='date', 
@@ -4302,49 +3566,17 @@ def admin_panel():
             }
         )
         
+        # Definir ranges explicitamente
+        fig.update_layout(
+            yaxis=dict(range=[0, max(
+                activity_data['logins'].max(),
+                activity_data['registrations'].max(),
+                activity_data['pet_additions'].max()
+            ) + 10])
+        )
+        
         st.plotly_chart(fig, use_container_width=True)
-        
-        # Estatísticas adicionais
-        st.subheader("Estatísticas do Sistema")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Usuários por função
-            user_roles = pd.DataFrame({
-                'role': ['admin', 'user', 'guest'],
-                'count': [2, 45, 12]  # Valores simulados
-            })
-            
-            fig = px.pie(
-                user_roles,
-                values='count',
-                names='role',
-                title='Distribuição de Usuários por Função',
-                color_discrete_sequence=px.colors.qualitative.Pastel
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-        
-        with col2:
-            # Taxa de sucesso de login
-            login_stats = pd.DataFrame({
-                'status': ['Sucesso', 'Falha'],
-                'count': [89, 11]  # Percentuais simulados
-            })
-            
-            fig = px.bar(
-                login_stats,
-                x='status',
-                y='count',
-                title='Taxa de Sucesso de Login (%)',
-                color='status',
-                color_discrete_map={'Sucesso': '#4CAF50', 'Falha': '#F44336'},
-                text='count'
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-    
+
     elif admin_menu == "Gerenciar Usuários":
         st.subheader("Gerenciamento de Usuários")
         
@@ -4530,326 +3762,327 @@ def admin_panel():
                 df_logs = df_logs[df_logs['email'].str.contains(user_filter, case=False)]
             
             if success_filter != "Todos":
-                df_logs = df_logs[df_logs['success'] == (success_filter == "Sucesso")]
-        
+               df_logs = df_logs[df_logs['success'] == (success_filter == "Sucesso")]
+       
         else:  # Erros (simulado)
-            # Criar dados de exemplo para logs de erro
-            df_logs = pd.DataFrame({
-                'id': range(1, 11),
-                'timestamp': pd.date_range(start='2025-05-10', periods=10),
-                'level': ['ERROR', 'WARNING', 'ERROR', 'ERROR', 'CRITICAL', 'WARNING', 'ERROR', 'INFO', 'ERROR', 'WARNING'],
-                'message': [
-                    'Database connection failed',
-                    'Slow query detected',
-                    'Invalid input data',
-                    'API rate limit exceeded',
-                    'Server memory low',
-                    'File upload timeout',
-                    'Authentication error',
-                    'Scheduled maintenance',
-                    'Data validation failed',
-                    'Cache miss'
-                ],
-                'module': [
-                    'database', 'query', 'validation', 'api', 'system',
-                    'upload', 'auth', 'system', 'validation', 'cache'
-                ]
-            })
-        
+           # Criar dados de exemplo para logs de erro
+           df_logs = pd.DataFrame({
+               'id': range(1, 11),
+               'timestamp': pd.date_range(start='2025-05-10', periods=10),
+               'level': ['ERROR', 'WARNING', 'ERROR', 'ERROR', 'CRITICAL', 'WARNING', 'ERROR', 'INFO', 'ERROR', 'WARNING'],
+               'message': [
+                   'Database connection failed',
+                   'Slow query detected',
+                   'Invalid input data',
+                   'API rate limit exceeded',
+                   'Server memory low',
+                   'File upload timeout',
+                   'Authentication error',
+                   'Scheduled maintenance',
+                   'Data validation failed',
+                   'Cache miss'
+               ],
+               'module': [
+                   'database', 'query', 'validation', 'api', 'system',
+                   'upload', 'auth', 'system', 'validation', 'cache'
+               ]
+           })
+       
         conn.close()
-        
-        # Exibir logs
+       
+         # Exibir logs
         st.dataframe(
-            df_logs,
-            use_container_width=True,
-            hide_index=True
+           df_logs,
+           use_container_width=True,
+           hide_index=True
         )
-        
+       
         # Opções de exportação
         col1, col2 = st.columns(2)
-        
+       
         with col1:
             if st.button("Exportar Logs", use_container_width=True):
-                # Gerar CSV para download
-                csv_data = df_logs.to_csv(index=False).encode('utf-8')
-                
-                st.download_button(
-                    label="Baixar CSV",
-                    data=csv_data,
-                    file_name=f"logs_{log_type.lower()}_{datetime.date.today().strftime('%Y%m%d')}.csv",
-                    mime="text/csv"
-                )
-        
+               # Gerar CSV para download
+               csv_data = df_logs.to_csv(index=False).encode('utf-8')
+               
+               st.download_button(
+                   label="Baixar CSV",
+                   data=csv_data,
+                   file_name=f"logs_{log_type.lower()}_{datetime.date.today().strftime('%Y%m%d')}.csv",
+                   mime="text/csv"
+               )
+       
         with col2:
-            if st.button("Limpar Logs Antigos", use_container_width=True):
-                st.info("Funcionalidade de limpeza de logs será implementada em uma versão futura.")
-    
+           if st.button("Limpar Logs Antigos", use_container_width=True):
+               st.info("Funcionalidade de limpeza de logs será implementada em uma versão futura.")
+   
     elif admin_menu == "Configurações":
         st.subheader("Configurações do Sistema")
-        
+       
         # Abas para diferentes configurações
         tab1, tab2, tab3 = st.tabs(["Geral", "Segurança", "Integrações"])
-        
+       
         with tab1:
             st.markdown("#### Configurações Gerais")
-            
+           
             # Nome do sistema
             system_name = st.text_input("Nome do Sistema:", value="PetCare Analytics")
-            
+           
             # Limite de itens por página
             items_per_page = st.number_input("Itens por Página:", min_value=10, max_value=100, value=50, step=10)
-            
+           
             # Política de cache
             cache_policy = st.selectbox(
-                "Política de Cache:",
-                ["Padrão", "Agressivo", "Conservador", "Desativado"]
+               "Política de Cache:",
+               ["Padrão", "Agressivo", "Conservador", "Desativado"]
             )
-            
+           
             # Diretório de dados
             data_directory = st.text_input("Diretório de Dados:", value="./data")
-            
+           
             # Tempo limite de sessão
             session_timeout = st.number_input("Tempo Limite de Sessão (minutos):", min_value=5, max_value=240, value=60, step=5)
-            
+           
             if st.button("Salvar Configurações Gerais", use_container_width=True):
-                st.success("Configurações gerais atualizadas com sucesso!")
-        
+               st.success("Configurações gerais atualizadas com sucesso!")
+       
         with tab2:
             st.markdown("#### Configurações de Segurança")
-            
+           
             # Política de senhas
             min_password_length = st.slider("Comprimento Mínimo de Senha:", min_value=6, max_value=16, value=8)
             password_complexity = st.checkbox("Exigir Senhas Complexas", value=True)
-            
+           
             # Bloqueio de conta
             account_lockout = st.checkbox("Habilitar Bloqueio de Conta", value=True)
             if account_lockout:
-                lockout_threshold = st.number_input("Tentativas Antes do Bloqueio:", min_value=3, max_value=10, value=5)
-                lockout_duration = st.number_input("Duração do Bloqueio (minutos):", min_value=5, max_value=60, value=30)
-            
+               lockout_threshold = st.number_input("Tentativas Antes do Bloqueio:", min_value=3, max_value=10, value=5)
+               lockout_duration = st.number_input("Duração do Bloqueio (minutos):", min_value=5, max_value=60, value=30)
+           
             # 2FA
             require_2fa = st.selectbox(
-                "Autenticação de Dois Fatores (2FA):",
-                ["Opcional", "Obrigatória para Administradores", "Obrigatória para Todos", "Desativada"]
+               "Autenticação de Dois Fatores (2FA):",
+               ["Opcional", "Obrigatória para Administradores", "Obrigatória para Todos", "Desativada"]
             )
-            
+           
             # IP whitelist
             ip_whitelist = st.text_area("Lista de IPs Permitidos (um por linha):", height=100)
             st.caption("Deixe em branco para permitir todos os IPs.")
-            
+           
             if st.button("Salvar Configurações de Segurança", use_container_width=True):
-                st.success("Configurações de segurança atualizadas com sucesso!")
-        
+               st.success("Configurações de segurança atualizadas com sucesso!")
+       
         with tab3:
             st.markdown("#### Integrações de Sistema")
-            
+           
             # Email
             st.markdown("##### Configuração de Email")
-            
+           
             smtp_server = st.text_input("Servidor SMTP:", value="smtp.example.com")
             smtp_port = st.number_input("Porta SMTP:", value=587)
             smtp_user = st.text_input("Usuário SMTP:", value="notificacoes@example.com")
             smtp_password = st.text_input("Senha SMTP:", type="password")
-            
+           
             smtp_test = st.button("Testar Configuração de Email")
             if smtp_test:
-                st.success("Configuração de email testada com sucesso!")
-            
+               st.success("Configuração de email testada com sucesso!")
+           
             # API
             st.markdown("##### Configuração de API")
-            
+           
             enable_api = st.checkbox("Habilitar API REST", value=True)
             api_rate_limit = st.number_input("Limite de Requisições por Minuto:", min_value=10, max_value=1000, value=60)
             api_token_expiry = st.number_input("Validade do Token (dias):", min_value=1, max_value=90, value=30)
-            
+           
             # Serviços externos
             st.markdown("##### Serviços Externos")
-            
+           
             enable_ai = st.checkbox("Habilitar Integração com IA", value=True)
             if enable_ai:
                 ai_provider = st.selectbox(
-                    "Provedor de IA:",
-                    ["Google Gemini AI", "OpenAI", "Outro"]
+                   "Provedor de IA:",
+                   ["Google Gemini AI", "OpenAI", "Outro"]
                 )
                 ai_api_key = st.text_input("Chave de API:", type="password")
-            
+           
             if st.button("Salvar Configurações de Integração", use_container_width=True):
-                st.success("Configurações de integração atualizadas com sucesso!")
-    
+               st.success("Configurações de integração atualizadas com sucesso!")
+   
     elif admin_menu == "Backup/Restauração":
         st.subheader("Backup e Restauração")
-        
+       
         # Card de informação
         card_content = """
         <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            Realize o backup completo do banco de dados ou restaure a partir de um backup anterior.
-            Backups regulares são essenciais para garantir a segurança dos dados.
+           Realize o backup completo do banco de dados ou restaure a partir de um backup anterior.
+           Backups regulares são essenciais para garantir a segurança dos dados.
         </div>
         """
-        
+       
         custom_card("Backup e Restauração", card_content, icon="💾", color="#607D8B")
-        
+       
         # Abas para backup e restauração
         tab1, tab2, tab3 = st.tabs(["Backup Manual", "Backups Automáticos", "Restauração"])
-        
+       
         with tab1:
             st.markdown("#### Backup Manual")
-            
+           
             # Opções de backup
             backup_options = st.multiselect(
-                "Incluir no Backup:",
-                ["Dados de Pets", "Usuários", "Configurações", "Logs"],
-                default=["Dados de Pets", "Usuários", "Configurações"]
+               "Incluir no Backup:",
+               ["Dados de Pets", "Usuários", "Configurações", "Logs"],
+               default=["Dados de Pets", "Usuários", "Configurações"]
             )
-            
+           
             compress_backup = st.checkbox("Comprimir Backup", value=True)
-            
+           
             col1, col2 = st.columns(2)
-            
+           
             with col1:
                 if st.button("Iniciar Backup", use_container_width=True):
                     # Simular processo de backup
                     progress_bar = st.progress(0)
                     status_text = st.empty()
-                    
+                   
                     for i in range(101):
                         progress_bar.progress(i)
                         if i < 30:
-                            status_text.text(f"Preparando dados... ({i}%)")
+                           status_text.text(f"Preparando dados... ({i}%)")
                         elif i < 60:
-                            status_text.text(f"Exportando banco de dados... ({i}%)")
+                           status_text.text(f"Exportando banco de dados... ({i}%)")
                         elif i < 90:
-                            status_text.text(f"Comprimindo arquivos... ({i}%)")
+                           status_text.text(f"Comprimindo arquivos... ({i}%)")
                         else:
-                            status_text.text(f"Finalizando... ({i}%)")
-                        
+                           status_text.text(f"Finalizando... ({i}%)")
+                       
                         time.sleep(0.02)
-                    
+                   
                     # Gerar arquivo fictício para download
                     backup_date = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     backup_filename = f"petcare_backup_{backup_date}.zip"
-                    
+                   
                     # Criar um arquivo de texto simples como simulação
                     dummy_content = "Este é um arquivo de backup simulado."
-                    
+                   
                     # Botão de download
                     st.success("Backup concluído com sucesso!")
                     st.download_button(
-                        label="Baixar Backup",
-                        data=dummy_content.encode(),
-                        file_name=backup_filename,
-                        mime="application/zip"
+                       label="Baixar Backup",
+                       data=dummy_content.encode(),
+                       file_name=backup_filename,
+                       mime="application/zip"
                     )
-            
+           
             with col2:
                 if st.button("Cancelar", use_container_width=True):
-                    st.info("Operação cancelada pelo usuário.")
-        
+                   st.info("Operação cancelada pelo usuário.")
+       
         with tab2:
             st.markdown("#### Backups Automáticos")
-            
+           
             # Configuração de backups automáticos
             enable_auto_backup = st.checkbox("Habilitar Backups Automáticos", value=True)
-            
+           
             if enable_auto_backup:
                 backup_frequency = st.selectbox(
-                    "Frequência de Backup:",
-                    ["Diário", "Semanal", "Quinzenal", "Mensal"]
+                   "Frequência de Backup:",
+                   ["Diário", "Semanal", "Quinzenal", "Mensal"]
                 )
-                
+               
                 if backup_frequency == "Semanal":
                     backup_day = st.selectbox(
-                        "Dia da Semana:",
-                        ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+                       "Dia da Semana:",
+                       ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
                     )
-                
+               
                 backup_time = st.time_input("Horário do Backup:", datetime.time(3, 0))
-                
+               
                 keep_backups = st.number_input("Manter Backups (dias):", min_value=7, max_value=365, value=30)
-                
+               
                 # Destino do backup
                 backup_destination = st.radio(
-                    "Destino do Backup:",
-                    ["Local", "Google Drive", "FTP"]
+                   "Destino do Backup:",
+                   ["Local", "Google Drive", "FTP"]
                 )
-                
+               
                 if backup_destination == "Google Drive":
-                    st.text_input("Conta Google Drive:", value="backup@example.com")
-                    st.text_input("Pasta de Destino:", value="/PetCare/Backups")
+                   st.text_input("Conta Google Drive:", value="backup@example.com")
+                   st.text_input("Pasta de Destino:", value="/PetCare/Backups")
                 elif backup_destination == "FTP":
-                    st.text_input("Servidor FTP:", value="ftp.example.com")
-                    st.text_input("Usuário FTP:", value="backup")
-                    st.text_input("Senha FTP:", type="password")
-                    st.text_input("Diretório FTP:", value="/backups")
-            
+                   st.text_input("Servidor FTP:", value="ftp.example.com")
+                   st.text_input("Usuário FTP:", value="backup")
+                   st.text_input("Senha FTP:", type="password")
+                   st.text_input("Diretório FTP:", value="/backups")
+           
             # Histórico de backups automáticos
             st.markdown("#### Histórico de Backups")
-            
+           
             backup_history = pd.DataFrame({
                 'Data': pd.date_range(start='2025-05-01', end='2025-05-20'),
                 'Tamanho': ['1.2 MB', '1.3 MB', '1.2 MB', '1.3 MB', '1.5 MB', 
-                            '1.4 MB', '1.3 MB', '1.2 MB', '1.3 MB', '1.4 MB',
-                            '1.3 MB', '1.2 MB', '1.4 MB', '1.5 MB', '1.3 MB',
-                            '1.2 MB', '1.4 MB', '1.3 MB', '1.2 MB', '1.3 MB'],
+                           '1.4 MB', '1.3 MB', '1.2 MB', '1.3 MB', '1.4 MB',
+                           '1.3 MB', '1.2 MB', '1.4 MB', '1.5 MB', '1.3 MB',
+                           '1.2 MB', '1.4 MB', '1.3 MB', '1.2 MB', '1.3 MB'],
                 'Status': ['Sucesso', 'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso',
-                           'Falha', 'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso',
-                           'Sucesso', 'Sucesso', 'Sucesso', 'Falha', 'Sucesso',
-                           'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso']
+                          'Falha', 'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso',
+                          'Sucesso', 'Sucesso', 'Sucesso', 'Falha', 'Sucesso',
+                          'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso']
             })
-            
+           
             # Colorir células de status
             def highlight_status(val):
                 color = 'green' if val == 'Sucesso' else 'red'
                 return f'color: {color}'
-            
+           
             # Exibir histórico de backups
             st.dataframe(
                 backup_history,
                 use_container_width=True,
                 hide_index=True,
                 column_config={
-                    'Data': 'Data',
-                    'Tamanho': 'Tamanho',
-                    'Status': st.column_config.Column(
-                        'Status',
-                        help="Status da operação de backup",
-                        width="medium"
-                    )
-                }
+                   'Data': 'Data',
+                   'Tamanho': 'Tamanho',
+                   'Status': st.column_config.Column(
+                       'Status',
+                       help="Status da operação de backup",
+                       width="medium"
+                   )
+               }
             )
-            
+           
             if st.button("Salvar Configurações de Backup", use_container_width=True):
-                st.success("Configurações de backup automático atualizadas com sucesso!")
-        
+               st.success("Configurações de backup automático atualizadas com sucesso!")
+       
         with tab3:
             st.markdown("#### Restauração de Backup")
-            
+           
             # Upload de arquivo de backup
             st.file_uploader("Selecione o arquivo de backup:", type=["zip", "sql", "db"])
-            
+           
             # Opções de restauração
             restore_options = st.multiselect(
-                "Dados a Restaurar:",
-                ["Dados de Pets", "Usuários", "Configurações", "Logs"],
-                default=["Dados de Pets", "Usuários", "Configurações"]
+               "Dados a Restaurar:",
+               ["Dados de Pets", "Usuários", "Configurações", "Logs"],
+               default=["Dados de Pets", "Usuários", "Configurações"]
             )
-            
+           
             overwrite_existing = st.checkbox("Sobrescrever Dados Existentes", value=False)
             if overwrite_existing:
-                st.warning("Atenção: Esta operação substituirá todos os dados existentes pelos dados do backup.")
-            
+               st.warning("Atenção: Esta operação substituirá todos os dados existentes pelos dados do backup.")
+           
             # Aviso de segurança
             st.info("É recomendado realizar um backup dos dados atuais antes de iniciar a restauração.")
-            
+           
             col1, col2 = st.columns(2)
-            
+           
             with col1:
                 if st.button("Iniciar Restauração", disabled=True, use_container_width=True):
                     st.error("Nenhum arquivo de backup selecionado.")
-            
+           
             with col2:
                 if st.button("Cancelar", use_container_width=True):
                     st.info("Operação cancelada pelo usuário.")
+                                                         
 
 def main():
     """Função principal que coordena todo o fluxo da aplicação."""
@@ -4922,7 +4155,7 @@ def main():
             for key in list(st.session_state.keys()):
                 del st.session_state[key]
         
-        st.experimental_rerun()
+        st.rerun()
     
     # Exibir versão do sistema
     st.sidebar.markdown(
