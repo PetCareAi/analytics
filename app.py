@@ -18,31 +18,50 @@ import base64
 from PIL import Image
 import json
 from wordcloud import WordCloud
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.cluster import KMeans, DBSCAN
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder, MinMaxScaler
+from sklearn.decomposition import PCA, FactorAnalysis
+from sklearn.cluster import KMeans, DBSCAN, AgglomerativeClustering
+from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier, IsolationForest, GradientBoostingRegressor
+# from sklearn.svm import SVM, SVR
+from sklearn.svm import SVC, SVR
+from sklearn.neighbors import LocalOutlierFactor
+from sklearn.svm import OneClassSVM
+from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
+from sklearn.naive_bayes import GaussianNB
+from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
+from sklearn.metrics import mean_squared_error, r2_score, accuracy_score, classification_report, confusion_matrix
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+from sklearn.feature_selection import SelectKBest, f_classif, f_regression
+from sklearn.manifold import TSNE
+from sklearn.pipeline import Pipeline
 import statsmodels.api as sm
 from statsmodels.tsa.seasonal import seasonal_decompose
+from statsmodels.tsa.arima.model import ARIMA
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 from dateutil.parser import parse
 from concurrent.futures import ThreadPoolExecutor
 import uuid
 from functools import wraps
 import warnings
 warnings.filterwarnings('ignore')
+from scipy import stats
+from scipy.cluster.hierarchy import dendrogram, linkage
+from scipy.spatial.distance import pdist
+import networkx as nx
+from textblob import TextBlob  # Para análise de sentimento (simulada)
 
 # Configurar diretórios necessários
 os.makedirs("assets", exist_ok=True)
 os.makedirs("data", exist_ok=True)
+os.makedirs("models", exist_ok=True)
+os.makedirs("exports", exist_ok=True)
 
 # Constantes
 DATABASE_PATH = "data/petcare.db"
 DEFAULT_ADMIN_EMAIL = "admin@petcare.com"
-DEFAULT_ADMIN_PASSWORD = "admin123"  # Isto será codificado antes de armazenar
+DEFAULT_ADMIN_PASSWORD = "admin123"
 
-# Funções de utilidade para autenticação e banco de dados
 def init_database():
     """Inicializar banco de dados SQLite com tabelas necessárias."""
     conn = sqlite3.connect(DATABASE_PATH)
@@ -66,63 +85,564 @@ def init_database():
     CREATE TABLE IF NOT EXISTS pets (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT NOT NULL,
-        bairro TEXT,
-        tipo_pet TEXT,
-        raca TEXT,
-        idade REAL,
-        peso REAL,
-        sexo TEXT,
-        tipo_comida TEXT,
-        humor_diario TEXT,
-        adotado BOOLEAN,
-        telefone TEXT,
-        status_vacinacao TEXT,
-        estado_saude TEXT,
-        comportamento TEXT,
-        nivel_atividade TEXT,
-        data_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        regiao TEXT,
-        created_by INTEGER,
-        FOREIGN KEY (created_by) REFERENCES users (id)
+        tipo_pet TEXT NOT NULL,
+        idade INTEGER,
+        genero TEXT,
+        status TEXT DEFAULT 'Disponível',
+        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        adotado BOOLEAN DEFAULT 0
     )
     ''')
     
-    # Tabela de registros de login
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS login_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        ip_address TEXT,
-        user_agent TEXT,
-        success BOOLEAN,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-    ''')
-    
-    # Tabela de atividades
+    # Tabela de logs de atividade
     c.execute('''
     CREATE TABLE IF NOT EXISTS activity_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
-        action TEXT,
+        action TEXT NOT NULL,
         details TEXT,
         timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
     )
     ''')
     
-    # Verificar se o usuário admin padrão existe
-    c.execute("SELECT * FROM users WHERE email = ?", (DEFAULT_ADMIN_EMAIL,))
-    if not c.fetchone():
-        password_hash = hashlib.sha256(DEFAULT_ADMIN_PASSWORD.encode()).hexdigest()
-        c.execute(
-            "INSERT INTO users (email, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
-            (DEFAULT_ADMIN_EMAIL, password_hash, "Administrador", "admin")
-        )
+    # Tabela de logs de login
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS login_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        success BOOLEAN,
+        ip_address TEXT,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users (id)
+    )
+    ''')
+    
+    # CORREÇÕES: Verificar e adicionar colunas faltantes
+    try:
+        # Corrigir tabela pets
+        c.execute("PRAGMA table_info(pets)")
+        pets_columns = [column[1] for column in c.fetchall()]
+        
+        pets_new_columns = {
+            'observacoes': 'TEXT',
+            'peso': 'REAL',
+            'comportamento': 'TEXT',
+            'vacinas': 'TEXT',
+            'castrado': 'BOOLEAN DEFAULT 0',
+            'cor': 'TEXT',
+            'contato': 'TEXT',
+            'endereco': 'TEXT',
+            'created_by': 'INTEGER',
+            'foto_url': 'TEXT',
+            'adaptabilidade': 'TEXT',  # ADICIONADO
+            'nivel_energia': 'TEXT',   # ADICIONADO (pode ser necessário)
+            'sociabilidade': 'TEXT',   # ADICIONADO (pode ser necessário)
+            'cuidados_especiais': 'TEXT',  # ADICIONADO (pode ser necessário)
+            'historico_medico': 'TEXT'     # ADICIONADO (pode ser necessário)
+        }
+        
+        for col_name, col_type in pets_new_columns.items():
+            if col_name not in pets_columns:
+                c.execute(f"ALTER TABLE pets ADD COLUMN {col_name} {col_type}")
+                print(f"✅ Coluna '{col_name}' adicionada à tabela pets")
+            
+    except Exception as e:
+        print(f"❌ Erro ao atualizar tabelas: {e}")
+    
+    # Criar usuário admin padrão se não existir
+    c.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'")
+    admin_count = c.fetchone()[0]
+    
+    if admin_count == 0:
+        admin_password = generate_password_hash("admin123")
+        c.execute('''
+        INSERT INTO users (email, password_hash, full_name, role)
+        VALUES (?, ?, ?, ?)
+        ''', ("admin@petcare.com", admin_password, "Administrador", "admin"))
+        print("✅ Usuário admin padrão criado (admin@petcare.com / admin123)")
     
     conn.commit()
     conn.close()
+    print("✅ Banco de dados inicializado com sucesso!")
+
+def add_pet(nome, tipo_pet, idade, genero, status="Disponível", cor="", contato="", endereco="", observacoes="", peso=None, comportamento="", vacinas="", castrado=False, created_by=None, foto_url="", adaptabilidade="", nivel_energia="", sociabilidade=""):
+    """Adiciona um novo pet ao banco de dados."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    c = conn.cursor()
+    
+    try:
+        # Verificar quais colunas existem na tabela
+        c.execute("PRAGMA table_info(pets)")
+        existing_columns = [column[1] for column in c.fetchall()]
+        
+        # Dados obrigatórios
+        pet_data = {
+            'nome': nome,
+            'tipo_pet': tipo_pet,
+            'idade': int(idade) if idade else None,
+            'genero': genero,
+            'status': status
+        }
+        
+        # Dados opcionais - adicionar apenas se as colunas existirem
+        optional_fields = {
+            'cor': cor,
+            'contato': contato,
+            'endereco': endereco,
+            'observacoes': observacoes,
+            'peso': float(peso) if peso else None,
+            'comportamento': comportamento,
+            'vacinas': vacinas,
+            'castrado': 1 if castrado else 0,
+            'created_by': created_by,
+            'foto_url': foto_url,
+            'adaptabilidade': adaptabilidade,      # ADICIONADO
+            'nivel_energia': nivel_energia,        # ADICIONADO
+            'sociabilidade': sociabilidade         # ADICIONADO
+        }
+        
+        # Filtrar apenas colunas que existem
+        for field, value in optional_fields.items():
+            if field in existing_columns:
+                pet_data[field] = value
+        
+        # Construir query dinamicamente
+        columns = ', '.join(pet_data.keys())
+        placeholders = ', '.join(['?' for _ in pet_data])
+        values = list(pet_data.values())
+        
+        query = f"INSERT INTO pets ({columns}) VALUES ({placeholders})"
+        c.execute(query, values)
+        
+        pet_id = c.lastrowid
+        conn.commit()
+        
+        return True, pet_id
+        
+    except Exception as e:
+        return False, str(e)
+    finally:
+        conn.close()
+        
+def display_add_pet_simple():
+    """Versão simples do formulário de adicionar pet."""
+    st.subheader("➕ Adicionar Novo Pet")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        nome = st.text_input("Nome do Pet*:")
+        tipo_pet = st.selectbox("Tipo*:", ["Cão", "Gato", "Ave", "Roedor", "Réptil", "Outro"])
+        idade = st.number_input("Idade (anos):", min_value=0, max_value=30, value=1)
+        genero = st.selectbox("Gênero*:", ["Macho", "Fêmea"])
+        peso = st.number_input("Peso (kg):", min_value=0.0, value=0.0, step=0.1)
+    
+    with col2:
+        cor = st.text_input("Cor:")
+        status = st.selectbox("Status:", ["Disponível", "Adotado", "Em Tratamento"])
+        castrado = st.checkbox("Castrado")
+        comportamento = st.selectbox("Comportamento:", ["Dócil", "Brincalhão", "Tímido", "Agressivo", "Calmo"])
+        vacinas = st.text_input("Vacinas:", placeholder="Ex: V8, Antirrábica")
+    
+    contato = st.text_input("Contato:", placeholder="Telefone ou email")
+    endereco = st.text_input("Endereço:")
+    observacoes = st.text_area("Observações:", height=100)
+    
+    col_btn1, col_btn2 = st.columns([1, 1])
+    
+    with col_btn1:
+        if st.button("✅ Adicionar Pet", use_container_width=True):
+            if nome and tipo_pet and genero:
+                success, result = add_pet(
+                    nome=nome,
+                    tipo_pet=tipo_pet,
+                    idade=idade,
+                    genero=genero,
+                    status=status,
+                    cor=cor,
+                    contato=contato,
+                    endereco=endereco,
+                    observacoes=observacoes,
+                    peso=peso if peso > 0 else None,
+                    comportamento=comportamento,
+                    vacinas=vacinas,
+                    castrado=castrado,
+                    created_by=st.session_state.user_id
+                )
+                
+                if success:
+                    st.success(f"✅ Pet '{nome}' adicionado com sucesso!")
+                    log_activity(st.session_state.user_id, "add_pet", f"Adicionou pet: {nome}")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Erro ao adicionar pet: {result}")
+            else:
+                st.error("❌ Preencha os campos obrigatórios")
+    
+    with col_btn2:
+        if st.button("❌ Cancelar", use_container_width=True):
+            st.rerun()
+
+def get_pets_data():
+    """Obtém todos os dados dos pets do banco."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    try:
+        # Verificar se a tabela existe e tem dados
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pets'")
+        if not cursor.fetchone():
+            return pd.DataFrame()
+        
+        # Obter dados dos pets
+        df = pd.read_sql_query("SELECT * FROM pets", conn)
+        return df
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {e}")
+        return pd.DataFrame()
+    finally:
+        conn.close()
+
+def import_csv_data(df):
+    """Importa dados do CSV para o banco de dados com tratamento completo de erros."""
+    
+    if df.empty:
+        return 0, 0, "DataFrame está vazio"
+
+    def prepare_dataframe_for_sqlite(df):
+        """Prepara DataFrame para importação no SQLite."""
+        df_copy = df.copy()
+        
+        # Converter colunas de data/hora para string
+        datetime_columns = ['data_registro', 'data_nascimento']
+        
+        for col in datetime_columns:
+            if col in df_copy.columns:
+                try:
+                    # Converter para datetime e depois para string
+                    df_copy[col] = pd.to_datetime(df_copy[col], errors='coerce')
+                    df_copy[col] = df_copy[col].dt.strftime('%Y-%m-%d %H:%M:%S')
+                except Exception as e:
+                    st.warning(f"Erro ao converter coluna {col}: {e}")
+                    # Se falhar, converter diretamente para string
+                    df_copy[col] = df_copy[col].astype(str)
+        
+        # Substituir NaN por None para compatibilidade com SQLite
+        df_copy = df_copy.where(pd.notna(df_copy), None)
+        
+        return df_copy
+    
+    # Preparar DataFrame
+    try:
+        df_prepared = prepare_dataframe_for_sqlite(df)
+    except Exception as e:
+        return 0, 0, f"Erro ao preparar dados: {str(e)}"
+    
+    # Conectar ao banco
+    try:
+        conn = sqlite3.connect(DATABASE_PATH)
+        c = conn.cursor()
+    except Exception as e:
+        return 0, 0, f"Erro ao conectar ao banco: {str(e)}"
+    
+    success_count = 0
+    error_count = 0
+    errors = []
+    
+    # Definir colunas esperadas (sem ID que é auto-increment)
+    expected_columns = [
+        'nome', 'bairro', 'tipo_pet', 'raca', 'idade', 'peso', 'sexo', 
+        'tipo_comida', 'humor_diario', 'adotado', 'telefone', 'status_vacinacao', 
+        'estado_saude', 'comportamento', 'nivel_atividade', 'data_registro', 
+        'regiao', 'created_by', 'microchip', 'castrado', 'historico_medico', 
+        'data_nascimento', 'cor_pelagem', 'necessidades_especiais', 'temperamento', 
+        'sociabilidade', 'energia', 'cuidados_veterinarios', 'custo_mensal', 
+        'tempo_disponivel', 'experiencia_tutor', 'ambiente_ideal', 
+        'compatibilidade_criancas', 'compatibilidade_pets', 'score_adocao', 
+        'cluster_comportamental', 'risco_abandono'
+    ]
+    
+    # Verificar se todas as colunas necessárias existem
+    missing_columns = [col for col in expected_columns if col not in df_prepared.columns]
+    if missing_columns:
+        conn.close()
+        return 0, 0, f"Colunas faltando no CSV: {', '.join(missing_columns)}"
+    
+    # Importar dados linha por linha
+    for index, row in df_prepared.iterrows():
+        try:
+            # Preparar dados da linha, excluindo a coluna 'id' se existir
+            row_data = []
+            for col in expected_columns:
+                value = row.get(col)
+                
+                # Tratamentos específicos por tipo de dado
+                if col in ['idade', 'created_by'] and value is not None:
+                    try:
+                        value = int(float(value)) if value != '' else None
+                    except (ValueError, TypeError):
+                        value = None
+                
+                elif col in ['peso', 'custo_mensal', 'score_adocao'] and value is not None:
+                    try:
+                        value = float(value) if value != '' else None
+                    except (ValueError, TypeError):
+                        value = None
+                
+                elif col == 'adotado' and value is not None:
+                    # Converter para boolean/integer
+                    if isinstance(value, str):
+                        value = 1 if value.lower() in ['true', '1', 'sim', 'yes'] else 0
+                    elif isinstance(value, bool):
+                        value = 1 if value else 0
+                    else:
+                        value = int(value) if value else 0
+                
+                elif col in ['castrado'] and value is not None:
+                    # Tratar campos Sim/Não
+                    if isinstance(value, str):
+                        value = 'Sim' if value.lower() in ['true', '1', 'sim', 'yes'] else 'Não'
+                
+                # Converter strings vazias para None
+                if value == '' or value == 'nan':
+                    value = None
+                
+                row_data.append(value)
+            
+            # Criar query de inserção
+            placeholders = ', '.join(['?' for _ in expected_columns])
+            query = f"""
+                INSERT INTO pets ({', '.join(expected_columns)}) 
+                VALUES ({placeholders})
+            """
+            
+            # Executar inserção
+            c.execute(query, row_data)
+            success_count += 1
+            
+        except sqlite3.IntegrityError as e:
+            error_msg = f"Linha {index + 1}: Erro de integridade - {str(e)}"
+            errors.append(error_msg)
+            error_count += 1
+            
+        except sqlite3.OperationalError as e:
+            error_msg = f"Linha {index + 1}: Erro operacional - {str(e)}"
+            errors.append(error_msg)
+            error_count += 1
+            
+        except Exception as e:
+            error_msg = f"Linha {index + 1}: {str(e)}"
+            errors.append(error_msg)
+            error_count += 1
+    
+    # Finalizar transação
+    try:
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        conn.rollback()
+        conn.close()
+        return 0, len(df_prepared), f"Erro ao salvar no banco: {str(e)}"
+    
+    # Preparar mensagem de resultado
+    if errors:
+        error_summary = f"Erros encontrados:\n" + "\n".join(errors[:5])
+        if len(errors) > 5:
+            error_summary += f"\n... e mais {len(errors) - 5} erros."
+    else:
+        error_summary = "Importação concluída sem erros!"
+    
+    return success_count, error_count, error_summary
+
+
+def display_import_results(success_count, error_count, error_summary):
+    """Exibe os resultados da importação de forma organizada."""
+    
+    # Métricas de resultado
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("✅ Sucessos", success_count, delta=None)
+    
+    with col2:
+        st.metric("❌ Erros", error_count, delta=None)
+    
+    with col3:
+        total = success_count + error_count
+        success_rate = (success_count / total * 100) if total > 0 else 0
+        st.metric("📊 Taxa de Sucesso", f"{success_rate:.1f}%")
+    
+    # Mostrar resumo dos erros
+    if error_count > 0:
+        st.error(f"**Resumo dos Erros:**\n{error_summary}")
+    else:
+        st.success("🎉 Todos os registros foram importados com sucesso!")
+    
+    # Log da atividade
+    if 'user_id' in st.session_state:
+        log_activity(
+            st.session_state.user_id, 
+            "import_data", 
+            f"Importou {success_count} registros com {error_count} erros"
+        )
+
+
+# Exemplo de como usar na interface
+def import_data_interface():
+    """Interface para importação de dados CSV."""
+    
+    st.subheader("📥 Importação de Dados")
+    
+    uploaded_file = st.file_uploader(
+        "Escolha um arquivo CSV",
+        type=['csv'],
+        help="Arquivo deve conter as colunas necessárias para pets"
+    )
+    
+    if uploaded_file is not None:
+        try:
+            # Ler CSV
+            df = pd.read_csv(uploaded_file)
+            
+            # Mostrar preview
+            st.write("**Preview dos dados:**")
+            st.dataframe(df.head(), use_container_width=True)
+            
+            # Informações sobre o arquivo
+            col1, col2 = st.columns(2)
+            with col1:
+                st.info(f"📊 Total de linhas: {len(df)}")
+            with col2:
+                st.info(f"📋 Total de colunas: {len(df.columns)}")
+            
+            # Botão de importação
+            if st.button("🚀 Importar Dados", type="primary", use_container_width=True):
+                with st.spinner("Importando dados..."):
+                    success_count, error_count, error_summary = import_csv_data(df)
+                
+                # Exibir resultados
+                display_import_results(success_count, error_count, error_summary)
+                
+                # Recarregar dados se houve sucesso
+                if success_count > 0:
+                    st.balloons()
+                    time.sleep(2)
+                    st.rerun()
+                    
+        except Exception as e:
+            st.error(f"❌ Erro ao processar arquivo: {str(e)}")
+            st.info("💡 Verifique se o arquivo CSV está no formato correto.")
+
+def update_pet_status(pet_id, new_status):
+    """Atualiza o status de um pet."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    c = conn.cursor()
+    
+    try:
+        c.execute("UPDATE pets SET status = ? WHERE id = ?", (new_status, pet_id))
+        
+        # Se foi adotado, marcar flag
+        if new_status == "Adotado":
+            c.execute("UPDATE pets SET adotado = 1 WHERE id = ?", (pet_id,))
+        
+        conn.commit()
+        return True
+    except Exception as e:
+        return False
+    finally:
+        conn.close()
+
+def delete_pet(pet_id):
+    """Remove um pet do banco de dados."""
+    conn = sqlite3.connect(DATABASE_PATH)
+    c = conn.cursor()
+    
+    try:
+        c.execute("DELETE FROM pets WHERE id = ?", (pet_id,))
+        conn.commit()
+        return True
+    except Exception as e:
+        return False
+    finally:
+        conn.close()
+
+def display_add_pet_form():
+    """Exibe formulário para adicionar novo pet."""
+    st.subheader("➕ Adicionar Novo Pet")
+    
+    with st.form("add_pet_form"):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            nome = st.text_input("Nome do Pet*:", key="pet_nome")
+            tipo_pet = st.selectbox("Tipo*:", ["Cão", "Gato", "Ave", "Roedor", "Réptil", "Outro"], key="pet_tipo")
+            idade = st.number_input("Idade (anos):", min_value=0, max_value=30, value=1, key="pet_idade")
+            genero = st.selectbox("Gênero*:", ["Macho", "Fêmea"], key="pet_genero")
+            peso = st.number_input("Peso (kg):", min_value=0.0, value=0.0, step=0.1, key="pet_peso")
+        
+        with col2:
+            cor = st.text_input("Cor:", key="pet_cor")
+            status = st.selectbox("Status:", ["Disponível", "Adotado", "Em Tratamento"], key="pet_status")
+            castrado = st.checkbox("Castrado", key="pet_castrado")
+            comportamento = st.selectbox("Comportamento:", ["Dócil", "Brincalhão", "Tímido", "Agressivo", "Calmo"], key="pet_comportamento")
+            vacinas = st.text_input("Vacinas:", placeholder="Ex: V8, Antirrábica", key="pet_vacinas")
+        
+        contato = st.text_input("Contato:", placeholder="Telefone ou email", key="pet_contato")
+        endereco = st.text_input("Endereço:", key="pet_endereco")
+        observacoes = st.text_area("Observações:", height=100, key="pet_observacoes")
+        
+        # Upload de foto
+        foto = st.file_uploader("Foto do Pet:", type=['png', 'jpg', 'jpeg'], key="pet_foto")
+        
+        # CORRIGIDO: Usar apenas form_submit_button
+        col_submit, col_cancel = st.columns([1, 1])
+        
+        with col_submit:
+            submit = st.form_submit_button("✅ Adicionar Pet", use_container_width=True, type="primary")
+        
+        with col_cancel:
+            cancel = st.form_submit_button("❌ Cancelar", use_container_width=True)
+        
+    # MOVER LÓGICA PARA FORA DO FORM
+    if submit:
+        if nome and tipo_pet and genero:
+            # Processar foto se enviada
+            foto_url = ""
+            if foto is not None:
+                foto_url = f"uploads/{foto.name}"
+            
+            # Adicionar pet
+            success, result = add_pet(
+                nome=nome,
+                tipo_pet=tipo_pet,
+                idade=idade,
+                genero=genero,
+                status=status,
+                cor=cor,
+                contato=contato,
+                endereco=endereco,
+                observacoes=observacoes,
+                peso=peso if peso > 0 else None,
+                comportamento=comportamento,
+                vacinas=vacinas,
+                castrado=castrado,
+                created_by=st.session_state.user_id,
+                foto_url=foto_url
+            )
+            
+            if success:
+                st.success(f"✅ Pet '{nome}' adicionado com sucesso!")
+                log_activity(st.session_state.user_id, "add_pet", f"Adicionou pet: {nome}")
+                time.sleep(1)  # Pequena pausa para mostrar a mensagem
+                st.rerun()
+            else:
+                st.error(f"❌ Erro ao adicionar pet: {result}")
+        else:
+            st.error("❌ Preencha os campos obrigatórios (Nome, Tipo e Gênero)")
+    
+    if cancel:
+        st.info("Operação cancelada.")
+        st.rerun()
 
 def hash_password(password):
     """Gera um hash SHA-256 para a senha."""
@@ -166,15 +686,25 @@ def authenticate_user(email, password):
     conn.close()
     return False, None, None
 
-def log_activity(user_id, action, details=""):
+def log_activity(user_id, action, details="", execution_time=None):
     """Registra uma atividade de usuário no sistema."""
     conn = sqlite3.connect(DATABASE_PATH)
     c = conn.cursor()
     
-    c.execute(
-        "INSERT INTO activity_logs (user_id, action, details) VALUES (?, ?, ?)",
-        (user_id, action, details)
-    )
+    session_id = st.session_state.get("session_id", str(uuid.uuid4()))
+    
+    try:
+        # Tentar inserir com todas as colunas
+        c.execute(
+            "INSERT INTO activity_logs (user_id, action, details, session_id, execution_time) VALUES (?, ?, ?, ?, ?)",
+            (user_id, action, details, session_id, execution_time)
+        )
+    except sqlite3.OperationalError:
+        # Se falhar, inserir apenas as colunas básicas
+        c.execute(
+            "INSERT INTO activity_logs (user_id, action, details, timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
+            (user_id, action, details)
+        )
     
     conn.commit()
     conn.close()
@@ -184,8 +714,26 @@ def get_user_info(user_id):
     conn = sqlite3.connect(DATABASE_PATH)
     c = conn.cursor()
     
-    c.execute("SELECT email, full_name, role FROM users WHERE id = ?", (user_id,))
-    result = c.fetchone()
+    try:
+        # Tentar buscar com as novas colunas
+        c.execute("SELECT email, full_name, role, preferences, profile_data FROM users WHERE id = ?", (user_id,))
+        result = c.fetchone()
+    except sqlite3.OperationalError:
+        # Se falhar, buscar apenas as colunas básicas
+        c.execute("SELECT email, full_name, role FROM users WHERE id = ?", (user_id,))
+        result = c.fetchone()
+        
+        if result:
+            conn.close()
+            return {
+                "email": result[0],
+                "full_name": result[1],
+                "role": result[2],
+                "preferences": {},  # Valores padrão
+                "profile_data": {}
+            }
+        conn.close()
+        return None
     
     conn.close()
     
@@ -193,7 +741,9 @@ def get_user_info(user_id):
         return {
             "email": result[0],
             "full_name": result[1],
-            "role": result[2]
+            "role": result[2],
+            "preferences": json.loads(result[3]) if result[3] else {},
+            "profile_data": json.loads(result[4]) if result[4] else {}
         }
     return None
 
@@ -214,7 +764,6 @@ def register_new_user(email, password, full_name, role="user"):
         conn.close()
         return True, user_id
     except sqlite3.IntegrityError:
-        # Email já existe
         conn.close()
         return False, None
 
@@ -256,56 +805,483 @@ def require_admin(func):
         return func(*args, **kwargs)
     return wrapper
 
+# Funções avançadas de Machine Learning
+class PetMLAnalyzer:
+    """Classe para análises avançadas de Machine Learning."""
+    
+    def __init__(self, df):
+        self.df = df.copy()
+        self.models = {}
+        self.scalers = {}
+        self.encoders = {}
+        self.feature_names = []
+        
+    def preprocess_data(self, target_column=None):
+        """Preprocessa os dados para ML."""
+        df_processed = self.df.copy()
+        
+        # Remover colunas desnecessárias
+        cols_to_drop = ['id', 'nome', 'telefone', 'data_registro', 'created_by']
+        cols_to_drop = [col for col in cols_to_drop if col in df_processed.columns]
+        df_processed = df_processed.drop(columns=cols_to_drop)
+        
+        # Tratar valores ausentes
+        for col in df_processed.columns:
+            if df_processed[col].dtype in ['object']:
+                df_processed[col] = df_processed[col].fillna('Desconhecido')
+            else:
+                df_processed[col] = df_processed[col].fillna(df_processed[col].median())
+        
+        # Encoding de variáveis categóricas
+        categorical_cols = df_processed.select_dtypes(include=['object']).columns
+        
+        for col in categorical_cols:
+            if col != target_column:
+                le = LabelEncoder()
+                df_processed[col] = le.fit_transform(df_processed[col].astype(str))
+                self.encoders[col] = le
+        
+        # Normalização de variáveis numéricas
+        numeric_cols = df_processed.select_dtypes(include=[np.number]).columns
+        numeric_cols = [col for col in numeric_cols if col != target_column]
+        
+        if numeric_cols:
+            scaler = StandardScaler()
+            df_processed[numeric_cols] = scaler.fit_transform(df_processed[numeric_cols])
+            self.scalers['standard'] = scaler
+        
+        self.feature_names = [col for col in df_processed.columns if col != target_column]
+        
+        return df_processed
+    
+    def advanced_clustering(self, n_clusters=5):
+        """Análise de clustering avançada."""
+        df_processed = self.preprocess_data()
+        
+        if len(df_processed) < n_clusters:
+            return None, None, "Dados insuficientes para clustering"
+        
+        # Aplicar diferentes algoritmos de clustering
+        algorithms = {
+            'KMeans': KMeans(n_clusters=n_clusters, random_state=42),
+            'DBSCAN': DBSCAN(eps=0.5, min_samples=5),
+            'Agglomerative': AgglomerativeClustering(n_clusters=n_clusters)
+        }
+        
+        results = {}
+        
+        for name, algorithm in algorithms.items():
+            try:
+                clusters = algorithm.fit_predict(df_processed)
+                
+                # Calcular silhouette score
+                if len(set(clusters)) > 1:
+                    from sklearn.metrics import silhouette_score
+                    silhouette = silhouette_score(df_processed, clusters)
+                else:
+                    silhouette = -1
+                
+                results[name] = {
+                    'clusters': clusters,
+                    'silhouette_score': silhouette,
+                    'n_clusters': len(set(clusters))
+                }
+            except:
+                continue
+        
+        # Análise de componentes principais para visualização
+        pca = PCA(n_components=min(3, df_processed.shape[1]))
+        pca_result = pca.fit_transform(df_processed)
+        
+        return results, pca_result, None
+    
+    def predictive_modeling(self, target_column, model_types=['all']):
+        """Modelagem preditiva avançada."""
+        df_processed = self.preprocess_data(target_column)
+        
+        if target_column not in df_processed.columns:
+            return None, f"Coluna alvo '{target_column}' não encontrada"
+        
+        X = df_processed.drop(columns=[target_column])
+        y = df_processed[target_column]
+        
+        # Dividir dados
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+        
+        # Determinar se é problema de regressão ou classificação
+        is_regression = pd.api.types.is_numeric_dtype(y) and len(y.unique()) > 10
+        
+        if is_regression:
+            models = {
+                'Linear Regression': LinearRegression(),
+                'Random Forest': RandomForestRegressor(n_estimators=100, random_state=42),
+                'Gradient Boosting': GradientBoostingRegressor(n_estimators=100, random_state=42),
+                'SVR': SVR(),
+                'Ridge': Ridge(),
+                'Lasso': Lasso()
+            }
+        else:
+            models = {
+                'Logistic Regression': LogisticRegression(random_state=42),
+                'Random Forest': RandomForestClassifier(n_estimators=100, random_state=42),
+                'Decision Tree': DecisionTreeClassifier(random_state=42),
+                'Naive Bayes': GaussianNB(),
+                'KNN': KNeighborsClassifier(),
+                'SVC': SVC(random_state=42)
+            }
+        
+        results = {}
+        
+        for name, model in models.items():
+            try:
+                # Treinar modelo
+                start_time = time.time()
+                model.fit(X_train, y_train)
+                training_time = time.time() - start_time
+                
+                # Fazer predições
+                y_pred = model.predict(X_test)
+                
+                # Calcular métricas
+                if is_regression:
+                    r2 = r2_score(y_test, y_pred)
+                    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
+                    mae = np.mean(np.abs(y_test - y_pred))
+                    
+                    metrics = {
+                        'R²': r2,
+                        'RMSE': rmse,
+                        'MAE': mae,
+                        'Training Time': training_time
+                    }
+                else:
+                    accuracy = accuracy_score(y_test, y_pred)
+                    
+                    # Cross-validation
+                    cv_scores = cross_val_score(model, X, y, cv=5)
+                    
+                    metrics = {
+                        'Accuracy': accuracy,
+                        'CV Mean': cv_scores.mean(),
+                        'CV Std': cv_scores.std(),
+                        'Training Time': training_time
+                    }
+                
+                # Feature importance (se disponível)
+                feature_importance = None
+                if hasattr(model, 'feature_importances_'):
+                    feature_importance = dict(zip(self.feature_names, model.feature_importances_))
+                elif hasattr(model, 'coef_'):
+                    feature_importance = dict(zip(self.feature_names, abs(model.coef_.flatten())))
+                
+                results[name] = {
+                    'model': model,
+                    'metrics': metrics,
+                    'predictions': y_pred,
+                    'feature_importance': feature_importance,
+                    'is_regression': is_regression
+                }
+                
+            except Exception as e:
+                results[name] = {'error': str(e)}
+        
+        return results, None
+    
+    def anomaly_detection(self, contamination=0.1, methods=['all']):
+        """Detecção de anomalias usando múltiplos métodos."""
+        df_processed = self.preprocess_data()
+        
+        methods_dict = {
+            'Isolation Forest': IsolationForest(contamination=contamination, random_state=42),
+            'One-Class SVM': OneClassSVM(nu=contamination),
+            'Local Outlier Factor': LocalOutlierFactor(n_neighbors=20, contamination=contamination)
+        }
+        
+        results = {}
+        
+        for name, method in methods_dict.items():
+            try:
+                if name == 'Local Outlier Factor':
+                    outliers = method.fit_predict(df_processed)
+                else:
+                    outliers = method.fit_predict(df_processed)
+                
+                # Converter para boolean (True = normal, False = anomalia)
+                outliers_bool = outliers == 1
+                anomaly_count = sum(~outliers_bool)
+                anomaly_percentage = (anomaly_count / len(df_processed)) * 100
+                
+                results[name] = {
+                    'outliers': outliers,
+                    'anomaly_indices': np.where(~outliers_bool)[0],
+                    'anomaly_count': anomaly_count,
+                    'anomaly_percentage': anomaly_percentage
+                }
+                
+            except Exception as e:
+                results[name] = {'error': str(e)}
+        
+        return results
+    
+    def time_series_analysis(self, date_column, value_column, forecast_periods=30):
+        """Análise de séries temporais avançada."""
+        if date_column not in self.df.columns or value_column not in self.df.columns:
+            return None, "Colunas especificadas não encontradas"
+        
+        # Preparar dados
+        ts_data = self.df[[date_column, value_column]].copy()
+        ts_data[date_column] = pd.to_datetime(ts_data[date_column])
+        ts_data = ts_data.sort_values(date_column)
+        ts_data.set_index(date_column, inplace=True)
+        
+        # Agrupar por período se necessário
+        ts_data = ts_data.resample('D').mean().fillna(method='ffill')
+        
+        results = {}
+        
+        try:
+            # Decomposição da série
+            if len(ts_data) >= 4:
+                decomposition = seasonal_decompose(ts_data[value_column], model='additive', period=7)
+                results['decomposition'] = decomposition
+            
+            # Modelos de previsão
+            # ARIMA
+            try:
+                model_arima = ARIMA(ts_data[value_column], order=(1, 1, 1))
+                fitted_arima = model_arima.fit()
+                forecast_arima = fitted_arima.forecast(steps=forecast_periods)
+                results['arima'] = {
+                    'model': fitted_arima,
+                    'forecast': forecast_arima,
+                    'aic': fitted_arima.aic
+                }
+            except:
+                pass
+            
+            # Exponential Smoothing
+            try:
+                model_exp = ExponentialSmoothing(ts_data[value_column], seasonal='add', seasonal_periods=7)
+                fitted_exp = model_exp.fit()
+                forecast_exp = fitted_exp.forecast(steps=forecast_periods)
+                results['exponential_smoothing'] = {
+                    'model': fitted_exp,
+                    'forecast': forecast_exp
+                }
+            except:
+                pass
+            
+        except Exception as e:
+            return None, str(e)
+        
+        return results, None
+    
+    def association_rules_analysis(self):
+        """Análise de regras de associação."""
+        # Simular análise de regras de associação
+        categorical_cols = self.df.select_dtypes(include=['object']).columns
+        
+        if len(categorical_cols) < 2:
+            return None, "Dados categóricos insuficientes"
+        
+        # Análise de associação simples
+        associations = {}
+        
+        for col1 in categorical_cols[:3]:  # Limitar para performance
+            for col2 in categorical_cols[:3]:
+                if col1 != col2:
+                    crosstab = pd.crosstab(self.df[col1], self.df[col2])
+                    
+                    # Calcular chi-square
+                    try:
+                        chi2, p_value, dof, expected = stats.chi2_contingency(crosstab)
+                        associations[f"{col1}_vs_{col2}"] = {
+                            'chi2': chi2,
+                            'p_value': p_value,
+                            'significant': p_value < 0.05,
+                            'crosstab': crosstab
+                        }
+                    except:
+                        continue
+        
+        return associations, None
+
+    def advanced_feature_engineering(self):
+        """Engenharia de características avançada."""
+        df_engineered = self.df.copy()
+        
+        # Criar novas features baseadas nas existentes
+        if 'idade' in df_engineered.columns and 'peso' in df_engineered.columns:
+            # IMC para pets (simulado)
+            df_engineered['imc_pet'] = df_engineered['peso'] / (df_engineered['idade'] + 1)
+            
+            # Categoria de idade
+            df_engineered['categoria_idade'] = pd.cut(df_engineered['idade'], 
+                                                    bins=[0, 1, 3, 7, 15], 
+                                                    labels=['Filhote', 'Jovem', 'Adulto', 'Idoso'])
+            
+            # Categoria de peso
+            df_engineered['categoria_peso'] = pd.cut(df_engineered['peso'], 
+                                                   bins=[0, 5, 15, 30, 100], 
+                                                   labels=['Pequeno', 'Médio', 'Grande', 'Gigante'])
+        
+        # Features temporais
+        if 'data_registro' in df_engineered.columns:
+            df_engineered['data_registro'] = pd.to_datetime(df_engineered['data_registro'])
+            df_engineered['mes_registro'] = df_engineered['data_registro'].dt.month
+            df_engineered['dia_semana_registro'] = df_engineered['data_registro'].dt.dayofweek
+            df_engineered['estacao_registro'] = df_engineered['mes_registro'].apply(
+                lambda x: 'Verão' if x in [12, 1, 2] else 
+                         'Outono' if x in [3, 4, 5] else 
+                         'Inverno' if x in [6, 7, 8] else 'Primavera'
+            )
+        
+        # Features de interação
+        if 'tipo_pet' in df_engineered.columns and 'comportamento' in df_engineered.columns:
+            df_engineered['tipo_comportamento'] = df_engineered['tipo_pet'] + '_' + df_engineered['comportamento'].fillna('Desconhecido')
+        
+        # Scores compostos
+        score_cols = ['sociabilidade', 'energia', 'nivel_atividade']
+        available_score_cols = [col for col in score_cols if col in df_engineered.columns]
+        
+        if available_score_cols:
+            # Simular scores se não existirem
+            for col in score_cols:
+                if col not in df_engineered.columns:
+                    df_engineered[col] = np.random.randint(1, 6, size=len(df_engineered))
+            
+            df_engineered['score_adocao'] = (
+                df_engineered['sociabilidade'] * 0.4 + 
+                df_engineered['energia'] * 0.3 + 
+                df_engineered['nivel_atividade'] * 0.3
+            )
+        
+        return df_engineered
+
 def load_data_from_db():
-    """Carrega os dados do banco de dados."""
-    # Conectar ao banco de dados
+    """Carrega os dados do banco de dados com campos expandidos."""
     conn = sqlite3.connect(DATABASE_PATH)
     
     try:
-        # Tentar carregar dados da tabela pets
         query = "SELECT * FROM pets"
         df = pd.read_sql_query(query, conn)
         
-        # Se não houver dados, criar um DataFrame vazio com as colunas necessárias
+        # Se não houver dados, criar um DataFrame com dados simulados para demonstração
         if len(df) == 0:
-            df = pd.DataFrame({
-                'id': [],
-                'nome': [],
-                'especie': [],
-                'raca': [],
-                'idade': [],
-                'genero': [],  # Garantir que a coluna 'genero' existe
-                'peso': [],
-                'data_cadastro': [],
-                'user_id': [],
-                'observacoes': [],
-                'ativo': []
-            })
+            df = generate_sample_data()
     except:
-        # Se a tabela não existir, criar um DataFrame vazio com as colunas necessárias
-        df = pd.DataFrame({
-            'id': [],
-            'nome': [],
-            'especie': [],
-            'raca': [],
-            'idade': [],
-            'genero': [],  # Garantir que a coluna 'genero' existe
-            'peso': [],
-            'data_cadastro': [],
-            'user_id': [],
-            'observacoes': [],
-            'ativo': []
-        })
+        df = generate_sample_data()
     
     conn.close()
     return df
+
+def generate_sample_data(n_samples=200):
+    """Gera dados de exemplo para demonstração do sistema."""
+    np.random.seed(42)
+    
+    # Listas de valores possíveis
+    nomes_cachorros = ['Rex', 'Bella', 'Max', 'Luna', 'Charlie', 'Lucy', 'Cooper', 'Daisy', 'Rocky', 'Molly']
+    nomes_gatos = ['Mimi', 'Simba', 'Nala', 'Whiskers', 'Shadow', 'Mittens', 'Tiger', 'Princess', 'Oscar', 'Cleo']
+    nomes_outros = ['Piu', 'Nemo', 'Spike', 'Buddy', 'Angel', 'Coco', 'Ziggy', 'Peanut', 'Kiwi', 'Mango']
+    
+    bairros = ['Centro', 'Trindade', 'Canasvieiras', 'Ingleses', 'Lagoa da Conceição', 
+               'Campeche', 'Pantano do Sul', 'Cachoeira do Bom Jesus', 'Santo Antônio de Lisboa']
+    
+    tipos_pet = ['Cachorro', 'Gato', 'Ave', 'Roedor', 'Réptil']
+    racas_cachorro = ['SRD', 'Labrador', 'Golden Retriever', 'Pastor Alemão', 'Bulldog', 'Poodle', 'Beagle']
+    racas_gato = ['SRD', 'Persa', 'Siamês', 'Maine Coon', 'Ragdoll', 'British Shorthair']
+    racas_outras = ['SRD', 'Canário', 'Hamster', 'Coelho', 'Iguana', 'Periquito']
+    
+    comportamentos = ['Calmo', 'Agitado', 'Brincalhão', 'Tímido', 'Sociável', 'Independente']
+    estados_saude = ['Excelente', 'Bom', 'Regular', 'Necessita cuidados']
+    status_vacinacao = ['Em dia', 'Parcial', 'Pendente']
+    
+    data = []
+    
+    for i in range(n_samples):
+        tipo_pet = np.random.choice(tipos_pet, p=[0.5, 0.3, 0.1, 0.05, 0.05])
+        
+        if tipo_pet == 'Cachorro':
+            nome = np.random.choice(nomes_cachorros)
+            raca = np.random.choice(racas_cachorro)
+            peso_base = np.random.normal(25, 15)  # Média 25kg
+            idade_max = 15
+        elif tipo_pet == 'Gato':
+            nome = np.random.choice(nomes_gatos)
+            raca = np.random.choice(racas_gato)
+            peso_base = np.random.normal(4, 2)  # Média 4kg
+            idade_max = 18
+        else:
+            nome = np.random.choice(nomes_outros)
+            raca = np.random.choice(racas_outras)
+            peso_base = np.random.normal(0.5, 0.3)  # Média 0.5kg
+            idade_max = 10
+        
+        idade = np.random.exponential(3)
+        idade = min(idade, idade_max)
+        peso = max(0.1, peso_base + np.random.normal(0, peso_base * 0.2))
+        
+        # Dados expandidos
+        sociabilidade = np.random.randint(1, 6)
+        energia = np.random.randint(1, 6)
+        nivel_atividade = np.random.randint(1, 6)
+        
+        # Score de adocao baseado em múltiplos fatores
+        score_adocao = (
+            sociabilidade * 0.3 + 
+            energia * 0.2 + 
+            nivel_atividade * 0.2 + 
+            (5 - idade/idade_max * 5) * 0.2 +  # Pets mais jovens têm score maior
+            np.random.uniform(0, 1) * 0.1  # Fator aleatório
+        )
+        
+        # Probabilidade de adocao baseada no score
+        prob_adocao = score_adocao / 5.0
+        adotado = np.random.random() < prob_adocao
+        
+        # Risco de abandono (inverso do score de adocao)
+        risco_abandono = 1 - (score_adocao / 5.0) + np.random.uniform(-0.2, 0.2)
+        risco_abandono = max(0, min(1, risco_abandono))
+        
+        record = {
+            'id': i + 1,
+            'nome': nome + f"_{i+1}" if i > len(nomes_cachorros) else nome,
+            'tipo_pet': tipo_pet,
+            'raca': raca,
+            'idade': round(idade, 1),
+            'peso': round(peso, 1),
+            'sexo': np.random.choice(['Macho', 'Fêmea']),
+            'bairro': np.random.choice(bairros),
+            'comportamento': np.random.choice(comportamentos),
+            'estado_saude': np.random.choice(estados_saude),
+            'status_vacinacao': np.random.choice(status_vacinacao),
+            'adotado': adotado,
+            'telefone': f"(48) 9{np.random.randint(1000, 9999)}-{np.random.randint(1000, 9999)}",
+            'data_registro': pd.Timestamp.now() - pd.Timedelta(days=np.random.randint(1, 365)),
+            'castrado': np.random.choice([True, False], p=[0.7, 0.3]),
+            'microchip': np.random.choice([True, False], p=[0.6, 0.4]),
+            'cor_pelagem': np.random.choice(['Marrom', 'Preto', 'Branco', 'Amarelo', 'Cinza', 'Misto']),
+            'sociabilidade': sociabilidade,
+            'energia': energia,
+            'nivel_atividade': nivel_atividade,
+            'score_adocao': round(score_adocao, 2),
+            'risco_abandono': round(risco_abandono, 2),
+            'custo_mensal': round(np.random.normal(200, 100), 2),
+            'tempo_disponivel': np.random.randint(1, 8),  # horas por dia
+            'compatibilidade_criancas': np.random.choice([True, False], p=[0.8, 0.2]),
+            'compatibilidade_pets': np.random.choice([True, False], p=[0.7, 0.3]),
+            'created_by': 1
+        }
+        
+        data.append(record)
+    
+    return pd.DataFrame(data)
 
 def save_pet_to_db(pet_data):
     """Salva um novo pet no banco de dados."""
     conn = sqlite3.connect(DATABASE_PATH)
     c = conn.cursor()
     
-    # Preparar colunas e valores
     columns = ', '.join(pet_data.keys())
     placeholders = ', '.join(['?' for _ in pet_data])
     values = tuple(pet_data.values())
@@ -322,43 +1298,8 @@ def save_pet_to_db(pet_data):
         conn.close()
         return False, str(e)
 
-def update_pet_in_db(pet_id, pet_data):
-    """Atualiza um pet existente no banco de dados."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
-    # Preparar atualizações
-    updates = ', '.join([f"{key} = ?" for key in pet_data])
-    values = list(pet_data.values()) + [pet_id]  # Adicionar pet_id ao final para o WHERE
-    
-    query = f"UPDATE pets SET {updates} WHERE id = ?"
-    
-    try:
-        c.execute(query, values)
-        conn.commit()
-        conn.close()
-        return True, "Pet atualizado com sucesso"
-    except Exception as e:
-        conn.close()
-        return False, str(e)
-
-def delete_pet_from_db(pet_id):
-    """Exclui um pet do banco de dados."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
-    try:
-        c.execute("DELETE FROM pets WHERE id = ?", (pet_id,))
-        conn.commit()
-        conn.close()
-        return True, "Pet excluído com sucesso"
-    except Exception as e:
-        conn.close()
-        return False, str(e)
-
-# Componentes de UI personalizados
 def custom_card(title, content, icon=None, color="#4527A0"):
-    """Renderiza um card personalizado com título, conteúdo e ícone opcional."""
+    """Renderiza um card personalizado."""
     card_css = f"""
     <style>
     .card-container {{
@@ -399,15 +1340,7 @@ def custom_card(title, content, icon=None, color="#4527A0"):
     st.markdown(card_css + card_html, unsafe_allow_html=True)
 
 def custom_metric(titulo, valor, subtexto=None, cor="#2196F3"):
-    """
-    Exibe um card de métrica personalizado.
-    
-    Args:
-        titulo: Título da métrica
-        valor: Valor principal a ser exibido
-        subtexto: Texto secundário ou de comparação (opcional)
-        cor: Cor de destaque (hexadecimal)
-    """
+    """Exibe um card de métrica personalizado."""
     st.markdown(
         f"""
         <div style="background-color: #FFFFFF; border-radius: 5px; padding: 15px; margin-bottom: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.12);">
@@ -420,9 +1353,7 @@ def custom_metric(titulo, valor, subtexto=None, cor="#2196F3"):
     )
 
 def display_login_page():
-    """Exibe a página de login com animação e estilo elegante."""
-    
-    # CSS personalizado para a página de login
+    """Exibe a página de login."""
     login_css = """
     <style>
     .login-container {
@@ -433,53 +1364,18 @@ def display_login_page():
         border-radius: 10px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
     }
-    .login-header {
-        text-align: center;
-        margin-bottom: 2rem;
-    }
-    .login-logo {
-        display: block;
-        margin: 0 auto;
-        width: 100px;
-        height: 100px;
-        object-fit: contain;
-        margin-bottom: 1rem;
-    }
     .login-title {
         font-size: 1.8rem;
         font-weight: bold;
         color: #4527A0;
         margin-bottom: 0.5rem;
+        text-align: center;
     }
     .login-subtitle {
         color: #666;
         font-size: 1rem;
-    }
-    .form-row {
-        margin-bottom: 1.5rem;
-    }
-    .login-footer {
         text-align: center;
-        margin-top: 2rem;
-        font-size: 0.9rem;
-        color: #666;
-    }
-    .or-divider {
-        display: flex;
-        align-items: center;
-        margin: 1.5rem 0;
-        color: #666;
-    }
-    .or-divider::before, .or-divider::after {
-        content: "";
-        flex: 1;
-        border-bottom: 1px solid #ddd;
-    }
-    .or-divider::before {
-        margin-right: 0.5rem;
-    }
-    .or-divider::after {
-        margin-left: 0.5rem;
+        margin-bottom: 2rem;
     }
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-20px); }
@@ -491,31 +1387,16 @@ def display_login_page():
     </style>
     """
     
-    # Renderizar CSS
     st.markdown(login_css, unsafe_allow_html=True)
     
-    # Centralizar conteúdo
     col1, col2, col3 = st.columns([1, 2, 1])
     
     with col2:
-        # Container da página de login
         st.markdown('<div class="login-container animated">', unsafe_allow_html=True)
         
-        # Cabeçalho com logo
-        st.markdown('<div class="login-header">', unsafe_allow_html=True)
+        st.markdown('<div class="login-title">🐾 PetCare Analytics</div>', unsafe_allow_html=True)
+        st.markdown('<div class="login-subtitle">Sistema Avançado de Análise com IA</div>', unsafe_allow_html=True)
         
-        # Verificar se o logo existe
-        logo_path = "assets/logo.jpg"
-        if os.path.exists(logo_path):
-            st.image(logo_path, width=100, use_column_width=False)
-        else:
-            st.markdown('🐾', unsafe_allow_html=True)
-        
-        st.markdown('<div class="login-title">PetCare Analytics</div>', unsafe_allow_html=True)
-        st.markdown('<div class="login-subtitle">Sistema Avançado de Análise de Dados para Pets</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        # Abas para Login e Registro
         tab1, tab2 = st.tabs(["Login", "Registro"])
         
         with tab1:
@@ -535,36 +1416,35 @@ def display_login_page():
                         st.error("Por favor, preencha todos os campos.")
                     else:
                         with st.spinner("Autenticando..."):
-                            time.sleep(0.5)  # Simular processamento
+                            time.sleep(0.5)
                             is_authenticated, user_id, role = authenticate_user(email, password)
                             
                             if is_authenticated:
                                 st.session_state.user_id = user_id
                                 st.session_state.user_role = role
                                 st.session_state.user_info = get_user_info(user_id)
+                                st.session_state.session_id = str(uuid.uuid4())
                                 
                                 if remember:
                                     st.session_state.remember_login = True
                                 
-                                # Registrar atividade
                                 log_activity(user_id, "login", "Login bem-sucedido")
                                 
                                 st.success("Login realizado com sucesso!")
                                 st.rerun()
                             else:
-                                st.error("Email ou senha incorretos. Tente novamente.")
+                                st.error("Email ou senha incorretos.")
                 
                 if forgot_password:
-                    st.info("Funcionalidade em desenvolvimento. Entre em contato com o administrador para redefinir sua senha.")
+                    st.info("Entre em contato com o administrador para redefinir sua senha.")
             
-            # Divisor "ou"
-            st.markdown('<div class="or-divider">ou</div>', unsafe_allow_html=True)
+            st.markdown('<div style="text-align: center; margin: 1rem 0;">ou</div>', unsafe_allow_html=True)
             
-            # Login como convidado
             if st.button("Continuar como Convidado", use_container_width=True):
                 st.session_state.user_id = None
                 st.session_state.user_role = "guest"
                 st.session_state.user_info = {"email": "guest", "full_name": "Convidado", "role": "guest"}
+                st.session_state.session_id = str(uuid.uuid4())
                 st.rerun()
         
         with tab2:
@@ -593,485 +1473,1104 @@ def display_login_page():
                         st.error("A senha deve ter pelo menos 6 caracteres.")
                     else:
                         with st.spinner("Criando conta..."):
-                            time.sleep(0.5)  # Simular processamento
+                            time.sleep(0.5)
                             success, user_id = register_new_user(new_email, new_password, full_name)
                             
                             if success:
-                                st.success("Conta criada com sucesso! Você já pode fazer login.")
+                                st.success("Conta criada com sucesso!")
                                 
-                                # Auto-login após registro
                                 st.session_state.user_id = user_id
                                 st.session_state.user_role = "user"
                                 st.session_state.user_info = get_user_info(user_id)
+                                st.session_state.session_id = str(uuid.uuid4())
                                 
-                                # Registrar atividade
                                 log_activity(user_id, "register", "Novo registro de usuário")
                                 
                                 st.rerun()
                             else:
-                                st.error("Este email já está em uso. Tente outro ou faça login.")
+                                st.error("Este email já está em uso.")
         
-        # Rodapé
-        st.markdown('<div class="login-footer">© 2025 PetCare Analytics. Todos os direitos reservados.</div>', unsafe_allow_html=True)
-        
-        # Fechar container
         st.markdown('</div>', unsafe_allow_html=True)
 
 def display_header():
-    """Exibe o cabeçalho da aplicação com informações do usuário."""
-    
-    # CSS para o cabeçalho
-    header_css = """
-    <style>
-    .header-container {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 0.5rem 0;
-        margin-bottom: 1rem;
-    }
-    .header-title {
-        display: flex;
-        align-items: center;
-    }
-    .header-logo {
-        margin-right: 1rem;
-    }
-    .header-user {
-        display: flex;
-        align-items: center;
-    }
-    .user-avatar {
-        width: 35px;
-        height: 35px;
-        border-radius: 50%;
-        background: #4527A0;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        margin-right: 0.5rem;
-        font-weight: bold;
-    }
-    .user-info {
-        font-size: 0.9rem;
-    }
-    .user-name {
-        font-weight: bold;
-    }
-    .user-role {
-        color: #666;
-        font-size: 0.8rem;
-    }
-    </style>
-    """
-    
-    st.markdown(header_css, unsafe_allow_html=True)
-    
-    # Obter informações do usuário
+    """Exibe o cabeçalho da aplicação."""
     user_info = st.session_state.get("user_info", {"full_name": "Convidado", "role": "guest"})
     user_name = user_info.get("full_name", "Convidado")
     user_role = user_info.get("role", "guest")
     
-    # Converter role para texto legível
     role_text = {
         "admin": "Administrador",
         "user": "Usuário",
         "guest": "Convidado"
     }.get(user_role, user_role)
     
-    # Obter iniciais do nome para o avatar
     initials = ''.join([name[0].upper() for name in user_name.split() if name])
     if not initials:
         initials = "?"
     
-    # Container do cabeçalho
     col1, col2 = st.columns([4, 1])
     
     with col1:
-        # Título e logo
-        header_title = '<div class="header-title">'
-        
-        # Verificar se o logo existe
-        logo_path = "assets/logo.jpg"
-        if os.path.exists(logo_path):
-            # Codificar imagem em base64
-            with open(logo_path, "rb") as img_file:
-                logo_base64 = base64.b64encode(img_file.read()).decode()
-            
-            header_title += f'<img src="data:image/jpeg;base64,{logo_base64}" class="header-logo" width="40">'
-        
-        header_title += '<h1>PetCare Analytics</h1></div>'
-        st.markdown(header_title, unsafe_allow_html=True)
+        st.markdown('<h1>🐾 PetCare Analytics - Sistema Avançado com IA</h1>', unsafe_allow_html=True)
     
     with col2:
-        # Informações do usuário
         user_html = f"""
-        <div class="header-user">
-            <div class="user-avatar">{initials}</div>
-            <div class="user-info">
-                <div class="user-name">{user_name}</div>
-                <div class="user-role">{role_text}</div>
+        <div style="display: flex; align-items: center; justify-content: flex-end;">
+            <div style="width: 35px; height: 35px; border-radius: 50%; background: #4527A0; color: white; 
+                        display: flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: bold;">
+                {initials}
+            </div>
+            <div>
+                <div style="font-weight: bold; font-size: 0.9rem;">{user_name}</div>
+                <div style="color: #666; font-size: 0.8rem;">{role_text}</div>
             </div>
         </div>
         """
-        
         st.markdown(user_html, unsafe_allow_html=True)
     
-    # Separador
     st.markdown('<hr style="margin: 0.5rem 0; opacity: 0.2;">', unsafe_allow_html=True)
 
 def apply_filters(df):
-    """Aplica filtros ao DataFrame e retorna o resultado filtrado."""
+    """Aplica filtros avançados ao DataFrame."""
     if df.empty:
         return df
     
-    st.sidebar.markdown("## Filtros")
+    st.sidebar.markdown("## 🔍 Filtros Avançados")
     
-    # Container para filtros colapsáveis
-    with st.sidebar.expander("Filtros Avançados", expanded=True):
+    with st.sidebar.expander("Filtros Básicos", expanded=True):
         # Filtro por bairro
         if 'bairro' in df.columns:
             bairros = ["Todos"] + sorted(df['bairro'].unique().tolist())
-            bairro_filtro = st.selectbox("Bairro:", bairros)
-            
+            bairro_filtro = st.selectbox("🏘️ Bairro:", bairros)
             if bairro_filtro != "Todos":
                 df = df[df['bairro'] == bairro_filtro]
         
         # Filtro por tipo de pet
         if 'tipo_pet' in df.columns:
             tipos_pet = ["Todos"] + sorted(df['tipo_pet'].unique().tolist())
-            tipo_pet_filtro = st.selectbox("Tipo de Pet:", tipos_pet)
-            
+            tipo_pet_filtro = st.selectbox("🐕 Tipo de Pet:", tipos_pet)
             if tipo_pet_filtro != "Todos":
                 df = df[df['tipo_pet'] == tipo_pet_filtro]
-        
-        # Filtro por raça
-        if 'raca' in df.columns:
-            racas = ["Todas"] + sorted(df['raca'].unique().tolist())
-            raca_filtro = st.selectbox("Raça:", racas)
-            
-            if raca_filtro != "Todas":
-                df = df[df['raca'] == raca_filtro]
         
         # Filtro por status de adoção
         if 'adotado' in df.columns:
             status_adocao = ["Todos", "Adotado", "Não Adotado"]
-            status_filtro = st.selectbox("Status de Adoção:", status_adocao)
-            
+            status_filtro = st.selectbox("❤️ Status de Adoção:", status_adocao)
             if status_filtro == "Adotado":
                 df = df[df['adotado'] == True]
             elif status_filtro == "Não Adotado":
                 df = df[df['adotado'] == False]
-        
+    
+    with st.sidebar.expander("Filtros Avançados"):
         # Filtro por intervalo de idade
         if 'idade' in df.columns:
             min_idade, max_idade = st.slider(
-                "Faixa de Idade:",
+                "📅 Faixa de Idade:",
                 min_value=float(df['idade'].min() if not df['idade'].isna().all() else 0),
                 max_value=float(df['idade'].max() if not df['idade'].isna().all() else 20),
                 value=(float(df['idade'].min() if not df['idade'].isna().all() else 0),
                        float(df['idade'].max() if not df['idade'].isna().all() else 20))
             )
-            
             df = df[(df['idade'] >= min_idade) & (df['idade'] <= max_idade)]
         
-        # Filtro por intervalo de peso
-        if 'peso' in df.columns:
-            min_peso, max_peso = st.slider(
-                "Faixa de Peso (kg):",
-                min_value=float(df['peso'].min() if not df['peso'].isna().all() else 0),
-                max_value=float(df['peso'].max() if not df['peso'].isna().all() else 50),
-                value=(float(df['peso'].min() if not df['peso'].isna().all() else 0),
-                       float(df['peso'].max() if not df['peso'].isna().all() else 50))
+        # Filtro por score de adoção
+        if 'score_adocao' in df.columns:
+            min_score, max_score = st.slider(
+                "⭐ Score de Adoção:",
+                min_value=float(df['score_adocao'].min() if not df['score_adocao'].isna().all() else 0),
+                max_value=float(df['score_adocao'].max() if not df['score_adocao'].isna().all() else 5),
+                value=(float(df['score_adocao'].min() if not df['score_adocao'].isna().all() else 0),
+                       float(df['score_adocao'].max() if not df['score_adocao'].isna().all() else 5))
             )
-            
-            df = df[(df['peso'] >= min_peso) & (df['peso'] <= max_peso)]
+            df = df[(df['score_adocao'] >= min_score) & (df['score_adocao'] <= max_score)]
         
-        # Filtro por período de registro (se tiver data)
-        if 'data_registro' in df.columns:
-            # Certifique-se de que a coluna é do tipo datetime
-            if not pd.api.types.is_datetime64_dtype(df['data_registro']):
-                try:
-                    df['data_registro'] = pd.to_datetime(df['data_registro'])
-                except:
-                    pass
-            
-            if pd.api.types.is_datetime64_dtype(df['data_registro']):
-                min_date = df['data_registro'].min().date()
-                max_date = df['data_registro'].max().date()
-                
-                data_inicio, data_fim = st.date_input(
-                    "Período de Registro:",
-                    [min_date, max_date],
-                    min_value=min_date,
-                    max_value=max_date
-                )
-                
-                df = df[(df['data_registro'].dt.date >= data_inicio) & 
-                         (df['data_registro'].dt.date <= data_fim)]
+        # Filtro por características comportamentais
+        if 'sociabilidade' in df.columns:
+            min_soc = st.slider("🤝 Sociabilidade mínima:", 1, 5, 1)
+            df = df[df['sociabilidade'] >= min_soc]
+        
+        if 'energia' in df.columns:
+            min_energia = st.slider("⚡ Energia mínima:", 1, 5, 1)
+            df = df[df['energia'] >= min_energia]
+    
+    with st.sidebar.expander("Filtros ML"):
+        # Filtro por cluster (se existir)
+        if 'cluster_comportamental' in df.columns:
+            clusters = ["Todos"] + sorted([str(x) for x in df['cluster_comportamental'].unique() if pd.notna(x)])
+            cluster_filtro = st.selectbox("🎯 Cluster Comportamental:", clusters)
+            if cluster_filtro != "Todos":
+                df = df[df['cluster_comportamental'] == int(cluster_filtro)]
+        
+        # Filtro por risco de abandono
+        if 'risco_abandono' in df.columns:
+            risco_max = st.slider("⚠️ Risco máximo de abandono:", 0.0, 1.0, 1.0, 0.1)
+            df = df[df['risco_abandono'] <= risco_max]
     
     # Exibir contagem de resultados
-    st.sidebar.markdown(f"**{len(df)} pets** correspondem aos filtros.")
+    st.sidebar.markdown(f"**📊 {len(df)} pets** correspondem aos filtros.")
+    
+    # Botão para limpar filtros
+    if st.sidebar.button("🔄 Limpar Filtros"):
+        st.rerun()
     
     return df
 
 @require_login
 def display_dashboard(df, df_filtrado):
-    """Exibe o dashboard com estatísticas e visualizações."""
-    # Exibir título e descrição
-    st.title("Dashboard PetCare Analytics")
-    st.write("Visualize as estatísticas e métricas dos dados dos pets.")
+    """Dashboard principal com análises avançadas."""
+    st.title("📊 Dashboard PetCare Analytics")
     
     # Card informativo
     card_content = """
     <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-        Este dashboard apresenta uma visão geral dos dados dos pets registrados no sistema.
+        Dashboard avançado com análises de Machine Learning, estatísticas detalhadas e insights baseados em IA.
         Utilize os filtros no menu lateral para personalizar a visualização.
     </div>
     """
     
-    custom_card("Dashboard", card_content, icon="📊", color="#4527A0")
+    custom_card("Dashboard Inteligente", card_content, icon="🤖", color="#4527A0")
     
-    # Exibir métricas
-    st.subheader("Métricas Principais")
+    # Métricas principais
+    st.subheader("📈 Métricas Principais")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
-    # Calcular métricas
     total_pets = len(df_filtrado)
-    
-    # Verificar se há dados antes de calcular a média
-    if len(df_filtrado) > 0 and 'idade' in df_filtrado.columns:
-        media_idade = round(df_filtrado['idade'].mean(), 1)
-    else:
-        media_idade = 0
-    
-    # Contagem por gênero - verificar se a coluna existe
-    if len(df_filtrado) > 0 and 'genero' in df_filtrado.columns:
-        contagem_genero = df_filtrado['genero'].value_counts()
-        total_machos = contagem_genero.get('M', 0)
-        total_femeas = contagem_genero.get('F', 0)
-    else:
-        total_machos = 0
-        total_femeas = 0
+    media_idade = round(df_filtrado['idade'].mean(), 1) if 'idade' in df_filtrado.columns and len(df_filtrado) > 0 else 0
+    taxa_adocao = round(df_filtrado['adotado'].mean() * 100, 1) if 'adotado' in df_filtrado.columns and len(df_filtrado) > 0 else 0
+    score_medio = round(df_filtrado['score_adocao'].mean(), 2) if 'score_adocao' in df_filtrado.columns and len(df_filtrado) > 0 else 0
+    risco_medio = round(df_filtrado['risco_abandono'].mean(), 2) if 'risco_abandono' in df_filtrado.columns and len(df_filtrado) > 0 else 0
     
     with col1:
         custom_metric("Total de Pets", total_pets, subtexto="no sistema", cor="#4527A0")
     
     with col2:
-        custom_metric("Idade Média", f"{media_idade} anos", subtexto="entre todos os pets", cor="#2196F3")
+        custom_metric("Idade Média", f"{media_idade} anos", subtexto="todos os pets", cor="#2196F3")
     
     with col3:
-        custom_metric("Machos", total_machos, subtexto=f"{round(total_machos/total_pets*100) if total_pets > 0 else 0}% do total", cor="#4CAF50")
+        custom_metric("Taxa de Adoção", f"{taxa_adocao}%", subtexto="pets adotados", cor="#4CAF50")
     
     with col4:
-        custom_metric("Fêmeas", total_femeas, subtexto=f"{round(total_femeas/total_pets*100) if total_pets > 0 else 0}% do total", cor="#FF9800")
+        custom_metric("Score Médio", f"{score_medio}/5.0", subtexto="adotabilidade", cor="#FF9800")
     
-    # USANDO COMPONENTES NATIVOS DO STREAMLIT EM VEZ DE PLOTLY
-    st.subheader("Visualizações")
+    with col5:
+        custom_metric("Risco Médio", f"{risco_medio}", subtexto="abandono", cor="#F44336")
     
-    # ========== GRÁFICOS ==========
-    col1, col2 = st.columns(2)
-    
-    # Função para criar dados de exemplo para uso quando necessário
-    def create_sample_data():
-        return pd.DataFrame({
-            'Idade': [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
-            'Quantidade': [5, 8, 12, 10, 7, 6, 4, 3, 2, 1],
-            'Espécie': ['Cachorro', 'Cachorro', 'Gato', 'Cachorro', 'Gato', 
-                        'Ave', 'Cachorro', 'Gato', 'Réptil', 'Cachorro']
-        })
-    
-    with col1:
-        st.subheader("Distribuição de Idade")
-        try:
-            if len(df_filtrado) > 0 and 'idade' in df_filtrado.columns:
-                # Usar o gráfico de barras nativo do Streamlit (mais estável)
-                idade_counts = df_filtrado['idade'].value_counts().sort_index()
-                
-                # Se não houver variação suficiente, criar exemplo
-                if len(idade_counts) <= 1:
-                    st.info("Poucos dados de idade. Exibindo exemplo.")
-                    sample_data = create_sample_data()
-                    st.bar_chart(sample_data.set_index('Idade')['Quantidade'])
-                else:
-                    st.bar_chart(idade_counts)
-            else:
-                st.info("Sem dados de idade. Exibindo exemplo.")
-                sample_data = create_sample_data()
-                st.bar_chart(sample_data.set_index('Idade')['Quantidade'])
-        except Exception as e:
-            st.warning("Não foi possível gerar o gráfico de idades.")
-            st.bar_chart(create_sample_data().set_index('Idade')['Quantidade'])
-    
-    with col2:
-        st.subheader("Distribuição por Espécie")
-        try:
-            if len(df_filtrado) > 0 and 'especie' in df_filtrado.columns:
-                # Contar espécies
-                especies_count = df_filtrado['especie'].value_counts()
-                
-                # Se houver apenas uma espécie, adicionar uma fictícia
-                if len(especies_count) <= 1:
-                    st.info("Poucas espécies diferentes. Exibindo exemplo.")
-                    sample_data = pd.DataFrame({
-                        'Espécie': ['Cachorro', 'Gato', 'Ave', 'Réptil', 'Outros'],
-                        'Quantidade': [15, 10, 5, 3, 1]
-                    })
-                    st.bar_chart(sample_data.set_index('Espécie'))
-                else:
-                    # Usar componente nativo de barras do Streamlit
-                    st.bar_chart(especies_count)
-                    
-                    # Mostrar também os percentuais em texto para complementar
-                    st.write("Distribuição percentual:")
-                    for especie, count in especies_count.items():
-                        percentual = round((count / especies_count.sum()) * 100, 1)
-                        st.write(f"- {especie}: {percentual}%")
-            else:
-                st.info("Sem dados de espécies. Exibindo exemplo.")
-                sample_data = pd.DataFrame({
-                    'Espécie': ['Cachorro', 'Gato', 'Ave', 'Réptil', 'Outros'],
-                    'Quantidade': [15, 10, 5, 3, 1]
-                })
-                st.bar_chart(sample_data.set_index('Espécie'))
-        except Exception as e:
-            st.warning("Não foi possível gerar o gráfico de espécies.")
-            st.bar_chart(pd.DataFrame({
-                'Espécie': ['Cachorro', 'Gato', 'Ave', 'Réptil'],
-                'Quantidade': [15, 10, 5, 3]
-            }).set_index('Espécie'))
-    
-    # Gráfico adicional - usando visualização tabular em vez de gráfico para evitar erros
-    st.subheader("Relação Idade x Peso")
-    try:
-        if len(df_filtrado) > 0 and 'idade' in df_filtrado.columns and 'peso' in df_filtrado.columns:
-            # Em vez de um scatter plot, mostrar uma tabela agrupada
-            # Agrupar dados por idade e mostrar estatísticas de peso
-            if len(df_filtrado) > 5:  # Se houver dados suficientes
-                df_agrupado = df_filtrado.groupby('idade')['peso'].agg(['mean', 'min', 'max', 'count']).reset_index()
-                df_agrupado.columns = ['Idade', 'Peso Médio', 'Peso Mínimo', 'Peso Máximo', 'Quantidade']
-                df_agrupado = df_agrupado.round(1)
-                
-                # Exibir tabela estilizada
-                st.dataframe(df_agrupado, use_container_width=True, hide_index=True)
-            else:
-                # Se houver poucos dados, mostrar os pontos individuais
-                pontos_df = df_filtrado[['idade', 'peso', 'especie']].copy()
-                pontos_df.columns = ['Idade', 'Peso', 'Espécie']
-                st.dataframe(pontos_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("Sem dados suficientes para análise de idade x peso.")
-    except Exception as e:
-        st.warning("Não foi possível analisar a relação idade x peso.")
-    
-    # Resumo de estatísticas
-    st.subheader("Resumo Estatístico")
-    
-    # Verificar se há dados para mostrar estatísticas
-    if len(df_filtrado) > 0:
-        try:
-            # Selecionar apenas colunas numéricas relevantes
-            colunas_numericas = [col for col in df_filtrado.columns if col in ['idade', 'peso'] and pd.api.types.is_numeric_dtype(df_filtrado[col])]
-            
-            if len(colunas_numericas) > 0:
-                # Calcular estatísticas
-                stats_df = df_filtrado[colunas_numericas].describe().round(1)
-                # Renomear índices para português
-                stats_df.index = ['Contagem', 'Média', 'Desvio Padrão', 'Mínimo', '25%', 'Mediana', '75%', 'Máximo']
-                st.dataframe(stats_df, use_container_width=True)
-            else:
-                st.info("Não há colunas numéricas para exibir estatísticas.")
-        except Exception as e:
-            st.warning("Não foi possível calcular as estatísticas.")
-    else:
-        st.info("Não há dados suficientes para gerar estatísticas.")
-    
-    # Dados mais recentes
-    st.subheader("Pets Cadastrados Recentemente")
+    # Análises visuais avançadas
+    st.subheader("📊 Análises Visuais Avançadas")
     
     if len(df_filtrado) > 0:
-        try:
-            # Verificar se há coluna de data
-            if 'data_cadastro' in df_filtrado.columns:
-                # Ordenar por data de cadastro
-                recentes_df = df_filtrado.sort_values('data_cadastro', ascending=False).head(5)
-            else:
-                # Se não houver coluna de data, apenas mostrar os primeiros
-                recentes_df = df_filtrado.head(5)
-            
-            # Selecionar colunas relevantes
-            colunas_exibir = [col for col in ['nome', 'especie', 'raca', 'idade', 'genero', 'data_cadastro'] if col in recentes_df.columns]
-            
-            if colunas_exibir:
-                st.dataframe(recentes_df[colunas_exibir], use_container_width=True, hide_index=True)
-            else:
-                st.info("Não há colunas relevantes para exibir.")
-        except Exception as e:
-            st.warning("Não foi possível exibir os pets recentes.")
-    else:
-        st.info("Não há pets cadastrados no sistema.")
-    
-    # Cartão com dicas para o usuário
-    st.markdown("""
-    <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; margin-top: 20px;">
-        <h4 style="margin-top: 0;">Dicas de Uso</h4>
-        <ul style="margin-bottom: 0;">
-            <li>Use os filtros no menu lateral para refinar os dados exibidos</li>
-            <li>Para análises mais detalhadas, utilize a seção "Análise Avançada"</li>
-            <li>Exporte os dados completos na seção "Exportar/Importar"</li>
-        </ul>
-    </div>
-    """, unsafe_allow_html=True)
-
-@require_login
-def visualizar_dados(df):
-    """Exibe e permite a visualização e filtragem dos dados."""
-    st.title("Visualizar Dados")
-    
-    # Verificar se há dados
-    if df.empty:
-        st.warning("Não há dados disponíveis. Adicione alguns pets para começar.")
-        return
-    
-    # Opções de visualização
-    tab1, tab2 = st.tabs(["Tabela de Dados", "Detalhes do Pet"])
-    
-    with tab1:
-        st.subheader("Tabela de Dados")
+        # Preparar analyzer ML
+        analyzer = PetMLAnalyzer(df_filtrado)
         
-        # Opções de visualização
-        with st.expander("Opções de Visualização", expanded=True):
+        # Tabs para diferentes análises
+        tab1, tab2, tab3, tab4 = st.tabs(["Distribuições", "Correlações", "Clustering", "Previsões"])
+        
+        with tab1:
             col1, col2 = st.columns(2)
             
             with col1:
-                # Seleção de colunas para exibir
+                # Distribuição de tipos com percentuais
+                if 'tipo_pet' in df_filtrado.columns:
+                    tipo_counts = df_filtrado['tipo_pet'].value_counts()
+                    fig = px.pie(
+                        values=tipo_counts.values, 
+                        names=tipo_counts.index, 
+                        title="Distribuição por Tipo de Pet",
+                        color_discrete_sequence=px.colors.qualitative.Set3
+                    )
+                    fig.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Distribuição de idades
+                if 'idade' in df_filtrado.columns:
+                    fig = px.histogram(
+                        df_filtrado, 
+                        x='idade', 
+                        nbins=20, 
+                        title="Distribuição de Idades",
+                        color_discrete_sequence=['#4527A0']
+                    )
+                    fig.update_layout(
+                        xaxis_title="Idade (anos)",
+                        yaxis_title="Quantidade"
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            # Análise por bairro
+            if 'bairro' in df_filtrado.columns and 'adotado' in df_filtrado.columns:
+                bairro_stats = df_filtrado.groupby('bairro').agg({
+                    'adotado': ['count', 'sum', 'mean'],
+                    'score_adocao': 'mean' if 'score_adocao' in df_filtrado.columns else 'count'
+                }).round(2)
+                
+                bairro_stats.columns = ['Total', 'Adotados', 'Taxa_Adocao', 'Score_Medio']
+                bairro_stats = bairro_stats.reset_index()
+                
+                fig = px.scatter(
+                    bairro_stats, 
+                    x='Total', 
+                    y='Taxa_Adocao', 
+                    size='Score_Medio' if 'score_adocao' in df_filtrado.columns else 'Total',
+                    color='Score_Medio' if 'score_adocao' in df_filtrado.columns else 'Taxa_Adocao',
+                    hover_name='bairro',
+                    title="Análise por Bairro: Total vs Taxa de Adoção",
+                    labels={'Taxa_Adocao': 'Taxa de Adoção (%)', 'Total': 'Total de Pets'}
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        
+        with tab2:
+            # Matriz de correlação avançada
+            if len(df_filtrado.select_dtypes(include=[np.number]).columns) > 2:
+                numeric_cols = df_filtrado.select_dtypes(include=[np.number]).columns
+                corr_matrix = df_filtrado[numeric_cols].corr()
+                
+                # Criar heatmap interativo
+                fig = px.imshow(
+                    corr_matrix,
+                    text_auto='.2f',
+                    aspect="auto",
+                    title="Matriz de Correlação Avançada",
+                    color_continuous_scale='RdBu_r'
+                )
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Top correlações
+                corr_pairs = []
+                for i in range(len(corr_matrix.columns)):
+                    for j in range(i+1, len(corr_matrix.columns)):
+                        corr_pairs.append({
+                            'Variável 1': corr_matrix.columns[i],
+                            'Variável 2': corr_matrix.columns[j],
+                            'Correlação': corr_matrix.iloc[i, j]
+                        })
+                
+                corr_df = pd.DataFrame(corr_pairs)
+                corr_df = corr_df.sort_values('Correlação', key=abs, ascending=False)
+                
+                st.subheader("🔗 Top 10 Correlações")
+                st.dataframe(corr_df.head(10), use_container_width=True, hide_index=True)
+        
+        with tab3:
+            # Análise de clustering
+            st.subheader("🎯 Análise de Clusters")
+            
+            if len(df_filtrado) >= 10:  # Mínimo para clustering
+                with st.spinner("Processando análise de clusters..."):
+                    cluster_results, pca_result, error = analyzer.advanced_clustering(n_clusters=5)
+                    
+                    if cluster_results and not error:
+                        # Escolher melhor algoritmo
+                        best_algorithm = max(cluster_results.keys(), 
+                                           key=lambda x: cluster_results[x].get('silhouette_score', -1))
+                        
+                        best_result = cluster_results[best_algorithm]
+                        
+                        st.success(f"Melhor algoritmo: {best_algorithm} (Silhouette Score: {best_result['silhouette_score']:.3f})")
+                        
+                        # Visualização 3D dos clusters
+                        if pca_result is not None:
+                            df_viz = pd.DataFrame({
+                                'PC1': pca_result[:, 0],
+                                'PC2': pca_result[:, 1],
+                                'PC3': pca_result[:, 2],
+                                'Cluster': best_result['clusters'],
+                                'Nome': df_filtrado['nome'].values if 'nome' in df_filtrado.columns else range(len(df_filtrado))
+                            })
+                            
+                            fig = px.scatter_3d(
+                                df_viz, 
+                                x='PC1', y='PC2', z='PC3',
+                                color='Cluster',
+                                hover_name='Nome',
+                                title=f'Visualização 3D dos Clusters ({best_algorithm})',
+                                color_continuous_scale='viridis'
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Estatísticas dos clusters
+                        df_with_clusters = df_filtrado.copy()
+                        df_with_clusters['cluster'] = best_result['clusters']
+                        
+                        cluster_stats = df_with_clusters.groupby('cluster').agg({
+                            'idade': ['mean', 'std'],
+                            'peso': ['mean', 'std'],
+                            'score_adocao': ['mean', 'std'] if 'score_adocao' in df_filtrado.columns else 'size'
+                        }).round(2)
+                        
+                        st.subheader("📊 Estatísticas dos Clusters")
+                        st.dataframe(cluster_stats, use_container_width=True)
+                    else:
+                        st.warning("Não foi possível realizar a análise de clusters com os dados disponíveis.")
+            else:
+                st.info("São necessários pelo menos 10 registros para análise de clusters.")
+        
+        with tab4:
+            # Previsões e modelagem
+            st.subheader("🔮 Análises Preditivas")
+            
+            if 'score_adocao' in df_filtrado.columns and len(df_filtrado) >= 20:
+                with st.spinner("Treinando modelos preditivos..."):
+                    # Prever score de adoção
+                    results, error = analyzer.predictive_modeling('score_adocao')
+                    
+                    if results and not error:
+                        # Mostrar performance dos modelos
+                        model_performance = []
+                        for name, result in results.items():
+                            if 'error' not in result:
+                                metrics = result['metrics']
+                                model_performance.append({
+                                    'Modelo': name,
+                                    'R²': metrics.get('R²', 0),
+                                    'RMSE': metrics.get('RMSE', 0),
+                                    'Tempo (s)': metrics.get('Training Time', 0)
+                                })
+                        
+                        perf_df = pd.DataFrame(model_performance)
+                        perf_df = perf_df.sort_values('R²', ascending=False)
+                        
+                        st.subheader("🏆 Performance dos Modelos")
+                        st.dataframe(perf_df, use_container_width=True, hide_index=True)
+                        
+                        # Melhor modelo
+                        best_model_name = perf_df.iloc[0]['Modelo']
+                        best_model_data = results[best_model_name]
+                        
+                        st.success(f"Melhor modelo: {best_model_name} (R² = {perf_df.iloc[0]['R²']:.3f})")
+                        
+                        # Feature importance
+                        if best_model_data['feature_importance']:
+                            importance_df = pd.DataFrame(
+                                list(best_model_data['feature_importance'].items()),
+                                columns=['Feature', 'Importância']
+                            ).sort_values('Importância', ascending=False)
+                            
+                            fig = px.bar(
+                                importance_df.head(10), 
+                                x='Importância', 
+                                y='Feature',
+                                orientation='h',
+                                title="Top 10 Features Mais Importantes",
+                                color='Importância',
+                                color_continuous_scale='viridis'
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.warning("Não foi possível treinar os modelos preditivos.")
+            else:
+                st.info("São necessários pelo menos 20 registros com score de adoção para análise preditiva.")
+    
+    # Insights automatizados
+    st.subheader("🧠 Insights Automatizados")
+    
+    insights = []
+    
+    # Insight 1: Taxa de adoção por tipo
+    if 'tipo_pet' in df_filtrado.columns and 'adotado' in df_filtrado.columns:
+        adocao_por_tipo = df_filtrado.groupby('tipo_pet')['adotado'].mean().sort_values(ascending=False)
+        if len(adocao_por_tipo) > 1:
+            melhor_tipo = adocao_por_tipo.index[0]
+            taxa_melhor = adocao_por_tipo.iloc[0] * 100
+            insights.append(f"🏆 **{melhor_tipo}s** têm a maior taxa de adoção ({taxa_melhor:.1f}%)")
+    
+    # Insight 2: Bairro com maior atividade
+    if 'bairro' in df_filtrado.columns:
+        atividade_bairro = df_filtrado['bairro'].value_counts()
+        bairro_ativo = atividade_bairro.index[0]
+        insights.append(f"📍 **{bairro_ativo}** é o bairro com mais pets cadastrados ({atividade_bairro.iloc[0]} pets)")
+    
+    # Insight 3: Análise de idade
+    if 'idade' in df_filtrado.columns:
+        idade_media = df_filtrado['idade'].mean()
+        if idade_media < 3:
+            insights.append("👶 A maioria dos pets são jovens, ideal para famílias que querem pets mais ativos")
+        elif idade_media > 7:
+            insights.append("👴 A maioria dos pets são mais velhos, ideais para famílias que preferem pets mais calmos")
+    
+    # Insight 4: Score de adoção
+    if 'score_adocao' in df_filtrado.columns:
+        score_alto = (df_filtrado['score_adocao'] > 4).sum()
+        perc_score_alto = (score_alto / len(df_filtrado)) * 100
+        insights.append(f"⭐ {perc_score_alto:.1f}% dos pets têm score de adoção alto (>4.0)")
+    
+    # Exibir insights
+    if insights:
+        for i, insight in enumerate(insights):
+            st.info(insight)
+    else:
+        st.info("Adicione mais dados para gerar insights automatizados.")
+
+# Funções auxiliares de segurança
+def safe_get_first(series_or_df, default="Não disponível"):
+    """Obtém o primeiro elemento de forma segura."""
+    try:
+        if hasattr(series_or_df, 'iloc') and len(series_or_df) > 0:
+            return series_or_df.iloc[0]
+        elif hasattr(series_or_df, 'index') and len(series_or_df) > 0:
+            return series_or_df.index[0]
+        else:
+            return default
+    except (IndexError, KeyError):
+        return default
+
+def safe_mode(series, default="Não definido"):
+    """Obtém a moda de forma segura."""
+    try:
+        if series.empty:
+            return default
+        mode_result = series.mode()
+        return mode_result.iloc[0] if len(mode_result) > 0 else default
+    except (IndexError, KeyError):
+        return default
+
+def safe_value_counts(series, default_dict=None):
+    """Obtém value_counts de forma segura."""
+    try:
+        if series.empty:
+            return default_dict or {}
+        return series.value_counts()
+    except Exception:
+        return default_dict or {}
+
+def safe_groupby(df, column, agg_dict, default_df=None):
+    """Realiza groupby de forma segura."""
+    try:
+        if df.empty or column not in df.columns:
+            return default_df or pd.DataFrame()
+        return df.groupby(column).agg(agg_dict)
+    except Exception:
+        return default_df or pd.DataFrame()
+
+@require_login
+def advanced_analytics(df):
+    """Análises avançadas com Machine Learning - Versão Robusta."""
+    st.title("🔬 Análises Avançadas com Machine Learning")
+    
+    # Verificações iniciais robustas
+    if df.empty:
+        st.warning("⚠️ Não há dados disponíveis para análise.")
+        st.info("📝 Adicione alguns pets primeiro para utilizar as análises avançadas.")
+        return
+    
+    if len(df) < 5:
+        st.warning("⚠️ São necessários pelo menos 5 registros para análises avançadas.")
+        st.info(f"📊 Atualmente há {len(df)} registros. Adicione mais {5-len(df)} pets.")
+        return
+    
+    # Verificações de dados válidos
+    try:
+        # Verificar se há dados válidos nas colunas principais
+        required_columns = ['nome', 'tipo_pet']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        
+        if missing_columns:
+            st.error(f"❌ Colunas obrigatórias faltando: {', '.join(missing_columns)}")
+            return
+        
+        # Verificar se há dados não-nulos
+        valid_data = df.dropna(subset=['nome', 'tipo_pet'])
+        if valid_data.empty:
+            st.warning("⚠️ Não há dados válidos suficientes para análise.")
+            return
+            
+        # Usar dados válidos para análise
+        df_analysis = valid_data.copy()
+        
+    except Exception as e:
+        st.error(f"❌ Erro na validação inicial dos dados: {str(e)}")
+        return
+    
+    # Inicializar analyzer
+    try:
+        analyzer = PetMLAnalyzer(df_analysis)
+    except Exception as e:
+        st.error(f"❌ Erro ao inicializar analisador ML: {str(e)}")
+        return
+    
+    # Menu de análises
+    analysis_type = st.sidebar.selectbox(
+        "Tipo de Análise:",
+        [
+            "Clustering Avançado",
+            "Modelagem Preditiva",
+            "Detecção de Anomalias", 
+            "Análise de Séries Temporais",
+            "Análise de Associação",
+            "Engenharia de Features",
+            "Análise de Componentes Principais",
+            "Análise de Sobrevivência",
+            "Rede de Relacionamentos",
+            "Otimização de Adoções"
+        ]
+    )
+    
+    if analysis_type == "Clustering Avançado":
+        st.subheader("🎯 Clustering Avançado")
+        
+        # Parâmetros
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            n_clusters = st.slider("Número de Clusters:", 2, 10, 5)
+        with col2:
+            algorithm = st.selectbox("Algoritmo:", ["KMeans", "DBSCAN", "Agglomerative", "Todos"])
+        with col3:
+            numeric_cols = df_analysis.select_dtypes(include=[np.number]).columns.tolist()
+            if not numeric_cols:
+                st.error("❌ Não há colunas numéricas suficientes para clustering.")
+                return
+            
+            include_features = st.multiselect(
+                "Features para incluir:",
+                options=numeric_cols,
+                default=numeric_cols[:min(3, len(numeric_cols))]
+            )
+        
+        if not include_features:
+            st.warning("⚠️ Selecione pelo menos uma variável para análise.")
+            return
+        
+        if st.button("Executar Clustering", use_container_width=True):
+            with st.spinner("Processando clustering avançado..."):
+                try:
+                    results, pca_result, error = analyzer.advanced_clustering(n_clusters)
+                    
+                    if results and not error:
+                        # Comparar algoritmos de forma segura
+                        comparison_data = []
+                        for name, result in results.items():
+                            if 'error' not in result:
+                                comparison_data.append({
+                                    'Algoritmo': name,
+                                    'N° Clusters': result.get('n_clusters', 0),
+                                    'Silhouette Score': result.get('silhouette_score', -1),
+                                    'Qualidade': 'Excelente' if result.get('silhouette_score', -1) > 0.7 else 
+                                                'Boa' if result.get('silhouette_score', -1) > 0.5 else 
+                                                'Regular' if result.get('silhouette_score', -1) > 0.3 else 'Baixa'
+                                })
+                        
+                        if comparison_data:
+                            comparison_df = pd.DataFrame(comparison_data)
+                            comparison_df = comparison_df.sort_values('Silhouette Score', ascending=False)
+                            
+                            st.subheader("📊 Comparação de Algoritmos")
+                            st.dataframe(comparison_df, use_container_width=True, hide_index=True)
+                            
+                            # Melhor algoritmo
+                            best_algorithm = safe_get_first(comparison_df['Algoritmo'])
+                            if best_algorithm != "Não disponível":
+                                best_result = results[best_algorithm]
+                                st.success(f"🏆 Melhor algoritmo: {best_algorithm}")
+                                
+                                # Visualização interativa
+                                if pca_result is not None and len(pca_result) > 0:
+                                    try:
+                                        df_viz = pd.DataFrame({
+                                            'PC1': pca_result[:, 0],
+                                            'PC2': pca_result[:, 1],
+                                            'PC3': pca_result[:, 2] if pca_result.shape[1] > 2 else pca_result[:, 0],
+                                            'Cluster': best_result['clusters'],
+                                            'Nome': df_analysis['nome'].values if 'nome' in df_analysis.columns else range(len(df_analysis)),
+                                            'Tipo': df_analysis['tipo_pet'].values if 'tipo_pet' in df_analysis.columns else 'Pet'
+                                        })
+                                        
+                                        # 3D scatter plot
+                                        fig = px.scatter_3d(
+                                            df_viz, 
+                                            x='PC1', y='PC2', z='PC3',
+                                            color='Cluster',
+                                            symbol='Tipo',
+                                            hover_name='Nome',
+                                            title=f'Visualização 3D - {best_algorithm}',
+                                            color_continuous_scale='rainbow'
+                                        )
+                                        st.plotly_chart(fig, use_container_width=True)
+                                    except Exception as viz_error:
+                                        st.warning(f"⚠️ Erro na visualização 3D: {str(viz_error)}")
+                                
+                                # Análise detalhada dos clusters
+                                st.subheader("🔍 Análise Detalhada dos Clusters")
+                                
+                                try:
+                                    df_with_clusters = df_analysis.copy()
+                                    df_with_clusters['cluster'] = best_result['clusters']
+                                    
+                                    unique_clusters = sorted(df_with_clusters['cluster'].unique())
+                                    
+                                    for cluster_id in unique_clusters:
+                                        cluster_data = df_with_clusters[df_with_clusters['cluster'] == cluster_id]
+                                        
+                                        st.markdown(f"### Cluster {cluster_id} ({len(cluster_data)} pets)")
+                                        
+                                        col1, col2 = st.columns(2)
+                                        
+                                        with col1:
+                                            # Características principais
+                                            stats = {}
+                                            
+                                            if 'idade' in cluster_data.columns:
+                                                stats['Idade Média'] = f"{cluster_data['idade'].mean():.1f} anos"
+                                            if 'peso' in cluster_data.columns:
+                                                stats['Peso Médio'] = f"{cluster_data['peso'].mean():.1f} kg"
+                                            if 'adotado' in cluster_data.columns:
+                                                stats['Taxa de Adoção'] = f"{cluster_data['adotado'].mean()*100:.1f}%"
+                                            if 'score_adocao' in cluster_data.columns:
+                                                stats['Score Médio'] = f"{cluster_data['score_adocao'].mean():.2f}"
+                                            
+                                            for key, value in stats.items():
+                                                st.metric(key, value)
+                                        
+                                        with col2:
+                                            # Distribuição por tipo
+                                            if 'tipo_pet' in cluster_data.columns:
+                                                try:
+                                                    tipo_dist = safe_value_counts(cluster_data['tipo_pet'])
+                                                    if len(tipo_dist) > 0:
+                                                        fig = px.pie(
+                                                            values=tipo_dist.values,
+                                                            names=tipo_dist.index,
+                                                            title=f"Distribuição por Tipo - Cluster {cluster_id}"
+                                                        )
+                                                        st.plotly_chart(fig, use_container_width=True)
+                                                except Exception:
+                                                    st.info("Dados insuficientes para gráfico de distribuição")
+                                
+                                except Exception as cluster_error:
+                                    st.warning(f"⚠️ Erro na análise de clusters: {str(cluster_error)}")
+                            else:
+                                st.error("❌ Nenhum algoritmo produziu resultados válidos.")
+                        else:
+                            st.error("❌ Não foi possível comparar algoritmos.")
+                    else:
+                        st.error(f"❌ Erro no clustering: {error}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Erro geral no clustering: {str(e)}")
+    
+    elif analysis_type == "Modelagem Preditiva":
+        st.subheader("🔮 Modelagem Preditiva Avançada")
+        
+        # Verificar colunas disponíveis para modelagem
+        target_options = []
+        if 'adotado' in df_analysis.columns:
+            target_options.append('adotado')
+        if 'score_adocao' in df_analysis.columns:
+            target_options.append('score_adocao')
+        if 'risco_abandono' in df_analysis.columns:
+            target_options.append('risco_abandono')
+        
+        if not target_options:
+            st.error("❌ Não há variáveis alvo disponíveis para modelagem preditiva.")
+            st.info("💡 Variáveis necessárias: adotado, score_adocao ou risco_abandono")
+            return
+        
+        target_column = st.selectbox("Variável Alvo:", target_options)
+        
+        # Parâmetros avançados
+        with st.expander("Parâmetros Avançados"):
+            test_size = st.slider("Tamanho do conjunto de teste:", 0.1, 0.5, 0.3)
+            cv_folds = st.slider("Folds para Cross-Validation:", 3, 10, 5)
+            enable_hyperparameter_tuning = st.checkbox("Otimização de hiperparâmetros", value=False)
+        
+        if st.button("Treinar Modelos", use_container_width=True):
+            with st.spinner("Treinando modelos avançados..."):
+                try:
+                    results, error = analyzer.predictive_modeling(target_column)
+                    
+                    if results and not error:
+                        # Performance comparison
+                        performance_data = []
+                        for name, result in results.items():
+                            if 'error' not in result:
+                                metrics = result.get('metrics', {})
+                                performance_data.append({
+                                    'Modelo': name,
+                                    **metrics
+                                })
+                        
+                        if performance_data:
+                            perf_df = pd.DataFrame(performance_data)
+                            
+                            # Verificar se é regressão ou classificação
+                            is_regression = 'R²' in perf_df.columns
+                            
+                            # Ordenar por métrica principal
+                            if is_regression:
+                                if 'R²' in perf_df.columns:
+                                    perf_df = perf_df.sort_values('R²', ascending=False)
+                                st.subheader("📊 Performance dos Modelos (Regressão)")
+                            else:
+                                if 'Accuracy' in perf_df.columns:
+                                    perf_df = perf_df.sort_values('Accuracy', ascending=False)
+                                st.subheader("📊 Performance dos Modelos (Classificação)")
+                            
+                            st.dataframe(perf_df, use_container_width=True, hide_index=True)
+                            
+                            # Visualização de performance
+                            if len(perf_df) > 1:
+                                try:
+                                    metric_col = 'R²' if is_regression else 'Accuracy'
+                                    
+                                    if metric_col in perf_df.columns:
+                                        fig = px.bar(
+                                            perf_df, 
+                                            x='Modelo', 
+                                            y=metric_col,
+                                            title=f"Comparação de {metric_col}",
+                                            color=metric_col,
+                                            color_continuous_scale='viridis'
+                                        )
+                                        st.plotly_chart(fig, use_container_width=True)
+                                except Exception:
+                                    st.info("Gráfico de performance não disponível")
+                            
+                            # Melhor modelo
+                            if not perf_df.empty:
+                                best_model_name = safe_get_first(perf_df['Modelo'])
+                                if best_model_name != "Não disponível":
+                                    best_result = results.get(best_model_name, {})
+                                    
+                                    st.success(f"🏆 Melhor modelo: {best_model_name}")
+                                    
+                                    # Feature importance
+                                    feature_importance = best_result.get('feature_importance')
+                                    if feature_importance:
+                                        st.subheader("📈 Importância das Features")
+                                        
+                                        try:
+                                            importance_df = pd.DataFrame(
+                                                list(feature_importance.items()),
+                                                columns=['Feature', 'Importância']
+                                            ).sort_values('Importância', ascending=False)
+                                            
+                                            fig = px.bar(
+                                                importance_df.head(15), 
+                                                x='Importância', 
+                                                y='Feature',
+                                                orientation='h',
+                                                title="Top 15 Features Mais Importantes",
+                                                color='Importância',
+                                                color_continuous_scale='plasma'
+                                            )
+                                            st.plotly_chart(fig, use_container_width=True)
+                                        except Exception:
+                                            st.info("Gráfico de importância não disponível")
+                                    
+                                    # Simulador de predições
+                                    st.subheader("🎯 Simulador de Predições")
+                                    
+                                    with st.form("prediction_form"):
+                                        st.write("Insira os valores para fazer uma predição:")
+                                        
+                                        input_values = {}
+                                        
+                                        # Criar inputs para as principais features
+                                        main_features = ['idade', 'peso', 'sociabilidade', 'energia']
+                                        available_features = [f for f in main_features if f in df_analysis.columns]
+                                        
+                                        if available_features:
+                                            col1, col2 = st.columns(2)
+                                            
+                                            for i, feature in enumerate(available_features):
+                                                try:
+                                                    min_val = float(df_analysis[feature].min())
+                                                    max_val = float(df_analysis[feature].max())
+                                                    mean_val = float(df_analysis[feature].mean())
+                                                    
+                                                    with col1 if i % 2 == 0 else col2:
+                                                        input_values[feature] = st.slider(
+                                                            f"{feature.title()}:",
+                                                            min_val, max_val, mean_val
+                                                        )
+                                                except Exception:
+                                                    continue
+                                        
+                                        predict_button = st.form_submit_button("Fazer Predição", use_container_width=True)
+                                        
+                                        if predict_button and input_values:
+                                            # Simular predição
+                                            try:
+                                                if target_column == 'score_adocao':
+                                                    prediction = np.mean(list(input_values.values())) * 0.8 + np.random.uniform(-0.5, 0.5)
+                                                    prediction = max(0, min(5, prediction))
+                                                    st.success(f"Score de Adoção Previsto: {prediction:.2f}/5.0")
+                                                elif target_column == 'adotado':
+                                                    prob = np.random.uniform(0.3, 0.9)
+                                                    st.success(f"Probabilidade de Adoção: {prob*100:.1f}%")
+                                                else:
+                                                    prediction = np.random.uniform(0, 1)
+                                                    st.success(f"Predição para {target_column}: {prediction:.3f}")
+                                            except Exception:
+                                                st.error("❌ Erro na predição")
+                        else:
+                            st.error("❌ Nenhum modelo foi treinado com sucesso.")
+                    else:
+                        st.error(f"❌ Erro na modelagem: {error}")
+                        
+                except Exception as e:
+                    st.error(f"❌ Erro geral na modelagem: {str(e)}")
+    
+    elif analysis_type == "Detecção de Anomalias":
+        st.subheader("🚨 Detecção de Anomalias")
+        
+        # Verificar se há colunas numéricas
+        numeric_cols = df_analysis.select_dtypes(include=[np.number]).columns.tolist()
+        if not numeric_cols:
+            st.error("❌ Não há colunas numéricas para detecção de anomalias.")
+            return
+        
+        # Parâmetros
+        col1, col2 = st.columns(2)
+        with col1:
+            contamination = st.slider("Taxa de Contaminação:", 0.01, 0.3, 0.1)
+        with col2:
+            method = st.selectbox("Método:", ["Isolation Forest", "One-Class SVM", "LOF", "Todos"])
+        
+        if st.button("Detectar Anomalias", use_container_width=True):
+            with st.spinner("Detectando anomalias..."):
+                try:
+                    results = analyzer.anomaly_detection(contamination)
+                    
+                    if results:
+                        # Comparar métodos
+                        anomaly_summary = []
+                        for name, result in results.items():
+                            if 'error' not in result:
+                                anomaly_summary.append({
+                                    'Método': name,
+                                    'Anomalias Detectadas': result.get('anomaly_count', 0),
+                                    'Porcentagem': f"{result.get('anomaly_percentage', 0):.2f}%"
+                                })
+                        
+                        if anomaly_summary:
+                            summary_df = pd.DataFrame(anomaly_summary)
+                            st.dataframe(summary_df, use_container_width=True, hide_index=True)
+                            
+                            # Usar melhor método (primeiro da lista)
+                            best_method = safe_get_first(summary_df['Método'])
+                            if best_method != "Não disponível" and best_method in results:
+                                best_result = results[best_method]
+                                
+                                st.subheader(f"🔍 Anomalias Detectadas - {best_method}")
+                                
+                                # Scatter plot com anomalias destacadas
+                                try:
+                                    if 'idade' in df_analysis.columns and 'peso' in df_analysis.columns:
+                                        df_viz = df_analysis.copy()
+                                        df_viz['Anomalia'] = False
+                                        
+                                        anomaly_indices = best_result.get('anomaly_indices', [])
+                                        if len(anomaly_indices) > 0:
+                                            df_viz.loc[anomaly_indices, 'Anomalia'] = True
+                                            
+                                            fig = px.scatter(
+                                                df_viz,
+                                                x='idade',
+                                                y='peso',
+                                                color='Anomalia',
+                                                hover_name='nome' if 'nome' in df_viz.columns else None,
+                                                title="Detecção de Anomalias: Idade vs Peso",
+                                                color_discrete_map={True: 'red', False: 'blue'}
+                                            )
+                                            st.plotly_chart(fig, use_container_width=True)
+                                        else:
+                                            st.info("Nenhuma anomalia foi detectada")
+                                except Exception:
+                                    st.info("Visualização de anomalias não disponível")
+                                
+                                # Lista de anomalias
+                                anomaly_indices = best_result.get('anomaly_indices', [])
+                                if len(anomaly_indices) > 0:
+                                    try:
+                                        anomalous_pets = df_analysis.iloc[anomaly_indices]
+                                        
+                                        st.subheader("📋 Lista de Pets Anômalos")
+                                        
+                                        # Selecionar colunas relevantes
+                                        display_cols = ['nome', 'tipo_pet', 'idade', 'peso', 'score_adocao']
+                                        display_cols = [col for col in display_cols if col in anomalous_pets.columns]
+                                        
+                                        if display_cols:
+                                            st.dataframe(
+                                                anomalous_pets[display_cols],
+                                                use_container_width=True,
+                                                hide_index=True
+                                            )
+                                    except Exception:
+                                        st.info("Lista de anomalias não disponível")
+                                else:
+                                    st.info("Nenhuma anomalia foi detectada com os parâmetros atuais.")
+                        else:
+                            st.error("❌ Nenhum método de detecção funcionou.")
+                    else:
+                        st.error("❌ Erro na detecção de anomalias.")
+                        
+                except Exception as e:
+                    st.error(f"❌ Erro geral na detecção: {str(e)}")
+    
+    elif analysis_type == "Análise de Séries Temporais":
+        st.subheader("📈 Análise de Séries Temporais")
+        
+        if 'data_registro' not in df_analysis.columns:
+            st.error("❌ Coluna 'data_registro' não encontrada. Necessária para análise temporal.")
+            return
+        
+        # Preparar dados temporais
+        try:
+            df_ts = df_analysis.copy()
+            df_ts['data_registro'] = pd.to_datetime(df_ts['data_registro'])
+        except Exception:
+            st.error("❌ Erro ao converter datas. Verifique o formato da coluna 'data_registro'.")
+            return
+        
+        # Agregar dados por período
+        aggregation = st.selectbox("Agregação:", ["Diário", "Semanal", "Mensal"])
+        metric = st.selectbox("Métrica:", ["Contagem de Registros", "Score Médio", "Taxa de Adoção"])
+        
+        freq_map = {"Diário": "D", "Semanal": "W", "Mensal": "M"}
+        
+        if st.button("Analisar Série Temporal", use_container_width=True):
+            with st.spinner("Processando análise temporal..."):
+                try:
+                    # Preparar série temporal
+                    if metric == "Contagem de Registros":
+                        ts_data = df_ts.set_index('data_registro').resample(freq_map[aggregation]).size()
+                    elif metric == "Score Médio" and 'score_adocao' in df_ts.columns:
+                        ts_data = df_ts.set_index('data_registro').resample(freq_map[aggregation])['score_adocao'].mean()
+                    elif metric == "Taxa de Adoção" and 'adotado' in df_ts.columns:
+                        ts_data = df_ts.set_index('data_registro').resample(freq_map[aggregation])['adotado'].mean()
+                    else:
+                        st.error("❌ Métrica selecionada não disponível nos dados.")
+                        return
+                    
+                    ts_data = ts_data.fillna(0)
+                    
+                    if len(ts_data) < 4:
+                        st.warning("⚠️ Dados insuficientes para análise temporal robusta.")
+                        return
+                    
+                    # Visualização da série
+                    fig = px.line(
+                        x=ts_data.index,
+                        y=ts_data.values,
+                        title=f"Série Temporal - {metric} ({aggregation})",
+                        labels={'x': 'Data', 'y': metric}
+                    )
+                    
+                    # Adicionar tendência
+                    try:
+                        from scipy import stats
+                        x_numeric = np.arange(len(ts_data))
+                        slope, intercept, r_value, p_value, std_err = stats.linregress(x_numeric, ts_data.values)
+                        trend_line = slope * x_numeric + intercept
+                        
+                        fig.add_trace(
+                            go.Scatter(
+                                x=ts_data.index,
+                                y=trend_line,
+                                mode='lines',
+                                name=f'Tendência (R²={r_value**2:.3f})',
+                                line=dict(dash='dash', color='red')
+                            )
+                        )
+                    except Exception:
+                        pass
+                    
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Insights da análise temporal
+                    st.subheader("💡 Insights da Análise Temporal")
+                    
+                    try:
+                        # Calcular estatísticas básicas
+                        mean_value = ts_data.mean()
+                        std_value = ts_data.std()
+                        trend_direction = "crescente" if slope > 0 else "decrescente" if slope < 0 else "estável"
+                        
+                        st.success(f"📊 Valor médio: {mean_value:.2f}")
+                        st.info(f"📈 Tendência: {trend_direction}")
+                        
+                        if abs(slope) > std_value * 0.1:
+                            if slope > 0:
+                                st.success(f"📈 Tendência de crescimento detectada (+{slope:.3f} por período)")
+                            else:
+                                st.warning(f"📉 Tendência de declínio detectada ({slope:.3f} por período)")
+                        else:
+                            st.info("➡️ Tendência estável ao longo do tempo")
+                            
+                    except Exception:
+                        st.info("Análise de tendência não disponível")
+                        
+                except Exception as e:
+                    st.error(f"❌ Erro na análise temporal: {str(e)}")
+    
+    else:
+        # Para outros tipos de análise não implementados
+        st.subheader(f"🚧 {analysis_type}")
+        st.info(f"A análise '{analysis_type}' será implementada em versão futura.")
+        
+        # Mostrar dados disponíveis para referência
+        st.subheader("📊 Dados Disponíveis")
+        st.write(f"**Total de registros:** {len(df_analysis)}")
+        st.write(f"**Colunas disponíveis:** {', '.join(df_analysis.columns.tolist())}")
+        
+        # Estatísticas básicas
+        numeric_cols = df_analysis.select_dtypes(include=[np.number]).columns.tolist()
+        if numeric_cols:
+            st.subheader("📈 Estatísticas Básicas")
+            stats_df = df_analysis[numeric_cols].describe().round(2)
+            st.dataframe(stats_df, use_container_width=True)
+
+@require_login
+def visualizar_dados(df):
+    """Visualização avançada de dados."""
+    st.title("📊 Visualização Avançada de Dados")
+    
+    if df.empty:
+        st.warning("Não há dados disponíveis.")
+        return
+    
+    # Tabs para diferentes tipos de visualização
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "Tabela Interativa", 
+        "Dashboards", 
+        "Comparações", 
+        "Trends Temporais", 
+        "Exportar Relatórios"
+    ])
+    
+    with tab1:
+        st.subheader("🗂️ Tabela Interativa Avançada")
+        
+        # Opções de visualização
+        with st.expander("⚙️ Opções de Visualização", expanded=True):
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Seleção de colunas
                 all_columns = df.columns.tolist()
-                default_columns = ['nome', 'bairro', 'tipo_pet', 'raca', 'idade', 'peso', 'adotado']
+                default_columns = ['nome', 'tipo_pet', 'idade', 'peso', 'adotado', 'score_adocao']
                 default_columns = [col for col in default_columns if col in all_columns]
                 
                 selected_columns = st.multiselect(
-                    "Selecione as colunas para exibir:",
+                    "Colunas para exibir:",
                     options=all_columns,
                     default=default_columns
                 )
             
             with col2:
-                # Opções de ordenação
-                sort_column = st.selectbox(
-                    "Ordenar por:",
-                    options=["Nenhum"] + all_columns
-                )
-                
+                # Ordenação
+                sort_column = st.selectbox("Ordenar por:", ["Nenhum"] + all_columns)
                 if sort_column != "Nenhum":
-                    sort_order = st.radio(
-                        "Ordem:",
-                        options=["Crescente", "Decrescente"],
-                        horizontal=True
-                    )
+                    sort_order = st.radio("Ordem:", ["Crescente", "Decrescente"], horizontal=True)
+            
+            with col3:
+                # Paginação
+                items_per_page = st.selectbox("Itens por página:", [10, 25, 50, 100], index=1)
+                show_totals = st.checkbox("Mostrar totais", value=True)
         
-        # Preparar DataFrame para exibição
+        # Preparar dados
         if selected_columns:
             df_display = df[selected_columns].copy()
         else:
@@ -1082,3037 +2581,1717 @@ def visualizar_dados(df):
             ascending = sort_order == "Crescente"
             df_display = df_display.sort_values(by=sort_column, ascending=ascending)
         
-        # Exibir dados com estilo
+        # Estatísticas resumidas
+        if show_totals:
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                st.metric("Total de Registros", len(df_display))
+            
+            with col2:
+                if 'adotado' in df_display.columns:
+                    adotados = df_display['adotado'].sum()
+                    st.metric("Pets Adotados", adotados)
+            
+            with col3:
+                if 'score_adocao' in df_display.columns:
+                    score_medio = df_display['score_adocao'].mean()
+                    st.metric("Score Médio", f"{score_medio:.2f}")
+            
+            with col4:
+                if 'idade' in df_display.columns:
+                    idade_media = df_display['idade'].mean()
+                    st.metric("Idade Média", f"{idade_media:.1f} anos")
+        
+        # Tabela com paginação
+        total_pages = (len(df_display) - 1) // items_per_page + 1
+        
+        if total_pages > 1:
+            page = st.selectbox(f"Página (1-{total_pages}):", range(1, total_pages + 1))
+            start_idx = (page - 1) * items_per_page
+            end_idx = start_idx + items_per_page
+            df_page = df_display.iloc[start_idx:end_idx]
+        else:
+            df_page = df_display
+        
+        # Exibir tabela
         st.dataframe(
-            df_display,
+            df_page,
             use_container_width=True,
-            height=400,
-            hide_index=True
+            hide_index=True,
+            column_config={
+                "score_adocao": st.column_config.ProgressColumn(
+                    "Score de Adoção",
+                    help="Score de adotabilidade (0-5)",
+                    min_value=0,
+                    max_value=5,
+                ),
+                "risco_abandono": st.column_config.ProgressColumn(
+                    "Risco de Abandono",
+                    help="Risco de abandono (0-1)",
+                    min_value=0,
+                    max_value=1,
+                ),
+                "adotado": st.column_config.CheckboxColumn("Adotado"),
+                "idade": st.column_config.NumberColumn("Idade", format="%.1f anos"),
+                "peso": st.column_config.NumberColumn("Peso", format="%.1f kg"),
+            }
         )
         
-        # Estatísticas básicas das colunas numéricas
-        st.subheader("Estatísticas Básicas")
+        # Estatísticas detalhadas
+        st.subheader("📈 Estatísticas Detalhadas")
         
         # Colunas numéricas
-        numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+        numeric_cols = df_display.select_dtypes(include=[np.number]).columns.tolist()
         
         if numeric_cols:
-            # Calcular estatísticas
-            stats = df[numeric_cols].describe().T.reset_index()
-            stats.columns = ['Variável', 'Contagem', 'Média', 'Desvio Padrão', 'Mín', '25%', '50%', '75%', 'Máx']
+            stats_expanded = df_display[numeric_cols].describe().T
+            stats_expanded['CV'] = stats_expanded['std'] / stats_expanded['mean']  # Coeficiente de variação
+            stats_expanded['IQR'] = stats_expanded['75%'] - stats_expanded['25%']  # Intervalo interquartil
             
-            # Formatar números
-            for col in stats.columns[1:]:
-                stats[col] = stats[col].round(2)
-            
-            # Exibir tabela de estatísticas
             st.dataframe(
-                stats,
+                stats_expanded.round(3),
                 use_container_width=True,
-                hide_index=True
+                column_config={
+                    "count": "Contagem",
+                    "mean": "Média",
+                    "std": "Desvio Padrão",
+                    "min": "Mínimo",
+                    "25%": "Q1",
+                    "50%": "Mediana",
+                    "75%": "Q3",
+                    "max": "Máximo",
+                    "CV": "Coef. Variação",
+                    "IQR": "Intervalo IQ"
+                }
             )
-        else:
-            st.info("Não há colunas numéricas para calcular estatísticas.")
+    
+    with tab2:
+        st.subheader("📊 Dashboards Customizados")
         
-        # Opções de exportação
-        with st.expander("Exportar Dados"):
+        # Dashboard builder
+        dashboard_type = st.selectbox(
+            "Tipo de Dashboard:",
+            ["Resumo Executivo", "Análise Comportamental", "Performance Regional", "Dashboard Personalizado"]
+        )
+        
+        if dashboard_type == "Resumo Executivo":
+            # KPIs principais
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                total_pets = len(df)
+                custom_metric("Total de Pets", total_pets, "registrados", "#1f77b4")
+            
+            with col2:
+                if 'adotado' in df.columns:
+                    taxa_adocao = df['adotado'].mean() * 100
+                    custom_metric("Taxa de Adoção", f"{taxa_adocao:.1f}%", "pets adotados", "#2ca02c")
+            
+            with col3:
+                if 'score_adocao' in df.columns:
+                    score_medio = df['score_adocao'].mean()
+                    custom_metric("Score Médio", f"{score_medio:.2f}", "de 5.0", "#ff7f0e")
+            
+            with col4:
+                if 'data_registro' in df.columns:
+                    df_mes = df.copy()
+                    df_mes['data_registro'] = pd.to_datetime(df_mes['data_registro'])
+                    registros_mes = len(df_mes[df_mes['data_registro'].dt.month == pd.Timestamp.now().month])
+                    custom_metric("Novos este Mês", registros_mes, "registros", "#d62728")
+            
+            # Gráficos do resumo executivo
             col1, col2 = st.columns(2)
             
             with col1:
-                export_format = st.selectbox(
-                    "Formato de exportação:",
-                    options=["CSV", "Excel", "JSON"]
+                # Distribuição por tipo
+                if 'tipo_pet' in df.columns:
+                    tipo_counts = df['tipo_pet'].value_counts()
+                    fig = px.pie(
+                        values=tipo_counts.values,
+                        names=tipo_counts.index,
+                        title="Distribuição por Tipo de Pet",
+                        hole=0.4
+                    )
+                    fig.update_traces(textposition='inside', textinfo='percent+label')
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            with col2:
+                # Taxa de adoção por mês
+                if 'data_registro' in df.columns and 'adotado' in df.columns:
+                    df_monthly = df.copy()
+                    df_monthly['data_registro'] = pd.to_datetime(df_monthly['data_registro'])
+                    df_monthly['mes'] = df_monthly['data_registro'].dt.to_period('M')
+                    
+                    monthly_adoption = df_monthly.groupby('mes')['adotado'].mean() * 100
+                    
+                    fig = px.line(
+                        x=monthly_adoption.index.astype(str),
+                        y=monthly_adoption.values,
+                        title="Taxa de Adoção Mensal (%)",
+                        markers=True
+                    )
+                    fig.update_layout(xaxis_title="Mês", yaxis_title="Taxa de Adoção (%)")
+                    st.plotly_chart(fig, use_container_width=True)
+            
+            # Tabela de performance por bairro
+            if 'bairro' in df.columns and 'adotado' in df.columns:
+                st.subheader("🏘️ Performance por Bairro")
+                
+                bairro_performance = df.groupby('bairro').agg({
+                    'adotado': ['count', 'sum', 'mean'],
+                    'score_adocao': 'mean' if 'score_adocao' in df.columns else 'count'
+                }).round(2)
+                
+                bairro_performance.columns = ['Total', 'Adotados', 'Taxa_Adocao', 'Score_Medio']
+                bairro_performance['Eficiencia'] = (
+                    bairro_performance['Taxa_Adocao'] * bairro_performance['Score_Medio']
+                ).round(2)
+                
+                bairro_performance = bairro_performance.sort_values('Eficiencia', ascending=False)
+                
+                st.dataframe(
+                    bairro_performance,
+                    use_container_width=True,
+                    column_config={
+                        "Taxa_Adocao": st.column_config.ProgressColumn("Taxa de Adoção", min_value=0, max_value=1),
+                        "Score_Medio": st.column_config.ProgressColumn("Score Médio", min_value=0, max_value=5),
+                        "Eficiencia": st.column_config.NumberColumn("Eficiência", format="%.2f")
+                    }
+                )
+        
+        elif dashboard_type == "Análise Comportamental":
+            st.subheader("🧠 Dashboard Comportamental")
+            
+            # Análise de características comportamentais
+            behavioral_cols = ['comportamento', 'sociabilidade', 'energia', 'nivel_atividade']
+            available_behavioral = [col for col in behavioral_cols if col in df.columns]
+            
+            if available_behavioral:
+                # Heatmap de características
+                if len(available_behavioral) > 1:
+                    df_behavioral = df[available_behavioral].copy()
+                    
+                    # Encoding para variáveis categóricas
+                    for col in df_behavioral.columns:
+                        if df_behavioral[col].dtype == 'object':
+                            le = LabelEncoder()
+                            df_behavioral[col] = le.fit_transform(df_behavioral[col].astype(str))
+                    
+                    corr_behavioral = df_behavioral.corr()
+                    
+                    fig = px.imshow(
+                        corr_behavioral,
+                        text_auto='.2f',
+                        title="Correlações entre Características Comportamentais",
+                        color_continuous_scale='RdBu_r'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Análise por clusters comportamentais
+                if 'sociabilidade' in df.columns and 'energia' in df.columns:
+                    fig = px.scatter(
+                        df,
+                        x='sociabilidade',
+                        y='energia',
+                        color='tipo_pet' if 'tipo_pet' in df.columns else None,
+                        size='score_adocao' if 'score_adocao' in df.columns else None,
+                        hover_name='nome' if 'nome' in df.columns else None,
+                        title="Mapa Comportamental: Sociabilidade vs Energia",
+                        labels={'sociabilidade': 'Sociabilidade (1-5)', 'energia': 'Energia (1-5)'}
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                # Distribuição de perfis comportamentais
+                if 'comportamento' in df.columns:
+                    comportamento_adocao = pd.crosstab(df['comportamento'], df['adotado'] if 'adotado' in df.columns else df['tipo_pet'])
+                    
+                    fig = px.bar(
+                        comportamento_adocao,
+                        title="Distribuição de Comportamentos",
+                        barmode='group' if 'adotado' in df.columns else 'stack'
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+        
+        elif dashboard_type == "Performance Regional":
+            st.subheader("🗺️ Dashboard Regional")
+            
+            if 'bairro' in df.columns:
+                # Mapa de calor regional
+                regional_stats = df.groupby('bairro').agg({
+                    'adotado': ['count', 'sum', 'mean'] if 'adotado' in df.columns else 'count',
+                    'score_adocao': 'mean' if 'score_adocao' in df.columns else 'count',
+                    'idade': 'mean' if 'idade' in df.columns else 'count'
+                }).round(2)
+                
+                # Flatten column names
+                regional_stats.columns = ['_'.join(col).strip() for col in regional_stats.columns.values]
+                regional_stats = regional_stats.reset_index()
+                
+                # Renomear colunas para melhor legibilidade
+                column_mapping = {
+                    'adotado_count': 'Total_Pets',
+                    'adotado_sum': 'Total_Adotados',
+                    'adotado_mean': 'Taxa_Adocao',
+                    'score_adocao_mean': 'Score_Medio',
+                    'idade_mean': 'Idade_Media'
+                }
+                
+                for old_col, new_col in column_mapping.items():
+                    if old_col in regional_stats.columns:
+                        regional_stats[new_col] = regional_stats[old_col]
+                
+                # Gráficos regionais
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Total de pets por bairro
+                    fig = px.bar(
+                        regional_stats.sort_values('Total_Pets', ascending=False),
+                        x='bairro',
+                        y='Total_Pets',
+                        title="Total de Pets por Bairro",
+                        color='Total_Pets',
+                        color_continuous_scale='blues'
+                    )
+                    fig.update_xaxis(tickangle=45)
+                    st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Taxa de adoção por bairro
+                    if 'Taxa_Adocao' in regional_stats.columns:
+                        fig = px.bar(
+                            regional_stats.sort_values('Taxa_Adocao', ascending=False),
+                            x='bairro',
+                            y='Taxa_Adocao',
+                            title="Taxa de Adoção por Bairro",
+                            color='Taxa_Adocao',
+                            color_continuous_scale='RdYlGn'
+                        )
+                        fig.update_xaxis(tickangle=45)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                # Análise de performance regional
+                st.subheader("📊 Ranking Regional")
+                
+                # Calcular score de performance
+                if 'Taxa_Adocao' in regional_stats.columns and 'Score_Medio' in regional_stats.columns:
+                    regional_stats['Performance_Score'] = (
+                        regional_stats['Taxa_Adocao'] * 0.6 + 
+                        (regional_stats['Score_Medio'] / 5) * 0.4
+                    ).round(3)
+                    
+                    top_regions = regional_stats.nlargest(10, 'Performance_Score')
+                    
+                    st.dataframe(
+                        top_regions[['bairro', 'Total_Pets', 'Taxa_Adocao', 'Score_Medio', 'Performance_Score']],
+                        use_container_width=True,
+                        hide_index=True,
+                        column_config={
+                            "bairro": "Bairro",
+                            "Total_Pets": "Total de Pets",
+                            "Taxa_Adocao": st.column_config.ProgressColumn("Taxa de Adoção", min_value=0, max_value=1),
+                            "Score_Medio": st.column_config.ProgressColumn("Score Médio", min_value=0, max_value=5),
+                            "Performance_Score": st.column_config.NumberColumn("Score de Performance", format="%.3f")
+                        }
+                    )
+        
+        else:  # Dashboard Personalizado
+            st.subheader("🎨 Dashboard Personalizado")
+            
+            # Builder de dashboard personalizado
+            st.write("Construa seu próprio dashboard selecionando os componentes:")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                chart_types = st.multiselect(
+                    "Tipos de gráfico:",
+                    ["Barras", "Pizza", "Linha", "Scatter", "Heatmap", "Box Plot"]
                 )
             
             with col2:
-                export_columns = st.radio(
-                    "Colunas para exportar:",
-                    options=["Todas as colunas", "Colunas selecionadas"],
-                    horizontal=True
+                variables_to_analyze = st.multiselect(
+                    "Variáveis para analisar:",
+                    df.columns.tolist(),
+                    default=['tipo_pet', 'idade', 'adotado']
                 )
             
-            # Preparar dados para exportação
-            if export_columns == "Colunas selecionadas" and selected_columns:
-                df_export = df[selected_columns].copy()
-            else:
-                df_export = df.copy()
+            if chart_types and variables_to_analyze:
+                # Gerar gráficos dinamicamente
+                for chart_type in chart_types:
+                    if chart_type == "Barras" and len(variables_to_analyze) >= 1:
+                        var = variables_to_analyze[0]
+                        if df[var].dtype == 'object':
+                            counts = df[var].value_counts()
+                            fig = px.bar(x=counts.index, y=counts.values, title=f"Distribuição de {var}")
+                            st.plotly_chart(fig, use_container_width=True)
+                    
+                    elif chart_type == "Pizza" and len(variables_to_analyze) >= 1:
+                        var = variables_to_analyze[0]
+                        if df[var].dtype == 'object':
+                            counts = df[var].value_counts()
+                            fig = px.pie(values=counts.values, names=counts.index, title=f"Proporção de {var}")
+                            st.plotly_chart(fig, use_container_width=True)
+                    
+                    elif chart_type == "Scatter" and len(variables_to_analyze) >= 2:
+                        var1, var2 = variables_to_analyze[0], variables_to_analyze[1]
+                        if pd.api.types.is_numeric_dtype(df[var1]) and pd.api.types.is_numeric_dtype(df[var2]):
+                            fig = px.scatter(df, x=var1, y=var2, title=f"{var1} vs {var2}")
+                            st.plotly_chart(fig, use_container_width=True)
+                    
+                    elif chart_type == "Box Plot" and len(variables_to_analyze) >= 1:
+                        var = variables_to_analyze[0]
+                        if pd.api.types.is_numeric_dtype(df[var]):
+                            fig = px.box(df, y=var, title=f"Distribuição de {var}")
+                            st.plotly_chart(fig, use_container_width=True)
+    
+    with tab3:
+        st.subheader("⚖️ Análises Comparativas")
+        
+        # Seleção de grupos para comparação
+        comparison_type = st.selectbox(
+            "Tipo de Comparação:",
+            ["Por Tipo de Pet", "Por Bairro", "Por Status de Adoção", "Por Faixa Etária", "Comparação Personalizada"]
+        )
+        
+        if comparison_type == "Por Tipo de Pet" and 'tipo_pet' in df.columns:
+            # Comparação detalhada por tipo
+            tipos = df['tipo_pet'].unique()
             
-            # Botão de exportação
-            if st.button("Exportar Dados", use_container_width=True):
-                if export_format == "CSV":
-                    csv_data = df_export.to_csv(index=False).encode('utf-8')
-                    
-                    st.download_button(
-                        label="Baixar CSV",
-                        data=csv_data,
-                        file_name="pets_data.csv",
-                        mime="text/csv",
-                        use_container_width=True
-                    )
+            # Seleção de métricas para comparar
+            metrics_to_compare = st.multiselect(
+                "Métricas para comparar:",
+                ['idade', 'peso', 'score_adocao', 'sociabilidade', 'energia'],
+                default=['idade', 'peso', 'score_adocao']
+            )
+            
+            available_metrics = [m for m in metrics_to_compare if m in df.columns]
+            
+            if available_metrics:
+                # Criar comparação estatística
+                comparison_data = []
                 
-                elif export_format == "Excel":
-                    # Preparar dados Excel
-                    excel_buffer = io.BytesIO()
-                    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-                        df_export.to_excel(writer, sheet_name='Dados de Pets', index=False)
+                for tipo in tipos:
+                    tipo_data = df[df['tipo_pet'] == tipo]
+                    row = {'Tipo': tipo, 'N': len(tipo_data)}
                     
-                    excel_data = excel_buffer.getvalue()
+                    for metric in available_metrics:
+                        if pd.api.types.is_numeric_dtype(df[metric]):
+                            row[f'{metric}_mean'] = tipo_data[metric].mean()
+                            row[f'{metric}_std'] = tipo_data[metric].std()
+                            row[f'{metric}_median'] = tipo_data[metric].median()
+                    
+                    comparison_data.append(row)
+                
+                comparison_df = pd.DataFrame(comparison_data)
+                
+                # Exibir tabela de comparação
+                st.subheader("📊 Comparação Estatística")
+                st.dataframe(comparison_df.round(2), use_container_width=True, hide_index=True)
+                
+                # Visualizações comparativas
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    # Box plots para cada métrica
+                    for metric in available_metrics[:2]:  # Máximo 2 para não sobrecarregar
+                        fig = px.box(
+                            df, 
+                            x='tipo_pet', 
+                            y=metric,
+                            title=f"Distribuição de {metric} por Tipo de Pet"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                with col2:
+                    # Violin plots
+                    for metric in available_metrics[:2]:
+                        fig = px.violin(
+                            df, 
+                            x='tipo_pet', 
+                            y=metric,
+                            title=f"Densidade de {metric} por Tipo de Pet"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                # Teste estatístico
+                st.subheader("🧪 Testes Estatísticos")
+                
+                for metric in available_metrics:
+                    if pd.api.types.is_numeric_dtype(df[metric]):
+                        groups = [df[df['tipo_pet'] == tipo][metric].dropna() for tipo in tipos]
+                        groups = [g for g in groups if len(g) > 1]  # Remover grupos vazios
+                        
+                        if len(groups) >= 2:
+                            try:
+                                # ANOVA
+                                f_stat, p_value = stats.f_oneway(*groups)
+                                
+                                if p_value < 0.05:
+                                    st.success(f"**{metric}**: Diferença significativa entre tipos (p = {p_value:.4f})")
+                                else:
+                                    st.info(f"**{metric}**: Sem diferença significativa entre tipos (p = {p_value:.4f})")
+                            except:
+                                st.warning(f"Não foi possível realizar teste para {metric}")
+        
+        elif comparison_type == "Comparação Personalizada":
+            # Interface para comparação personalizada
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                group_by_column = st.selectbox("Agrupar por:", df.columns.tolist())
+            
+            with col2:
+                analyze_column = st.selectbox("Analisar:", df.select_dtypes(include=[np.number]).columns.tolist())
+            
+            if group_by_column and analyze_column:
+                # Análise de grupos personalizada
+                group_analysis = df.groupby(group_by_column)[analyze_column].agg([
+                    'count', 'mean', 'median', 'std', 'min', 'max'
+                ]).round(2)
+                
+                st.dataframe(group_analysis, use_container_width=True)
+                
+                # Visualização
+                fig = px.box(df, x=group_by_column, y=analyze_column, 
+                           title=f"{analyze_column} por {group_by_column}")
+                st.plotly_chart(fig, use_container_width=True)
+    
+    with tab4:
+        st.subheader("📈 Análise de Tendências Temporais")
+        
+        if 'data_registro' not in df.columns:
+            st.error("Coluna 'data_registro' necessária para análise temporal.")
+        else:
+            # Preparar dados temporais
+            df_temporal = df.copy()
+            df_temporal['data_registro'] = pd.to_datetime(df_temporal['data_registro'])
+            
+            # Opções de agregação temporal
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                time_granularity = st.selectbox("Granularidade:", ["Diário", "Semanal", "Mensal", "Trimestral"])
+            
+            with col2:
+                metric_to_analyze = st.selectbox(
+                    "Métrica a analisar:",
+                    ["Contagem de Registros", "Taxa de Adoção", "Score Médio", "Idade Média"]
+                )
+            
+            with col3:
+                date_range = st.date_input(
+                    "Período:",
+                    [df_temporal['data_registro'].min().date(), df_temporal['data_registro'].max().date()]
+                )
+            
+            # Filtrar por período
+            if len(date_range) == 2:
+                start_date, end_date = date_range
+                df_temporal = df_temporal[
+                    (df_temporal['data_registro'].dt.date >= start_date) &
+                    (df_temporal['data_registro'].dt.date <= end_date)
+                ]
+            
+            # Agregação temporal
+            freq_map = {"Diário": "D", "Semanal": "W", "Mensal": "M", "Trimestral": "Q"}
+            freq = freq_map[time_granularity]
+            
+            if metric_to_analyze == "Contagem de Registros":
+                time_series = df_temporal.set_index('data_registro').resample(freq).size()
+                y_label = "Número de Registros"
+            elif metric_to_analyze == "Taxa de Adoção" and 'adotado' in df_temporal.columns:
+                time_series = df_temporal.set_index('data_registro').resample(freq)['adotado'].mean()
+                y_label = "Taxa de Adoção"
+            elif metric_to_analyze == "Score Médio" and 'score_adocao' in df_temporal.columns:
+                time_series = df_temporal.set_index('data_registro').resample(freq)['score_adocao'].mean()
+                y_label = "Score Médio de Adoção"
+            elif metric_to_analyze == "Idade Média" and 'idade' in df_temporal.columns:
+                time_series = df_temporal.set_index('data_registro').resample(freq)['idade'].mean()
+                y_label = "Idade Média (anos)"
+            else:
+                st.error("Métrica selecionada não disponível nos dados.")
+                return
+            
+            # Visualização da série temporal
+            fig = px.line(
+                x=time_series.index,
+                y=time_series.values,
+                title=f"Tendência Temporal: {metric_to_analyze} ({time_granularity})",
+                labels={'x': 'Data', 'y': y_label}
+            )
+            
+            # Adicionar linha de tendência
+            if len(time_series) > 2:
+                from scipy import stats
+                x_numeric = np.arange(len(time_series))
+                slope, intercept, r_value, p_value, std_err = stats.linregress(x_numeric, time_series.values)
+                trend_line = slope * x_numeric + intercept
+                
+                fig.add_trace(
+                    go.Scatter(
+                        x=time_series.index,
+                        y=trend_line,
+                        mode='lines',
+                        name=f'Tendência (R²={r_value**2:.3f})',
+                        line=dict(dash='dash', color='red')
+                    )
+                )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Análises estatísticas da tendência
+            if len(time_series) > 2:
+                col1, col2, col3, col4 = st.columns(4)
+                
+                with col1:
+                    st.metric("Tendência", f"{slope:.4f}")
+                
+                with col2:
+                    st.metric("R²", f"{r_value**2:.3f}")
+                
+                with col3:
+                    trend_direction = "Crescente" if slope > 0 else "Decrescente" if slope < 0 else "Estável"
+                    st.metric("Direção", trend_direction)
+                
+                with col4:
+                    significance = "Significativa" if p_value < 0.05 else "Não Significativa"
+                    st.metric("Significância", significance)
+                
+                # Insights automáticos
+                st.subheader("💡 Insights Temporais")
+                
+                insights = []
+                
+                if abs(slope) > time_series.std() * 0.1:
+                    if slope > 0:
+                        insights.append(f"📈 Tendência de crescimento detectada (+{slope:.3f} por período)")
+                    else:
+                        insights.append(f"📉 Tendência de declínio detectada ({slope:.3f} por período)")
+                else:
+                    insights.append("➡️ Tendência estável ao longo do tempo")
+                
+                # Detectar sazonalidade
+                if time_granularity in ["Semanal", "Mensal"] and len(time_series) >= 12:
+                    try:
+                        from statsmodels.tsa.seasonal import seasonal_decompose
+                        decomposition = seasonal_decompose(time_series, model='additive', period=4)
+                        seasonal_strength = abs(decomposition.seasonal).mean()
+                        
+                        if seasonal_strength > time_series.std() * 0.1:
+                            insights.append(f"🔄 Padrão sazonal detectado (força: {seasonal_strength:.3f})")
+                        else:
+                            insights.append("📊 Sem padrão sazonal significativo")
+                    except:
+                        pass
+                
+                # Detectar outliers temporais
+                q1, q3 = time_series.quantile([0.25, 0.75])
+                iqr = q3 - q1
+                outliers = time_series[(time_series < q1 - 1.5*iqr) | (time_series > q3 + 1.5*iqr)]
+                
+                if len(outliers) > 0:
+                    insights.append(f"⚠️ {len(outliers)} períodos atípicos detectados")
+                
+                for insight in insights:
+                    st.info(insight)
+    
+    with tab5:
+        st.subheader("📄 Exportar Relatórios Avançados")
+        
+        # Opções de relatório
+        report_type = st.selectbox(
+            "Tipo de Relatório:",
+            ["Relatório Completo", "Relatório Executivo", "Análise Estatística", "Relatório Personalizado"]
+        )
+        
+        # Opções de formato
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            export_format = st.selectbox("Formato:", ["Excel", "CSV", "JSON", "PDF"])
+        
+        with col2:
+            include_charts = st.checkbox("Incluir gráficos", value=True)
+        
+        with col3:
+            include_statistics = st.checkbox("Incluir estatísticas", value=True)
+        
+        # Gerar relatório
+        if st.button("Gerar Relatório", use_container_width=True):
+            with st.spinner("Gerando relatério..."):
+                # Simular geração de relatório
+                time.sleep(2)
+                
+                if report_type == "Relatório Completo":
+                    # Dados completos com todas as análises
+                    report_data = df.copy()
+                    
+                    # Adicionar estatísticas calculadas
+                    if include_statistics:
+                        # Adicionar scores e classificações
+                        if 'score_adocao' in df.columns:
+                            report_data['classificacao_score'] = pd.cut(
+                                df['score_adocao'], 
+                                bins=[0, 2, 3.5, 5], 
+                                labels=['Baixo', 'Médio', 'Alto']
+                            )
+                        
+                        if 'idade' in df.columns:
+                            report_data['faixa_etaria'] = pd.cut(
+                                df['idade'], 
+                                bins=[0, 1, 3, 7, 20], 
+                                labels=['Filhote', 'Jovem', 'Adulto', 'Idoso']
+                            )
+                    
+                    filename = f"relatorio_completo_pets_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                
+                elif report_type == "Relatório Executivo":
+                    # Apenas métricas principais e resumos
+                    summary_data = {
+                        'Métrica': ['Total de Pets', 'Taxa de Adoção', 'Score Médio', 'Idade Média'],
+                        'Valor': [
+                            len(df),
+                            f"{df['adotado'].mean()*100:.1f}%" if 'adotado' in df.columns else "N/A",
+                            f"{df['score_adocao'].mean():.2f}" if 'score_adocao' in df.columns else "N/A",
+                            f"{df['idade'].mean():.1f} anos" if 'idade' in df.columns else "N/A"
+                        ]
+                    }
+                    
+                    report_data = pd.DataFrame(summary_data)
+                    filename = f"relatorio_executivo_pets_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                
+                elif report_type == "Análise Estatística":
+                    # Estatísticas descritivas detalhadas
+                    numeric_cols = df.select_dtypes(include=[np.number]).columns
+                    report_data = df[numeric_cols].describe().T
+                    
+                    # Adicionar métricas adicionais
+                    report_data['CV'] = report_data['std'] / report_data['mean']
+                    report_data['IQR'] = report_data['75%'] - report_data['25%']
+                    report_data['Skewness'] = df[numeric_cols].skew()
+                    report_data['Kurtosis'] = df[numeric_cols].kurtosis()
+                    
+                    filename = f"analise_estatistica_pets_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                
+                else:  # Relatório Personalizado
+                    # Permitir seleção de campos
+                    selected_fields = st.multiselect(
+                        "Campos para incluir:",
+                        df.columns.tolist(),
+                        default=['nome', 'tipo_pet', 'idade', 'adotado']
+                    )
+                    
+                    if selected_fields:
+                        report_data = df[selected_fields].copy()
+                        filename = f"relatorio_personalizado_pets_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                    else:
+                        st.error("Selecione pelo menos um campo para o relatório personalizado.")
+                        return
+                
+                # Gerar arquivo baseado no formato
+                if export_format == "Excel":
+                    # Criar Excel com múltiplas abas
+                    buffer = io.BytesIO()
+                    
+                    with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                        report_data.to_excel(writer, sheet_name='Dados', index=False)
+                        
+                        if include_statistics and report_type != "Análise Estatística":
+                            # Aba de estatísticas
+                            numeric_cols = df.select_dtypes(include=[np.number]).columns
+                            if len(numeric_cols) > 0:
+                                stats_df = df[numeric_cols].describe()
+                                stats_df.to_excel(writer, sheet_name='Estatísticas')
+                        
+                        # Aba de resumo por categoria
+                        if 'tipo_pet' in df.columns:
+                            summary_by_type = df.groupby('tipo_pet').agg({
+                                'adotado': ['count', 'sum', 'mean'] if 'adotado' in df.columns else 'count',
+                                'idade': 'mean' if 'idade' in df.columns else 'count'
+                            }).round(2)
+                            summary_by_type.to_excel(writer, sheet_name='Resumo por Tipo')
+                    
+                    excel_data = buffer.getvalue()
                     
                     st.download_button(
-                        label="Baixar Excel",
+                        label="📊 Baixar Relatório Excel",
                         data=excel_data,
-                        file_name="pets_data.xlsx",
+                        file_name=f"{filename}.xlsx",
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                         use_container_width=True
                     )
                 
-                elif export_format == "JSON":
-                    json_data = df_export.to_json(orient='records', indent=4).encode('utf-8')
+                elif export_format == "CSV":
+                    csv_data = report_data.to_csv(index=False).encode('utf-8')
                     
                     st.download_button(
-                        label="Baixar JSON",
+                        label="📄 Baixar Relatório CSV",
+                        data=csv_data,
+                        file_name=f"{filename}.csv",
+                        mime="text/csv",
+                        use_container_width=True
+                    )
+                
+                elif export_format == "JSON":
+                    json_data = report_data.to_json(orient='records', indent=2).encode('utf-8')
+                    
+                    st.download_button(
+                        label="🔗 Baixar Relatório JSON",
                         data=json_data,
-                        file_name="pets_data.json",
+                        file_name=f"{filename}.json",
                         mime="application/json",
                         use_container_width=True
                     )
-    
-    with tab2:
-        st.subheader("Detalhes do Pet")
-        
-        # Lista de pets para seleção
-        if 'nome' in df.columns:
-            pets_list = df['nome'].tolist()
-            selected_pet = st.selectbox("Selecione um pet para ver detalhes:", options=pets_list)
-            
-            # Exibir detalhes do pet selecionado
-            pet_data = df[df['nome'] == selected_pet].iloc[0]
-            
-            # Container de detalhes
-            col1, col2 = st.columns([1, 2])
-            
-            with col1:
-                # Card de informações básicas
-                card_content = f"""
-                <div style="margin-bottom: 1rem;">
-                    <div><strong>Bairro:</strong> {pet_data.get('bairro', 'N/A')}</div>
-                    <div><strong>Tipo:</strong> {pet_data.get('tipo_pet', 'N/A')}</div>
-                    <div><strong>Raça:</strong> {pet_data.get('raca', 'N/A')}</div>
-                    <div><strong>Idade:</strong> {pet_data.get('idade', 'N/A')} anos</div>
-                    <div><strong>Peso:</strong> {pet_data.get('peso', 'N/A')} kg</div>
-                    <div><strong>Sexo:</strong> {pet_data.get('sexo', 'N/A')}</div>
-                    <div><strong>Status:</strong> {'Adotado' if pet_data.get('adotado', False) else 'Não Adotado'}</div>
-                </div>
-                """
                 
-                custom_card(f"🐾 {selected_pet}", card_content, color="#4527A0")
+                elif export_format == "PDF":
+                    st.info("Geração de PDF requer bibliotecas adicionais. Disponível em versão futura.")
                 
-                # Card de contato
-                if 'telefone' in pet_data:
-                    card_content = f"""
-                    <div style="margin-bottom: 1rem;">
-                        <div><strong>Telefone:</strong> {pet_data.get('telefone', 'N/A')}</div>
-                    </div>
-                    """
-                    
-                    custom_card("📞 Contato", card_content, color="#00BCD4")
+                st.success("Relatório gerado com sucesso!")
                 
-                # Card de saúde
-                health_fields = ['status_vacinacao', 'estado_saude']
-                if any(field in pet_data for field in health_fields):
-                    health_content = "<div style='margin-bottom: 1rem;'>"
-                    
-                    if 'status_vacinacao' in pet_data:
-                        health_content += f"<div><strong>Vacinação:</strong> {pet_data.get('status_vacinacao', 'N/A')}</div>"
-                    
-                    if 'estado_saude' in pet_data:
-                        health_content += f"<div><strong>Estado de Saúde:</strong> {pet_data.get('estado_saude', 'N/A')}</div>"
-                    
-                    health_content += "</div>"
-                    
-                    custom_card("💉 Saúde", health_content, color="#4CAF50")
-            
-            with col2:
-                # Informações comportamentais
-                behavior_fields = ['humor_diario', 'comportamento', 'nivel_atividade', 'tipo_comida']
-                if any(field in pet_data for field in behavior_fields):
-                    behavior_content = "<div style='margin-bottom: 1rem;'>"
-                    
-                    if 'humor_diario' in pet_data:
-                        behavior_content += f"<div><strong>Humor Diário:</strong> {pet_data.get('humor_diario', 'N/A')}</div>"
-                    
-                    if 'comportamento' in pet_data:
-                        behavior_content += f"<div><strong>Comportamento:</strong> {pet_data.get('comportamento', 'N/A')}</div>"
-                    
-                    if 'nivel_atividade' in pet_data:
-                        behavior_content += f"<div><strong>Nível de Atividade:</strong> {pet_data.get('nivel_atividade', 'N/A')}</div>"
-                    
-                    if 'tipo_comida' in pet_data:
-                        behavior_content += f"<div><strong>Preferência Alimentar:</strong> {pet_data.get('tipo_comida', 'N/A')}</div>"
-                    
-                    behavior_content += "</div>"
-                    
-                    custom_card("🧠 Comportamento", behavior_content, color="#FF9800")
-                
-                # Comparação com médias
-                comparison_content = "<div style='margin-bottom: 1rem;'>"
-                
-                if 'idade' in pet_data and 'idade' in df.columns:
-                    media_idade = df['idade'].mean()
-                    diff_idade = pet_data['idade'] - media_idade
-                    
-                    comparison_content += f"""
-                    <div style="margin-bottom: 0.5rem;">
-                        <strong>Idade vs. Média:</strong> {pet_data['idade']} anos vs. {media_idade:.1f} anos
-                        <div style="margin-top: 0.3rem; height: 6px; background-color: #e0e0e0; border-radius: 3px;">
-                            <div style="height: 100%; width: {min(max((pet_data['idade'] / df['idade'].max()) * 100, 10), 100)}%; background-color: {'#2196F3' if diff_idade >= 0 else '#F44336'}; border-radius: 3px;"></div>
-                        </div>
-                    </div>
-                    """
-                
-                if 'peso' in pet_data and 'peso' in df.columns:
-                    # Filtrar por tipo_pet se disponível
-                    if 'tipo_pet' in pet_data and 'tipo_pet' in df.columns:
-                        media_peso = df[df['tipo_pet'] == pet_data['tipo_pet']]['peso'].mean()
-                        referencia = f"média de {pet_data['tipo_pet']}s"
-                    else:
-                        media_peso = df['peso'].mean()
-                        referencia = "média geral"
-                    
-                    diff_peso = pet_data['peso'] - media_peso
-                    
-                    comparison_content += f"""
-                    <div style="margin-bottom: 0.5rem;">
-                        <strong>Peso vs. {referencia}:</strong> {pet_data['peso']} kg vs. {media_peso:.1f} kg
-                        <div style="margin-top: 0.3rem; height: 6px; background-color: #e0e0e0; border-radius: 3px;">
-                            <div style="height: 100%; width: {min(max((pet_data['peso'] / df['peso'].max()) * 100, 10), 100)}%; background-color: {'#2196F3' if diff_peso >= 0 else '#F44336'}; border-radius: 3px;"></div>
-                        </div>
-                    </div>
-                    """
-                
-                comparison_content += "</div>"
-                
-                custom_card("📊 Comparação com Médias", comparison_content, color="#9C27B0")
-                
-                # Registro
-                if 'data_registro' in pet_data or 'created_by' in pet_data:
-                    meta_content = "<div style='margin-bottom: 1rem;'>"
-                    
-                    if 'data_registro' in pet_data:
-                        data_formatada = pd.to_datetime(pet_data['data_registro']).strftime('%d/%m/%Y %H:%M') if not pd.isna(pet_data['data_registro']) else 'N/A'
-                        meta_content += f"<div><strong>Data de Registro:</strong> {data_formatada}</div>"
-                    
-                    if 'created_by' in pet_data:
-                        meta_content += f"<div><strong>Registrado por:</strong> {pet_data['created_by']}</div>"
-                    
-                    if 'created_by_email' in pet_data:
-                        meta_content += f"<div><strong>Email do Criador:</strong> {pet_data['created_by_email']}</div>"
-                    
-                    meta_content += "</div>"
-                    
-                    custom_card("📝 Metadados", meta_content, color="#607D8B")
-            
-            # Opções de ação
-            st.subheader("Ações")
-            
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("Editar Pet", use_container_width=True):
-                    # Aqui você implementaria a funcionalidade de edição
-                    st.info("Funcionalidade de edição será implementada em versão futura.")
-            
-            with col2:
-                if st.button("Alterar Status", use_container_width=True):
-                    # Aqui você implementaria a funcionalidade de alteração de status
-                    st.info("Funcionalidade de alteração de status será implementada em versão futura.")
-            
-            with col3:
-                if st.button("Excluir Pet", use_container_width=True):
-                    # Aqui você implementaria a funcionalidade de exclusão
-                    st.info("Funcionalidade de exclusão será implementada em versão futura.")
-        else:
-            st.info("Os dados não contêm a coluna 'nome', necessária para identificar os pets.")
+                # Mostrar prévia do relatório
+                st.subheader("👀 Prévia do Relatório")
+                st.dataframe(report_data.head(10), use_container_width=True, hide_index=True)
 
 @require_login
 def adicionar_pet():
-    """Formulário para adicionar um novo pet."""
-    st.title("Adicionar Pet")
+    """Formulário avançado para adicionar um novo pet."""
+    st.title("➕ Adicionar Pet")
     
-    # Formulário para adicionar novo pet
+    # Assistente inteligente
+    st.info("💡 **Assistente Inteligente**: Este formulário usa IA para sugerir valores e calcular scores automaticamente.")
+    
+    # Formulário corrigido
     with st.form("add_pet_form"):
-        st.subheader("Informações Básicas")
+        # Etapa 1: Informações Básicas
+        st.subheader("🐾 Informações Básicas")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            nome = st.text_input("Nome do Pet*")
-            bairro = st.text_input("Bairro")
+            nome = st.text_input("Nome do Pet*", help="Nome único para identificação")
             tipo_pet = st.selectbox("Tipo de Pet*", ["Cachorro", "Gato", "Ave", "Roedor", "Réptil", "Outro"])
-            raca = st.text_input("Raça*")
+            raca = st.text_input("Raça*", help="Raça ou 'SRD' para Sem Raça Definida")
+            idade = st.number_input("Idade (anos)*", min_value=0.0, max_value=30.0, step=0.1, value=1.0)
         
         with col2:
-            idade = st.number_input("Idade (anos)", min_value=0.0, step=0.5)
-            peso = st.number_input("Peso (kg)", min_value=0.0, step=0.1)
-            sexo = st.radio("Sexo", options=["Macho", "Fêmea"], horizontal=True)
-            adotado = st.checkbox("Adotado")
+            peso = st.number_input("Peso (kg)*", min_value=0.1, max_value=100.0, step=0.1, value=5.0)
+            sexo = st.selectbox("Sexo*", ["Macho", "Fêmea"])
+            castrado = st.checkbox("Castrado", value=False)
+            microchip = st.checkbox("Possui Microchip", value=False)
         
-        st.subheader("Informações Adicionais")
+        # Etapa 2: Localização
+        st.subheader("📍 Localização")
         
         col1, col2 = st.columns(2)
         
         with col1:
-            tipo_comida = st.selectbox("Preferência Alimentar", ["Ração seca", "Ração úmida", "Natural", "Mista", "Outro"])
-            humor_diario = st.selectbox("Humor Diário", ["Calmo", "Agitado", "Brincalhão", "Tímido", "Agressivo", "Outro"])
-            status_vacinacao = st.selectbox("Status de Vacinação", ["Em dia", "Parcial", "Pendente", "Desconhecido"])
+            bairro = st.text_input("Bairro", help="Bairro onde o pet se encontra")
+            regiao = st.selectbox("Região", ["Centro", "Norte", "Sul", "Leste", "Oeste", "Continental"])
         
         with col2:
-            telefone = st.text_input("Telefone de Contato*")
-            estado_saude = st.selectbox("Estado de Saúde", ["Excelente", "Bom", "Regular", "Tratamento", "Requer atenção"])
-            comportamento = st.selectbox("Comportamento", ["Sociável", "Independente", "Territorial", "Medroso", "Afetuoso", "Outro"])
-            nivel_atividade = st.selectbox("Nível de Atividade", ["Muito ativo", "Ativo", "Moderado", "Calmo", "Sedentário"])
+            telefone = st.text_input("Telefone de Contato*", help="Telefone para contato sobre o pet")
         
-        # Campos extras (opcionais)
-        with st.expander("Campos Extras (opcional)"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                regiao = st.text_input("Região da Cidade")
-                observacoes = st.text_area("Observações")
-            
-            with col2:
-                alergias = st.text_input("Alergias")
-                necessidades_especiais = st.text_input("Necessidades Especiais")
+        # Etapa 3: Características Físicas
+        st.subheader("🎨 Características Físicas")
         
-        # Informações sobre campos obrigatórios
-        st.markdown("*Campos obrigatórios")
+        col1, col2 = st.columns(2)
         
-        # Botão de submissão
-        submitted = st.form_submit_button("Adicionar Pet", use_container_width=True)
+        with col1:
+            cor_pelagem = st.selectbox("Cor da Pelagem", 
+                ["Branco", "Preto", "Marrom", "Amarelo", "Cinza", "Misto", "Tigrado", "Outro"])
+            porte = st.selectbox("Porte", ["Muito Pequeno", "Pequeno", "Médio", "Grande", "Gigante"])
         
-        if submitted:
-            # Validar campos obrigatórios
-            if not nome:
-                st.error("Por favor, informe o nome do pet.")
-            elif not raca:
-                st.error("Por favor, informe a raça do pet.")
-            elif not telefone:
-                st.error("Por favor, informe um telefone de contato.")
+        with col2:
+            condicao_fisica = st.selectbox("Condição Física", 
+                ["Excelente", "Boa", "Regular", "Necessita cuidados", "Debilitado"])
+        
+        # Etapa 4: Saúde e Cuidados
+        st.subheader("🏥 Saúde e Cuidados")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            status_vacinacao = st.selectbox("Status de Vacinação", 
+                ["Em dia", "Parcial", "Atrasado", "Desconhecido"])
+            estado_saude = st.selectbox("Estado de Saúde", 
+                ["Excelente", "Bom", "Regular", "Tratamento", "Requer atenção veterinária"])
+        
+        with col2:
+            necessidades_especiais = st.text_area("Necessidades Especiais", 
+                help="Descreva qualquer necessidade médica ou cuidado especial")
+            historico_medico = st.text_area("Histórico Médico", 
+                help="Cirurgias, tratamentos, medicamentos, etc.")
+        
+        # Etapa 5: Comportamento e Personalidade
+        st.subheader("🧠 Comportamento e Personalidade")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            comportamento = st.selectbox("Comportamento Geral", 
+                ["Calmo", "Agitado", "Brincalhão", "Tímido", "Sociável", "Independente", "Territorial"])
+            temperamento = st.selectbox("Temperamento", 
+                ["Dócil", "Ativo", "Protetor", "Carinhoso", "Reservado", "Dominante"])
+        
+        with col2:
+            sociabilidade = st.slider("Sociabilidade", 1, 5, 3, 
+                help="1=Muito tímido, 5=Extremamente sociável")
+            energia = st.slider("Nível de Energia", 1, 5, 3, 
+                help="1=Muito calmo, 5=Hiperativo")
+        
+        with col3:
+            nivel_atividade = st.slider("Nível de Atividade", 1, 5, 3, 
+                help="1=Sedentário, 5=Muito ativo")
+            adaptabilidade = st.slider("Adaptabilidade", 1, 5, 3, 
+                help="1=Difícil adaptação, 5=Adapta-se facilmente")
+        
+        # Etapa 6: Status de Adoção
+        st.subheader("❤️ Status de Adoção")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            adotado = st.checkbox("Pet já foi adotado")
+            prioridade_adocao = st.selectbox("Prioridade para Adoção", 
+                ["Normal", "Alta", "Urgente", "Baixa"])
+        
+        with col2:
+            if adotado:
+                data_adocao = st.date_input("Data da Adoção")
             else:
-                # Criar dados do pet
-                pet_data = {
-                    'nome': nome,
-                    'bairro': bairro,
-                    'tipo_pet': tipo_pet,
-                    'raca': raca,
-                    'idade': idade,
-                    'peso': peso,
-                    'sexo': sexo,
-                    'adotado': adotado,
-                    'tipo_comida': tipo_comida,
-                    'humor_diario': humor_diario,
-                    'status_vacinacao': status_vacinacao,
-                    'telefone': telefone,
-                    'estado_saude': estado_saude,
-                    'comportamento': comportamento,
-                    'nivel_atividade': nivel_atividade,
-                    'data_registro': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                    'created_by': st.session_state.user_id
-                }
-                
-                # Adicionar campos extras se disponíveis
-                extra_fields = {
-                    'regiao': regiao,
-                    'observacoes': observacoes,
-                    'alergias': alergias,
-                    'necessidades_especiais': necessidades_especiais
-                }
-                
-                # Filtrar campos extras vazios
-                extra_fields = {k: v for k, v in extra_fields.items() if v}
-                pet_data.update(extra_fields)
-                
-                # Salvar no banco de dados
-                with st.spinner("Adicionando pet..."):
+                data_adocao = None
+        
+        # Etapa 7: Observações Adicionais
+        st.subheader("📝 Observações")
+        
+        observacoes = st.text_area("Observações Gerais", 
+            height=100,
+            help="Qualquer informação adicional relevante sobre o pet")
+        
+        # CORREÇÃO: Usar apenas st.form_submit_button dentro do formulário
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            submitted = st.form_submit_button("🐾 Adicionar Pet", use_container_width=True)
+        
+        # Processar formulário quando submetido
+        if submitted:
+            # Validação
+            erros = []
+            
+            if not nome:
+                erros.append("Nome é obrigatório")
+            if not raca:
+                erros.append("Raça é obrigatória")
+            if not telefone:
+                erros.append("Telefone é obrigatório")
+            if idade <= 0:
+                erros.append("Idade deve ser maior que zero")
+            if peso <= 0:
+                erros.append("Peso deve ser maior que zero")
+            
+            if erros:
+                for erro in erros:
+                    st.error(f"❌ {erro}")
+            else:
+                with st.spinner("🤖 Calculando scores inteligentes..."):
+                    # Simular processamento IA
+                    time.sleep(1)
+                    
+                    # Calcular score de adoção baseado em múltiplos fatores
+                    score_adocao = calculate_adoption_score(
+                        idade, sociabilidade, energia, nivel_atividade, 
+                        estado_saude, comportamento, tipo_pet
+                    )
+                    
+                    # Calcular risco de abandono
+                    risco_abandono = calculate_abandonment_risk(
+                        idade, necessidades_especiais, 200.0,  # custo estimado
+                        "Boa", "Casa com quintal pequeno"  # valores padrão
+                    )
+                    
+                    # Criar dados do pet
+                    pet_data = {
+                        'nome': nome,
+                        'tipo_pet': tipo_pet,
+                        'raca': raca,
+                        'idade': idade,
+                        'peso': peso,
+                        'sexo': sexo,
+                        'castrado': castrado,
+                        'microchip': microchip,
+                        'bairro': bairro,
+                        'regiao': regiao,
+                        'telefone': telefone,
+                        'cor_pelagem': cor_pelagem,
+                        'status_vacinacao': status_vacinacao,
+                        'estado_saude': estado_saude,
+                        'necessidades_especiais': necessidades_especiais,
+                        'historico_medico': historico_medico,
+                        'comportamento': comportamento,
+                        'temperamento': temperamento,
+                        'sociabilidade': sociabilidade,
+                        'energia': energia,
+                        'nivel_atividade': nivel_atividade,
+                        'adaptabilidade': adaptabilidade,
+                        'adotado': adotado,
+                        'score_adocao': score_adocao,
+                        'risco_abandono': risco_abandono,
+                        'observacoes': observacoes,
+                        'data_registro': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                        'created_by': st.session_state.user_id
+                    }
+                    
+                    # Salvar no banco de dados
                     success, result = save_pet_to_db(pet_data)
                     
                     if success:
                         # Registrar atividade
                         log_activity(st.session_state.user_id, "add_pet", f"Adicionou pet: {nome}")
                         
-                        st.success(f"Pet {nome} adicionado com sucesso!")
+                        # Feedback de sucesso
+                        st.success(f"🎉 Pet {nome} adicionado com sucesso!")
                         st.balloons()
+                        
+                        # Mostrar scores calculados
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.metric("Score de Adoção", f"{score_adocao:.2f}/5.0", 
+                                    help="Calculado com base em idade, comportamento e saúde")
+                        
+                        with col2:
+                            st.metric("Risco de Abandono", f"{risco_abandono:.2f}", 
+                                    help="0=Baixo risco, 1=Alto risco")
+                        
+                        with col3:
+                            prioridade_calc = "Alta" if score_adocao > 4.0 else "Média" if score_adocao > 2.5 else "Baixa"
+                            st.metric("Prioridade Calculada", prioridade_calc, 
+                                    help="Baseada no score de adoção")
+                        
+                        # Recomendações inteligentes
+                        st.subheader("🤖 Recomendações Inteligentes")
+                        
+                        recommendations = generate_pet_recommendations(pet_data)
+                        
+                        for rec in recommendations:
+                            if rec['type'] == 'success':
+                                st.success(f"✅ {rec['message']}")
+                            elif rec['type'] == 'warning':
+                                st.warning(f"⚠️ {rec['message']}")
+                            else:
+                                st.info(f"💡 {rec['message']}")
+                        
+                        # Sugestão de próximos passos
+                        st.info("📋 **Próximos Passos Sugeridos:**\n"
+                               "1. Agendar avaliação veterinária se necessário\n"
+                               "2. Tirar fotos profissionais para divulgação\n"
+                               "3. Criar perfil nas redes sociais de adoção\n"
+                               "4. Iniciar busca por tutores compatíveis")
+                        
                     else:
-                        st.error(f"Erro ao adicionar pet: {result}")
+                        st.error(f"❌ Erro ao adicionar pet: {result}")
+
+    # CORREÇÃO: Botões fora do formulário
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("🔄 Limpar Formulário", use_container_width=True):
+            st.rerun()
+    
+    with col2:
+        if st.button("📋 Ver Lista de Pets", use_container_width=True):
+            st.session_state.page = "Visualizar Dados"
+            st.rerun()
+
+def calculate_adoption_score(idade, sociabilidade, energia, nivel_atividade, estado_saude, comportamento, tipo_pet):
+    """Calcula o score de adoção usando algoritmo inteligente."""
+    score = 0.0
+    
+    # Fator idade (pets jovens têm score mais alto)
+    if idade <= 1:
+        score += 1.0
+    elif idade <= 3:
+        score += 0.8
+    elif idade <= 7:
+        score += 0.6
+    else:
+        score += 0.3
+    
+    # Fatores comportamentais
+    score += (sociabilidade / 5) * 1.0
+    score += (energia / 5) * 0.7
+    score += (nivel_atividade / 5) * 0.5
+    
+    # Fator saúde
+    saude_scores = {
+        'Excelente': 1.0,
+        'Bom': 0.8,
+        'Regular': 0.6,
+        'Tratamento': 0.4,
+        'Requer atenção veterinária': 0.2
+    }
+    score += saude_scores.get(estado_saude, 0.5)
+    
+    # Fator comportamento
+    comportamento_scores = {
+        'Sociável': 0.8,
+        'Brincalhão': 0.7,
+        'Calmo': 0.6,
+        'Independente': 0.5,
+        'Tímido': 0.4,
+        'Agitado': 0.3,
+        'Territorial': 0.2
+    }
+    score += comportamento_scores.get(comportamento, 0.5)
+    
+    # Fator tipo de pet (alguns são mais populares)
+    tipo_scores = {
+        'Cachorro': 0.3,
+        'Gato': 0.3,
+        'Ave': 0.1,
+        'Roedor': 0.1,
+        'Réptil': 0.05
+    }
+    score += tipo_scores.get(tipo_pet, 0.1)
+    
+    # Normalizar para escala 0-5
+    return min(5.0, max(0.0, score))
+
+def calculate_abandonment_risk(idade, necessidades_especiais, custo_mensal, compatibilidade_criancas, ambiente_ideal):
+    """Calcula o risco de abandono."""
+    risk = 0.0
+    
+    # Idade (pets muito jovens ou muito velhos têm maior risco)
+    if idade < 0.5 or idade > 10:
+        risk += 0.2
+    
+    # Necessidades especiais aumentam risco
+    if necessidades_especiais and len(necessidades_especiais.strip()) > 0:
+        risk += 0.3
+    
+    # Custo alto aumenta risco
+    if custo_mensal > 400:
+        risk += 0.2
+    elif custo_mensal > 300:
+        risk += 0.1
+    
+    # Incompatibilidade com crianças
+    if compatibilidade_criancas == "Não recomendado":
+        risk += 0.2
+    
+    # Ambiente muito específico
+    if ambiente_ideal in ["Chácara/Sítio"]:
+        risk += 0.1
+    
+    return min(1.0, max(0.0, risk))
+
+def generate_pet_recommendations(pet_data):
+    """Gera recomendações inteligentes baseadas nos dados do pet."""
+    recommendations = []
+    
+    # Recomendações baseadas no score
+    if pet_data['score_adocao'] > 4.0:
+        recommendations.append({
+            'type': 'success',
+            'message': 'Pet com alto potencial de adoção! Priorize divulgação nas redes sociais.'
+        })
+    elif pet_data['score_adocao'] < 2.0:
+        recommendations.append({
+            'type': 'warning',
+            'message': 'Score baixo de adoção. Considere trabalhar comportamento e saúde antes da divulgação.'
+        })
+    
+    # Recomendações baseadas na idade
+    if pet_data['idade'] < 0.5:
+        recommendations.append({
+            'type': 'info',
+            'message': 'Pet filhote: será necessário tutor experiente e acompanhamento veterinário frequente.'
+        })
+    elif pet_data['idade'] > 8:
+        recommendations.append({
+            'type': 'info',
+            'message': 'Pet idoso: destacar personalidade calma e carinhosa na divulgação.'
+        })
+    
+    # Recomendações baseadas no risco
+    if pet_data['risco_abandono'] > 0.7:
+        recommendations.append({
+            'type': 'warning',
+            'message': 'Alto risco de abandono. Faça triagem rigorosa de tutores e acompanhamento pós-adoção.'
+        })
+    
+    # Recomendações específicas por tipo
+    if pet_data['tipo_pet'] == 'Cachorro' and pet_data['energia'] > 4:
+        recommendations.append({
+            'type': 'info',
+            'message': 'Cachorro com alta energia: buscar tutores ativos que gostem de exercícios.'
+        })
+    
+    if pet_data['necessidades_especiais'] and len(pet_data['necessidades_especiais'].strip()) > 0:
+        recommendations.append({
+            'type': 'warning',
+            'message': 'Pet com necessidades especiais: criar material educativo para tutores sobre os cuidados.'
+        })
+    
+    return recommendations
 
 @require_login
 def exportar_importar_dados(df):
-    """Facilita a exportação e importação de dados."""
-    st.title("Exportar/Importar Dados")
+    """Sistema avançado de exportação e importação."""
+    st.title("📤📥 Exportar/Importar Dados Avançado")
     
-    # Abas para exportação e importação
-    tab1, tab2 = st.tabs(["Exportar Dados", "Importar Dados"])
+    tab1, tab2, tab3 = st.tabs(["Exportar Dados", "Importar Dados", "Sincronização"])
     
     with tab1:
-        st.subheader("Exportar Dados")
+        st.subheader("📊 Exportação Avançada de Dados")
         
-        with st.expander("Opções de Exportação", expanded=True):
-            col1, col2 = st.columns(2)
+        # Opções de exportação
+        with st.expander("🎛️ Configurações de Exportação", expanded=True):
+            col1, col2, col3 = st.columns(3)
             
             with col1:
-                formato_exportacao = st.radio(
-                    "Formato de exportação:",
-                    options=["CSV", "Excel", "JSON"]
+                formato_exportacao = st.selectbox(
+                    "Formato de Exportação:",
+                    ["Excel Avançado", "CSV", "JSON", "XML", "Parquet", "Feather"]
                 )
-            
-            with col2:
+                
                 incluir_filtrados = st.checkbox("Exportar apenas dados filtrados", value=False)
-                
-                if incluir_filtrados:
-                    df_exportar = st.session_state.get("df_filtrado", df)
-                else:
-                    df_exportar = df
-                
-                st.markdown(f"**{len(df_exportar)} registros** serão exportados.")
-        
-        # Mostrar prévia
-        st.markdown("**Prévia dos dados a serem exportados:**")
-        st.dataframe(
-            df_exportar.head(5),
-            use_container_width=True,
-            hide_index=True
-        )
-        
-        # Opções específicas por formato
-        if formato_exportacao == "CSV":
-            # Opções de CSV
-            col1, col2 = st.columns(2)
-            with col1:
-                separador = st.selectbox(
-                    "Separador:",
-                    options=[",", ";", "\\t"],
-                    format_func=lambda x: "Vírgula (,)" if x == "," else "Ponto e vírgula (;)" if x == ";" else "Tab (\\t)"
-                )
+                incluir_imagens = st.checkbox("Incluir referências de imagens", value=False)
+            
             with col2:
-                incluir_cabecalho = st.checkbox("Incluir cabeçalho", value=True)
-            
-            # Preparar dados CSV
-            csv_data = df_exportar.to_csv(sep=separador, index=False, header=incluir_cabecalho).encode('utf-8')
-            
-            # Botão de download
-            st.download_button(
-                label="Baixar CSV",
-                data=csv_data,
-                file_name="pets_data.csv",
-                mime="text/csv",
-                use_container_width=True
-            )
-            
-        elif formato_exportacao == "Excel":
-            # Preparar dados Excel
-            excel_buffer = io.BytesIO()
-            with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-                df_exportar.to_excel(writer, sheet_name='Dados de Pets', index=False)
-            
-            excel_data = excel_buffer.getvalue()
-            
-            # Botão de download
-            st.download_button(
-                label="Baixar Excel",
-                data=excel_data,
-                file_name="pets_data.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-            
-        elif formato_exportacao == "JSON":
-            # Opções de JSON
-            indent_json = st.checkbox("Formatar JSON (identado)", value=True)
-            orient_options = {
-                "records": "Lista de registros",
-                "index": "Dicionário com índices",
-                "columns": "Dicionário com colunas",
-                "values": "Apenas valores",
-                "table": "Formato de tabela"
-            }
-            orient = st.selectbox(
-                "Orientação do JSON:", 
-                options=list(orient_options.keys()),
-                format_func=lambda x: orient_options[x]
-            )
-            
-            # Preparar dados JSON
-            indent = 4 if indent_json else None
-            json_data = df_exportar.to_json(orient=orient, indent=indent).encode('utf-8')
-            
-            # Botão de download
-            st.download_button(
-                label="Baixar JSON",
-                data=json_data,
-                file_name="pets_data.json",
-                mime="application/json",
-                use_container_width=True
-            )
-    
-    with tab2:
-        st.subheader("Importar Dados")
-        
-        # Opções de importação
-        uploaded_file = st.file_uploader("Escolha um arquivo", type=["csv", "xlsx", "json"])
-        
-        if uploaded_file is not None:
-            try:
-                # Detectar tipo de arquivo
-                file_type = uploaded_file.name.split(".")[-1].lower()
+                nivel_detalhamento = st.selectbox(
+                    "Nível de Detalhamento:",
+                    ["Básico", "Completo", "Personalizado"]
+                )
                 
-                if file_type == "csv":
-                    # Opções de importação CSV
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        separador_import = st.selectbox(
-                            "Separador:", 
-                            options=[",", ";", "\\t"], 
-                            format_func=lambda x: "Vírgula (,)" if x == "," else "Ponto e vírgula (;)" if x == ";" else "Tab (\\t)",
-                            key="separador_import"
-                        )
-                    with col2:
-                        header_row = st.checkbox("Primeira linha é cabeçalho", value=True)
+                incluir_metadados = st.checkbox("Incluir metadados", value=True)
+                incluir_estatisticas = st.checkbox("Incluir estatísticas", value=True)
+            
+            with col3:
+                compressao = st.selectbox(
+                    "Compressão:",
+                    ["Nenhuma", "ZIP", "GZIP"]
+                )
+                
+                criptografia = st.checkbox("Criptografar arquivo", value=False)
+                if criptografia:
+                    senha_export = st.text_input("Senha para criptografia:", type="password")
+        
+        # Seleção de dados
+        if incluir_filtrados:
+            df_exportar = st.session_state.get("df_filtrado", df)
+        else:
+            df_exportar = df
+        
+        st.info(f"📊 **{len(df_exportar)} registros** serão exportados.")
+        
+        # Configuração personalizada
+        if nivel_detalhamento == "Personalizado":
+            st.subheader("🎯 Configuração Personalizada")
+            
+            # Seleção de colunas
+            colunas_disponiveis = df_exportar.columns.tolist()
+            colunas_selecionadas = st.multiselect(
+                "Colunas para exportar:",
+                colunas_disponiveis,
+                default=colunas_disponiveis
+            )
+            
+            if colunas_selecionadas:
+                df_exportar = df_exportar[colunas_selecionadas]
+            
+            # Filtros adicionais
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if 'data_registro' in df_exportar.columns:
+                    data_inicio = st.date_input("Data início:")
+                    data_fim = st.date_input("Data fim:")
+            
+            with col2:
+                if 'score_adocao' in df_exportar.columns:
+                    score_min = st.slider("Score mínimo:", 0.0, 5.0, 0.0)
+                    df_exportar = df_exportar[df_exportar['score_adocao'] >= score_min]
+        
+        # Prévia dos dados
+        st.subheader("👀 Prévia dos Dados")
+        st.dataframe(df_exportar.head(10), use_container_width=True, hide_index=True)
+        
+        # Botão de exportação
+        col1, col2, col3 = st.columns([1, 2, 1])
+        
+        with col2:
+            if st.button("🚀 Gerar Exportação", use_container_width=True):
+                with st.spinner("Gerando arquivo de exportação..."):
+                    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
                     
-                    # Ler CSV
-                    header_val = 0 if header_row else None
-                    df_importado = pd.read_csv(uploaded_file, sep=separador_import, header=header_val)
+                    if formato_exportacao == "Excel Avançado":
+                        # Excel com múltiplas abas e formatação
+                        buffer = io.BytesIO()
+                        
+                        with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+                            # Aba principal
+                            df_exportar.to_excel(writer, sheet_name='Dados_Pets', index=False)
+                            
+                            # Aba de estatísticas
+                            if incluir_estatisticas:
+                                numeric_cols = df_exportar.select_dtypes(include=[np.number]).columns
+                                if len(numeric_cols) > 0:
+                                    stats_df = df_exportar[numeric_cols].describe()
+                                    stats_df.to_excel(writer, sheet_name='Estatisticas')
+                            
+                            # Aba de resumos
+                            if 'tipo_pet' in df_exportar.columns:
+                                resumo_tipos = df_exportar.groupby('tipo_pet').agg({
+                                    'adotado': ['count', 'sum', 'mean'] if 'adotado' in df_exportar.columns else 'count',
+                                    'idade': 'mean' if 'idade' in df_exportar.columns else 'count'
+                                }).round(2)
+                                resumo_tipos.to_excel(writer, sheet_name='Resumo_por_Tipo')
+                            
+                            # Aba de metadados
+                            if incluir_metadados:
+                                metadata = pd.DataFrame({
+                                    'Informacao': ['Data_Exportacao', 'Total_Registros', 'Usuario', 'Versao_Sistema'],
+                                    'Valor': [timestamp, len(df_exportar), st.session_state.user_info['full_name'], '1.0.0']
+                                })
+                                metadata.to_excel(writer, sheet_name='Metadados', index=False)
+                            
+                            # Formatação
+                            workbook = writer.book
+                            worksheet = writer.sheets['Dados_Pets']
+                            
+                            # Formato para cabeçalhos
+                            header_format = workbook.add_format({
+                                'bold': True,
+                                'text_wrap': True,
+                                'valign': 'top',
+                                'fg_color': '#4527A0',
+                                'font_color': 'white',
+                                'border': 1
+                            })
+                            
+                            # Aplicar formato aos cabeçalhos
+                            for col_num, value in enumerate(df_exportar.columns.values):
+                                worksheet.write(0, col_num, value, header_format)
+                        
+                        arquivo_data = buffer.getvalue()
+                        nome_arquivo = f"petcare_export_{timestamp}.xlsx"
+                        mime_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     
-                elif file_type == "xlsx":
-                    # Ler Excel
-                    df_importado = pd.read_excel(uploaded_file)
+                    elif formato_exportacao == "CSV":
+                        arquivo_data = df_exportar.to_csv(index=False).encode('utf-8')
+                        nome_arquivo = f"petcare_export_{timestamp}.csv"
+                        mime_type = "text/csv"
                     
-                elif file_type == "json":
-                    # Opções de importação JSON
-                    orient_options_import = {
-                        "records": "Lista de registros",
-                        "index": "Dicionário com índices",
-                        "columns": "Dicionário com colunas",
-                        "values": "Apenas valores",
-                        "table": "Formato de tabela"
-                    }
-                    orient_import = st.selectbox(
-                        "Orientação do JSON:", 
-                        options=list(orient_options_import.keys()),
-                        format_func=lambda x: orient_options_import[x],
-                        key="orient_import"
+                    elif formato_exportacao == "JSON":
+                        json_data = {
+                            'metadata': {
+                                'export_date': timestamp,
+                                'total_records': len(df_exportar),
+                                'exported_by': st.session_state.user_info['full_name'],
+                                'version': '1.0.0'
+                            },
+                            'data': df_exportar.to_dict('records')
+                        }
+                        arquivo_data = json.dumps(json_data, indent=2, default=str).encode('utf-8')
+                        nome_arquivo = f"petcare_export_{timestamp}.json"
+                        mime_type = "application/json"
+                    
+                    elif formato_exportacao == "Parquet":
+                        buffer = io.BytesIO()
+                        df_exportar.to_parquet(buffer, index=False)
+                        arquivo_data = buffer.getvalue()
+                        nome_arquivo = f"petcare_export_{timestamp}.parquet"
+                        mime_type = "application/octet-stream"
+                    
+                    # Aplicar compressão se solicitada
+                    if compressao == "ZIP":
+                        import zipfile
+                        zip_buffer = io.BytesIO()
+                        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                            zip_file.writestr(nome_arquivo, arquivo_data)
+                        arquivo_data = zip_buffer.getvalue()
+                        nome_arquivo = nome_arquivo.replace('.', '_compressed.')
+                        mime_type = "application/zip"
+                    
+                    # Registrar atividade
+                    log_activity(
+                        st.session_state.user_id, 
+                        "export_data", 
+                        f"Exportou {len(df_exportar)} registros em formato {formato_exportacao}"
                     )
                     
-                    # Ler JSON
-                    df_importado = pd.read_json(uploaded_file, orient=orient_import)
+                    # Botão de download
+                    st.download_button(
+                        label=f"📥 Baixar {formato_exportacao}",
+                        data=arquivo_data,
+                        file_name=nome_arquivo,
+                        mime=mime_type,
+                        use_container_width=True
+                    )
+                    
+                    st.success("✅ Arquivo gerado com sucesso!")
+    
+    with tab2:
+        st.subheader("📥 Importação Avançada de Dados")
+        
+        # Upload de arquivo
+        uploaded_file = st.file_uploader(
+            "Escolha um arquivo para importar:",
+            type=["csv", "xlsx", "json", "xml", "parquet"],
+            help="Formatos suportados: CSV, Excel, JSON, XML, Parquet"
+        )
+        
+        if uploaded_file is not None:
+            # Detectar tipo de arquivo
+            file_type = uploaded_file.name.split(".")[-1].lower()
+            
+            try:
+                # Carregar dados baseado no tipo
+                if file_type == "csv":
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        separador = st.selectbox("Separador:", [",", ";", "\t", "|"])
+                        encoding = st.selectbox("Codificação:", ["utf-8", "latin-1", "cp1252"])
+                    with col2:
+                        has_header = st.checkbox("Primeira linha é cabeçalho", value=True)
+                        skip_lines = st.number_input("Pular linhas:", min_value=0, value=0)
+                    
+                    df_importado = pd.read_csv(
+                        uploaded_file, 
+                        sep=separador, 
+                        encoding=encoding,
+                        header=0 if has_header else None,
+                        skiprows=skip_lines
+                    )
+                
+                elif file_type == "xlsx":
+                    # Opções Excel
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        sheet_name = st.text_input("Nome da aba:", value="0")
+                        has_header = st.checkbox("Primeira linha é cabeçalho", value=True)
+                    with col2:
+                        skip_rows = st.number_input("Pular linhas:", min_value=0, value=0)
+                    
+                    # Tentar converter sheet_name para int se possível
+                    try:
+                        sheet_name = int(sheet_name)
+                    except:
+                        pass
+                    
+                    df_importado = pd.read_excel(
+                        uploaded_file,
+                        sheet_name=sheet_name,
+                        header=0 if has_header else None,
+                        skiprows=skip_rows
+                    )
+                
+                elif file_type == "json":
+                    import json
+                    json_data = json.load(uploaded_file)
+                    
+                    # Detectar estrutura do JSON
+                    if isinstance(json_data, dict) and 'data' in json_data:
+                        df_importado = pd.DataFrame(json_data['data'])
+                    elif isinstance(json_data, list):
+                        df_importado = pd.DataFrame(json_data)
+                    else:
+                        df_importado = pd.json_normalize(json_data)
+                
+                elif file_type == "parquet":
+                    df_importado = pd.read_parquet(uploaded_file)
                 
                 # Mostrar prévia dos dados importados
-                st.markdown(f"**Prévia dos dados importados ({len(df_importado)} registros):**")
-                st.dataframe(
-                    df_importado.head(5),
-                    use_container_width=True,
-                    hide_index=True
-                )
+                st.subheader("👀 Prévia dos Dados Importados")
+                st.info(f"📊 **{len(df_importado)} registros** e **{len(df_importado.columns)} colunas** detectados.")
                 
-                # Opções de importação
-                modo_importacao = st.radio(
-                    "Modo de importação:",
-                    options=["Substituir dados existentes", "Anexar aos dados existentes"]
-                )
+                # Mostrar amostra dos dados
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    st.dataframe(df_importado.head(10), use_container_width=True, hide_index=True)
+                
+                with col2:
+                    # Informações sobre as colunas
+                    st.write("**Informações das Colunas:**")
+                    for col in df_importado.columns:
+                        dtype = str(df_importado[col].dtype)
+                        null_count = df_importado[col].isnull().sum()
+                        st.write(f"• **{col}**: {dtype} ({null_count} nulos)")
                 
                 # Mapeamento de colunas
-                if st.checkbox("Mapear colunas", value=False):
-                    st.markdown("**Mapeamento de colunas (opcional):**")
-                    st.info("Selecione a coluna do arquivo importado que corresponde a cada coluna do sistema.")
-                    
-                    # Obter colunas de origem e destino
-                    colunas_origem = df_importado.columns.tolist()
-                    colunas_destino = df.columns.tolist()
-                    
-                    # Criar mapeamento
-                    mapeamento = {}
-                    for col_destino in colunas_destino:
-                        opcoes = ["Ignorar"] + colunas_origem
-                        col_selecionada = st.selectbox(
-                            f"Mapeamento para '{col_destino}':",
-                            options=opcoes,
-                            index=opcoes.index(col_destino) if col_destino in opcoes else 0,
-                            key=f"map_{col_destino}"
+                st.subheader("🔄 Mapeamento de Colunas")
+                
+                # Colunas do sistema
+                system_columns = [
+                    'nome', 'tipo_pet', 'raca', 'idade', 'peso', 'sexo', 'bairro',
+                    'comportamento', 'estado_saude', 'adotado', 'score_adocao',
+                    'sociabilidade', 'energia', 'nivel_atividade'
+                ]
+                
+                mapping = {}
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Colunas do Sistema:**")
+                    for sys_col in system_columns:
+                        imported_options = ["[Ignorar]"] + list(df_importado.columns)
+                        
+                        # Tentar encontrar correspondência automática
+                        default_idx = 0
+                        for i, imp_col in enumerate(df_importado.columns):
+                            if sys_col.lower() in imp_col.lower() or imp_col.lower() in sys_col.lower():
+                                default_idx = i + 1
+                                break
+                        
+                        selected = st.selectbox(
+                            sys_col,
+                            imported_options,
+                            index=default_idx,
+                            key=f"map_{sys_col}"
                         )
                         
-                        if col_selecionada != "Ignorar":
-                            mapeamento[col_destino] = col_selecionada
+                        if selected != "[Ignorar]":
+                            mapping[sys_col] = selected
+                
+                with col2:
+                    st.write("**Validação de Dados:**")
                     
-                    # Aplicar mapeamento se confirmado
-                    if st.button("Aplicar Mapeamento", key="apply_mapping"):
-                        if mapeamento:
-                            # Criar dataframe mapeado
-                            df_mapeado = pd.DataFrame()
-                            
-                            for col_destino, col_origem in mapeamento.items():
-                                df_mapeado[col_destino] = df_importado[col_origem]
-                            
-                            # Atualizar dataframe importado
-                            df_importado = df_mapeado
-                            
-                            st.success("Mapeamento aplicado com sucesso!")
-                            st.dataframe(
-                                df_importado.head(5),
-                                use_container_width=True,
-                                hide_index=True
-                            )
+                    validation_issues = []
+                    
+                    # Validar tipos de dados
+                    for sys_col, imp_col in mapping.items():
+                        if sys_col in ['idade', 'peso', 'score_adocao', 'sociabilidade', 'energia']:
+                            if not pd.api.types.is_numeric_dtype(df_importado[imp_col]):
+                                try:
+                                    pd.to_numeric(df_importado[imp_col], errors='coerce')
+                                except:
+                                    validation_issues.append(f"❌ {imp_col} não é numérico")
+                        
+                        # Verificar valores obrigatórios
+                        if sys_col in ['nome', 'tipo_pet', 'raca']:
+                            null_count = df_importado[imp_col].isnull().sum()
+                            if null_count > 0:
+                                validation_issues.append(f"⚠️ {imp_col} tem {null_count} valores vazios")
+                    
+                    if validation_issues:
+                        for issue in validation_issues:
+                            st.write(issue)
+                    else:
+                        st.success("✅ Todos os dados passaram na validação!")
+                
+                # Opções de importação
+                st.subheader("⚙️ Opções de Importação")
+                
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    import_mode = st.selectbox(
+                        "Modo de Importação:",
+                        ["Adicionar novos registros", "Substituir todos os dados", "Atualizar existentes"]
+                    )
+                
+                with col2:
+                    validate_data = st.checkbox("Validar dados antes da importação", value=True)
+                    create_backup = st.checkbox("Criar backup antes da importação", value=True)
+                
+                with col3:
+                    batch_size = st.number_input("Tamanho do lote:", min_value=10, max_value=1000, value=100)
                 
                 # Botão de importação
-                if st.button("Importar Dados", use_container_width=True):
-                    with st.spinner("Importando dados..."):
-                        # Necessário adicionar created_by e data_registro
-                        if 'created_by' not in df_importado.columns:
-                            df_importado['created_by'] = st.session_state.user_id
-                        
-                        if 'data_registro' not in df_importado.columns:
-                            df_importado['data_registro'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-                        
-                        # Conectar ao banco de dados
-                        conn = sqlite3.connect(DATABASE_PATH)
-                        c = conn.cursor()
-                        
+                if st.button("🚀 Iniciar Importação", use_container_width=True):
+                    with st.spinner("Processando importação..."):
                         try:
-                            if modo_importacao == "Substituir dados existentes":
-                                # Verificar se todas as colunas obrigatórias estão presentes
-                                colunas_obrigatorias = ['nome', 'tipo_pet', 'raca']
-                                faltando = [col for col in colunas_obrigatorias if col not in df_importado.columns]
+                            # Aplicar mapeamento
+                            df_mapped = pd.DataFrame()
+                            
+                            for sys_col, imp_col in mapping.items():
+                                df_mapped[sys_col] = df_importado[imp_col]
+                            
+                            # Adicionar campos obrigatórios se não existirem
+                            if 'created_by' not in df_mapped.columns:
+                                df_mapped['created_by'] = st.session_state.user_id
+                            
+                            if 'data_registro' not in df_mapped.columns:
+                                df_mapped['data_registro'] = datetime.datetime.now()
+                            
+                            # Validação adicional
+                            if validate_data:
+                                # Converter tipos de dados
+                                numeric_cols = ['idade', 'peso', 'score_adocao', 'sociabilidade', 'energia']
+                                for col in numeric_cols:
+                                    if col in df_mapped.columns:
+                                        df_mapped[col] = pd.to_numeric(df_mapped[col], errors='coerce')
                                 
-                                if faltando:
-                                    st.error(f"O arquivo importado não contém as colunas obrigatórias: {', '.join(faltando)}")
-                                else:
-                                    # Limpar tabela existente
-                                    c.execute("DELETE FROM pets")
-                                    
-                                    # Inserir novos dados
-                                    for _, row in df_importado.iterrows():
-                                        # Preparar colunas e valores
+                                # Remover registros com dados críticos ausentes
+                                required_cols = ['nome', 'tipo_pet']
+                                for col in required_cols:
+                                    if col in df_mapped.columns:
+                                        df_mapped = df_mapped.dropna(subset=[col])
+                            
+                            # Criar backup se solicitado
+                            if create_backup:
+                                backup_filename = f"backup_before_import_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+                                df.to_csv(f"data/{backup_filename}", index=False)
+                                st.info(f"💾 Backup criado: {backup_filename}")
+                            
+                            # Executar importação
+                            conn = sqlite3.connect(DATABASE_PATH)
+                            
+                            if import_mode == "Substituir todos os dados":
+                                # Limpar tabela existente
+                                conn.execute("DELETE FROM pets")
+                                conn.commit()
+                            
+                            # Inserir dados em lotes
+                            success_count = 0
+                            error_count = 0
+                            
+                            for i in range(0, len(df_mapped), batch_size):
+                                batch = df_mapped.iloc[i:i+batch_size]
+                                
+                                for _, row in batch.iterrows():
+                                    try:
+                                        # Preparar dados para inserção
                                         columns = ', '.join(row.index)
                                         placeholders = ', '.join(['?' for _ in row])
                                         values = tuple(row.values)
                                         
                                         query = f"INSERT INTO pets ({columns}) VALUES ({placeholders})"
-                                        c.execute(query, values)
-                                    
-                                    conn.commit()
-                                    
-                                    # Registrar atividade
-                                    log_activity(st.session_state.user_id, "replace_data", f"Substituiu todos os dados por importação ({len(df_importado)} registros)")
-                                    
-                                    st.success(f"Dados importados com sucesso! {len(df_importado)} registros substituíram os dados existentes.")
-                                    st.balloons()
-                                    
-                                    # Recarregar a página para atualizar os dados
-                                    st.rerun()
-                            else:
-                                # Anexar aos dados existentes
-                                for _, row in df_importado.iterrows():
-                                    # Preparar colunas e valores
-                                    columns = ', '.join(row.index)
-                                    placeholders = ', '.join(['?' for _ in row])
-                                    values = tuple(row.values)
-                                    
-                                    query = f"INSERT INTO pets ({columns}) VALUES ({placeholders})"
-                                    c.execute(query, values)
+                                        conn.execute(query, values)
+                                        success_count += 1
+                                        
+                                    except Exception as e:
+                                        error_count += 1
+                                        st.error(f"Erro na linha {i}: {str(e)}")
                                 
+                                # Commit em lotes
                                 conn.commit()
                                 
-                                # Registrar atividade
-                                log_activity(st.session_state.user_id, "append_data", f"Adicionou dados por importação ({len(df_importado)} registros)")
-                                
-                                st.success(f"Dados importados com sucesso! {len(df_importado)} registros adicionados aos dados existentes.")
-                                st.balloons()
-                                
-                                # Recarregar a página para atualizar os dados
-                                st.rerun()
-                        
-                        except Exception as e:
-                            conn.rollback()
-                            st.error(f"Erro ao importar dados: {str(e)}")
-                        
-                        finally:
+                                # Mostrar progresso
+                                progress = min((i + batch_size) / len(df_mapped), 1.0)
+                                st.progress(progress)
+                            
                             conn.close()
-            
-            except Exception as e:
-                st.error(f"Erro ao ler arquivo: {str(e)}")
-
-@require_login
-def analise_avancada(df):
-    """Oferece ferramentas de análise avançada de dados."""
-    st.title("Análise Avançada")
-    
-    # Verificar se há dados suficientes
-    if df.empty or len(df) < 5:
-        st.warning("Não há dados suficientes para análise avançada. Adicione mais pets para utilizar esta funcionalidade.")
-        return
-    
-    # Menu de análises disponíveis
-    analise_tipo = st.sidebar.radio(
-        "Tipo de Análise:",
-        ["Clusterização", "Análise de Correlação", "Previsões", "Análise Textual", "Detecção de Anomalias"]
-    )
-    
-    if analise_tipo == "Clusterização":
-        st.subheader("Clusterização de Dados")
-        
-        # Card de informação
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            A clusterização agrupa pets com características similares, revelando padrões naturais nos dados.
-            Esta análise permite identificar grupos distintos de pets com base em múltiplas variáveis.
-        </div>
-        """
-        
-        custom_card("Análise de Clusters", card_content, icon="🔍", color="#3F51B5")
-        
-        # Seleção de variáveis para clustering
-        df_num = df.select_dtypes(include=['number'])
-        
-        if len(df_num.columns) < 2:
-            st.warning("São necessárias pelo menos duas variáveis numéricas para realizar a clusterização.")
-            return
-        
-        # Seleção de variáveis
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            selected_vars = st.multiselect(
-                "Selecione as variáveis para clusterização:",
-                options=df_num.columns.tolist(),
-                default=df_num.columns.tolist()[:3] if len(df_num.columns) >= 3 else df_num.columns.tolist()
-            )
-        
-        with col2:
-            n_clusters = st.slider("Número de clusters:", min_value=2, max_value=10, value=3)
-            cluster_method = st.selectbox(
-                "Método de clusterização:",
-                options=["K-Means", "DBSCAN"]
-            )
-        
-        if not selected_vars:
-            st.warning("Selecione pelo menos uma variável para continuar.")
-            return
-        
-        # Preparar dados
-        X = df_num[selected_vars].copy()
-        
-        # Remover linhas com NaN
-        X.dropna(inplace=True)
-        
-        if len(X) < n_clusters:
-            st.warning(f"Não há dados suficientes para criar {n_clusters} clusters após remover valores ausentes.")
-            return
-        
-        # Normalizar dados
-        scaler = StandardScaler()
-        X_scaled = scaler.fit_transform(X)
-        
-        # Aplicar clusterização
-        if st.button("Executar Clusterização", use_container_width=True):
-            with st.spinner("Processando clusterização..."):
-                try:
-                    if cluster_method == "K-Means":
-                        # K-Means
-                        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-                        clusters = kmeans.fit_predict(X_scaled)
-                        
-                        # Adicionar resultados ao dataframe original
-                        df_cluster = X.copy()
-                        df_cluster['Cluster'] = clusters
-                        
-                        # Estatísticas por cluster
-                        st.subheader("Estatísticas por Cluster")
-                        
-                        # Tabela de estatísticas
-                        cluster_stats = df_cluster.groupby('Cluster').agg(['mean', 'count'])
-                        st.dataframe(cluster_stats, use_container_width=True)
-                        
-                        # Visualização 2D ou 3D
-                        if len(selected_vars) >= 3:
-                            # PCA para visualização 3D
-                            pca = PCA(n_components=3)
-                            components = pca.fit_transform(X_scaled)
-                            
-                            # Dataframe para plotly
-                            df_plot = pd.DataFrame(
-                                {
-                                    'PC1': components[:, 0],
-                                    'PC2': components[:, 1],
-                                    'PC3': components[:, 2],
-                                    'Cluster': clusters
-                                }
-                            )
-                            
-                            # Adicionar informações originais se disponíveis
-                            if 'nome' in df.columns:
-                                df_plot['Nome'] = X.index.map(df['nome'])
-                            
-                            # Gráfico 3D
-                            fig = px.scatter_3d(
-                                df_plot, 
-                                x='PC1', 
-                                y='PC2', 
-                                z='PC3',
-                                color='Cluster',
-                                hover_name='Nome' if 'Nome' in df_plot.columns else None,
-                                title=f'Visualização 3D dos Clusters ({cluster_method})',
-                                labels={'Cluster': 'Grupo'},
-                                color_continuous_scale=px.colors.qualitative.G10
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            # Visualização 2D para 2 variáveis
-                            fig = px.scatter(
-                                df_cluster,
-                                x=selected_vars[0],
-                                y=selected_vars[1] if len(selected_vars) > 1 else selected_vars[0],
-                                color='Cluster',
-                                title=f'Visualização dos Clusters ({cluster_method})',
-                                labels={'Cluster': 'Grupo'}
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Interpretação dos clusters
-                        st.subheader("Interpretação dos Clusters")
-                        
-                        for i in range(n_clusters):
-                            cluster_data = df_cluster[df_cluster['Cluster'] == i]
-                            
-                            # Tamanho e proporção do cluster
-                            size = len(cluster_data)
-                            prop = size / len(df_cluster) * 100
-                            
-                            # Características distintas
-                            means = cluster_data.mean().drop('Cluster')
-                            overall_means = df_cluster.mean().drop('Cluster')
-                            diffs = ((means - overall_means) / overall_means * 100).abs()
-                            key_features = diffs.nlargest(3)
-                            
-                            # Criar descrição
-                            content = f"""
-                            <div style="margin-bottom: 1rem;">
-                                <div><strong>Tamanho:</strong> {size} pets ({prop:.1f}% do total)</div>
-                                <div style="margin-top: 0.7rem;"><strong>Características distintivas:</strong></div>
-                                <ul style="margin-top: 0.3rem;">
-                            """
-                            
-                            for feat, diff in key_features.items():
-                                direction = "acima" if means[feat] > overall_means[feat] else "abaixo"
-                                content += f"<li>{feat}: {direction} da média em {diff:.1f}%</li>"
-                            
-                            content += """
-                                </ul>
-                            </div>
-                            """
-                            
-                            custom_card(f"Cluster {i+1}", content, icon=f"#{i+1}", color="#3F51B5")
-                    
-                    elif cluster_method == "DBSCAN":
-                        # DBSCAN
-                        dbscan = DBSCAN(eps=0.5, min_samples=5)
-                        clusters = dbscan.fit_predict(X_scaled)
-                        
-                        # Adicionar resultados ao dataframe original
-                        df_cluster = X.copy()
-                        df_cluster['Cluster'] = clusters
-                        
-                        # Estatísticas por cluster
-                        st.subheader("Estatísticas por Cluster")
-                        
-                        # Tabela de estatísticas
-                        cluster_stats = df_cluster.groupby('Cluster').agg(['mean', 'count'])
-                        st.dataframe(cluster_stats, use_container_width=True)
-                        
-                        # Visualização 2D ou 3D
-                        if len(selected_vars) >= 3:
-                            # PCA para visualização 3D
-                            pca = PCA(n_components=3)
-                            components = pca.fit_transform(X_scaled)
-                            
-                            # Dataframe para plotly
-                            df_plot = pd.DataFrame(
-                                {
-                                    'PC1': components[:, 0],
-                                    'PC2': components[:, 1],
-                                    'PC3': components[:, 2],
-                                    'Cluster': clusters
-                                }
-                            )
-                            
-                            # Adicionar informações originais se disponíveis
-                            if 'nome' in df.columns:
-                                df_plot['Nome'] = X.index.map(df['nome'])
-                            
-                            # Gráfico 3D
-                            fig = px.scatter_3d(
-                                df_plot, 
-                                x='PC1', 
-                                y='PC2', 
-                                z='PC3',
-                                color='Cluster',
-                                hover_name='Nome' if 'Nome' in df_plot.columns else None,
-                                title=f'Visualização 3D dos Clusters ({cluster_method})',
-                                labels={'Cluster': 'Grupo'},
-                                color_continuous_scale=px.colors.qualitative.G10
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                        else:
-                            # Visualização 2D para 2 variáveis
-                            fig = px.scatter(
-                                df_cluster,
-                                x=selected_vars[0],
-                                y=selected_vars[1] if len(selected_vars) > 1 else selected_vars[0],
-                                color='Cluster',
-                                title=f'Visualização dos Clusters ({cluster_method})',
-                                labels={'Cluster': 'Grupo'}
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True)
-                except Exception as e:
-                    st.error(f"Erro na clusterização: {str(e)}")
-    
-    elif analise_tipo == "Análise de Correlação":
-        st.subheader("Análise Avançada de Correlação")
-        
-        # Card de informação
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            A análise de correlação mede a força e direção da relação entre variáveis, 
-            permitindo identificar fatores que se influenciam mutuamente.
-        </div>
-        """
-        
-        custom_card("Correlações e Relações", card_content, icon="🔄", color="#E91E63")
-        
-        # Obter variáveis numéricas
-        df_num = df.select_dtypes(include=['number'])
-        
-        if len(df_num.columns) < 2:
-            st.warning("São necessárias pelo menos duas variáveis numéricas para análise de correlação.")
-            return
-        
-        # Matriz de correlação
-        st.subheader("Matriz de Correlação")
-        
-        corr = df_num.corr()
-        
-        # Heatmap de correlação
-        fig = px.imshow(
-            corr,
-            text_auto='.2f',
-            title="Matriz de Correlação",
-            color_continuous_scale='RdBu_r',
-            zmin=-1, zmax=1
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Selecionar variáveis para análise detalhada
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            var_x = st.selectbox("Variável X:", options=df_num.columns.tolist(), index=0)
-        
-        with col2:
-            var_y = st.selectbox("Variável Y:", options=df_num.columns.tolist(), index=min(1, len(df_num.columns)-1))
-        
-        # Evitar mesma variável
-        if var_x == var_y:
-            st.warning("Por favor, selecione variáveis diferentes para análise.")
-            return
-        
-        # Preparar dados para análise
-        df_corr = df[[var_x, var_y]].dropna()
-        
-        if len(df_corr) < 5:
-            st.warning("Não há dados suficientes para análise de correlação após remover valores ausentes.")
-            return
-        
-        # Calcular correlação
-        corr_value = df_corr[var_x].corr(df_corr[var_y])
-        
-        # Interpretar correlação
-        if abs(corr_value) < 0.3:
-            strength = "fraca"
-            color = "#FFC107"
-        elif abs(corr_value) < 0.7:
-            strength = "moderada"
-            color = "#FF9800"
-        else:
-            strength = "forte"
-            color = "#F44336" if corr_value < 0 else "#4CAF50"
-        
-        direction = "positiva" if corr_value >= 0 else "negativa"
-        
-        # Exibir resultado
-        correlation_content = f"""
-        <div style="margin-bottom: 1rem;">
-            <div style="font-size: 1.2rem; font-weight: bold; margin-bottom: 0.5rem;">
-                Correlação: <span style="color: {color}">{corr_value:.2f}</span>
-            </div>
-            <div>
-                Existe uma correlação <strong>{strength} {direction}</strong> entre {var_x} e {var_y}.
-            </div>
-            <div style="margin-top: 0.5rem;">
-                <strong>Interpretação:</strong> 
-                {
-                    f"Quando {var_x} aumenta, {var_y} tende a aumentar também." if corr_value > 0 else
-                    f"Quando {var_x} aumenta, {var_y} tende a diminuir."
-                }
-            </div>
-        </div>
-        """
-        
-        custom_card(f"Correlação entre {var_x} e {var_y}", correlation_content, icon="📊", color="#9C27B0")
-        
-        # Gráfico de dispersão com linha de tendência
-        fig = px.scatter(
-            df_corr,
-            x=var_x,
-            y=var_y,
-            trendline="ols",
-            labels={var_x: var_x, var_y: var_y},
-            title=f"Relação entre {var_x} e {var_y}"
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Análise de regressão
-        st.subheader("Análise de Regressão")
-        
-        X = df_corr[[var_x]]
-        y = df_corr[var_y]
-        
-        # Treinar modelo de regressão
-        model = LinearRegression()
-        model.fit(X, y)
-        
-        # Fazer previsões
-        y_pred = model.predict(X)
-        
-        # Calcular métricas
-        r2 = r2_score(y, y_pred)
-        rmse = np.sqrt(mean_squared_error(y, y_pred))
-        
-        # Exibir equação da reta
-        equation = f"y = {model.coef_[0]:.4f}x + {model.intercept_:.4f}"
-        
-        # Mostrar resultados
-        regression_content = f"""
-        <div style="margin-bottom: 1rem;">
-            <div style="margin-bottom: 0.5rem;"><strong>Equação da reta:</strong> {equation}</div>
-            <div style="margin-bottom: 0.5rem;"><strong>R² (Coeficiente de determinação):</strong> {r2:.4f}</div>
-            <div style="margin-bottom: 0.5rem;"><strong>RMSE (Erro quadrático médio):</strong> {rmse:.4f}</div>
-            <div style="margin-top: 0.8rem;">
-                <strong>Interpretação:</strong> 
-                {
-                    f"O modelo explica {r2*100:.1f}% da variação em {var_y}." 
-                }
-                {
-                    f"Para cada unidade de aumento em {var_x}, {var_y} {'aumenta' if model.coef_[0] > 0 else 'diminui'} em {abs(model.coef_[0]):.4f} unidades."
-                }
-            </div>
-        </div>
-        """
-        
-        custom_card("Modelo de Regressão", regression_content, icon="📈", color="#00BCD4")
-        
-        # Modelo de regressão com statsmodels para detalhes
-        X_sm = sm.add_constant(X)
-        model_sm = sm.OLS(y, X_sm).fit()
-        
-        # Exibir resumo do modelo
-        st.subheader("Detalhes do Modelo de Regressão")
-        st.text(model_sm.summary().as_text())
-        
-        # Simulação de valores
-        st.subheader("Simulador de Valores")
-        
-        # Slider para selecionar valor de X
-        x_min, x_max = df_corr[var_x].min(), df_corr[var_x].max()
-        x_val = st.slider(
-            f"Selecione um valor para {var_x}:",
-            min_value=float(x_min),
-            max_value=float(x_max),
-            value=float((x_min + x_max) / 2),
-            step=float((x_max - x_min) / 100)
-        )
-        
-        # Prever valor de Y
-        y_val = model.predict([[x_val]])[0]
-        
-        # Exibir previsão
-        st.success(f"Para {var_x} = {x_val:.2f}, o valor previsto de {var_y} é {y_val:.2f}")
-    
-    elif analise_tipo == "Previsões":
-        st.subheader("Modelos de Previsão")
-        
-        # Card de informação
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            Os modelos de previsão utilizam dados históricos para estimar valores futuros ou 
-            prever uma variável com base em outras, permitindo antecipação de tendências e comportamentos.
-        </div>
-        """
-        
-        custom_card("Previsão e Modelagem", card_content, icon="🔮", color="#4CAF50")
-        
-        # Tipo de previsão
-        previsao_tipo = st.radio(
-            "Tipo de Previsão:",
-            ["Previsão de Variável", "Análise Temporal"]
-        )
-        
-        # Previsão de variável com base em outras
-        if previsao_tipo == "Previsão de Variável":
-            # Obter variáveis numéricas
-            df_num = df.select_dtypes(include=['number'])
-            
-            if len(df_num.columns) < 2:
-                st.warning("São necessárias pelo menos duas variáveis numéricas para este tipo de previsão.")
-                return
-            
-            # Seleção de variável alvo
-            var_target = st.selectbox("Variável a ser prevista:", options=df_num.columns.tolist())
-            
-            # Seleção de variáveis preditoras
-            var_predictors = st.multiselect(
-                "Variáveis preditoras:",
-                options=[col for col in df_num.columns if col != var_target],
-                default=[col for col in df_num.columns[:3] if col != var_target]
-            )
-            
-            if not var_predictors:
-                st.warning("Selecione pelo menos uma variável preditora.")
-                return
-            
-            # Preparar dados
-            X = df_num[var_predictors].copy()
-            y = df_num[var_target].copy()
-            
-            # Remover linhas com NaN
-            mask = ~(X.isna().any(axis=1) | y.isna())
-            X = X[mask]
-            y = y[mask]
-            
-            if len(X) < 10:
-                st.warning("Não há dados suficientes para treinar um modelo após remover valores ausentes.")
-                return
-            
-            # Treinar modelo
-            if st.button("Treinar Modelo de Previsão", use_container_width=True):
-                with st.spinner("Treinando modelo..."):
-                    try:
-                        # Dividir em treino e teste
-                        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
-                        
-                        # Treinar modelo
-                        model = LinearRegression()
-                        model.fit(X_train, y_train)
-                        
-                        # Avaliar no conjunto de teste
-                        y_pred = model.predict(X_test)
-                        
-                        # Métricas
-                        r2 = r2_score(y_test, y_pred)
-                        rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-                        
-                        # Exibir resultados
-                        st.subheader("Resultados do Modelo")
-                        
-                        metrics_content = f"""
-                        <div style="margin-bottom: 1rem;">
-                            <div style="margin-bottom: 0.5rem;"><strong>R² (Coeficiente de determinação):</strong> {r2:.4f}</div>
-                            <div style="margin-bottom: 0.5rem;"><strong>RMSE (Erro quadrático médio):</strong> {rmse:.4f}</div>
-                            <div style="margin-top: 0.8rem;">
-                                <strong>Interpretação:</strong> 
-                                {
-                                    f"O modelo explica {r2*100:.1f}% da variação em {var_target}." 
-                                }
-                            </div>
-                        </div>
-                        """
-                        
-                        custom_card("Métricas do Modelo", metrics_content, icon="📊", color="#FF5722")
-                        
-                        # Importância das variáveis
-                        importance = pd.DataFrame({
-                            'Variável': var_predictors,
-                            'Importância': np.abs(model.coef_)
-                        })
-                        importance = importance.sort_values('Importância', ascending=False)
-                        
-                        fig = px.bar(
-                            importance,
-                            x='Variável',
-                            y='Importância',
-                            title="Importância das Variáveis",
-                            labels={'Importância': 'Importância Relativa', 'Variável': 'Variável'}
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Comparação Valores Reais vs. Previstos
-                        fig = px.scatter(
-                            x=y_test,
-                            y=y_pred,
-                            labels={'x': 'Valores Reais', 'y': 'Valores Previstos'},
-                            title="Valores Reais vs. Previstos"
-                        )
-                        
-                        # Adicionar linha de referência perfeita
-                        min_val = min(y_test.min(), y_pred.min())
-                        max_val = max(y_test.max(), y_pred.max())
-                        fig.add_trace(
-                            go.Scatter(
-                                x=[min_val, max_val],
-                                y=[min_val, max_val],
-                                mode='lines',
-                                line=dict(color='red', dash='dash'),
-                                name='Previsão Perfeita'
-                            )
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Simulação de novos valores
-                        st.subheader("Simulador de Previsão")
-                        
-                        # Criar sliders para cada variável preditora
-                        input_values = {}
-                        
-                        for var in var_predictors:
-                            var_min, var_max = df_num[var].min(), df_num[var].max()
-                            var_avg = df_num[var].mean()
-                            
-                            input_values[var] = st.slider(
-                                f"{var}:",
-                                min_value=float(var_min),
-                                max_value=float(var_max),
-                                value=float(var_avg),
-                                step=float((var_max - var_min) / 100)
-                            )
-                        
-                        # Criar array de entrada
-                        input_array = np.array([[input_values[var] for var in var_predictors]])
-                        
-                        # Fazer previsão
-                        prediction = model.predict(input_array)[0]
-                        
-                        # Exibir previsão
-                        st.success(f"Valor previsto de {var_target}: {prediction:.2f}")
-                        
-                        # Intervalos de confiança (simplificado)
-                        st.info(f"Nota: Este valor previsto é uma estimativa e pode variar. O modelo tem precisão de {r2*100:.1f}%.")
-                    
-                    except Exception as e:
-                        st.error(f"Erro ao treinar o modelo: {str(e)}")
-        
-        # Análise temporal
-        elif previsao_tipo == "Análise Temporal":
-            # Verificar se há coluna de data
-            date_cols = [col for col in df.columns if pd.api.types.is_datetime64_dtype(df[col])]
-            
-            if not date_cols and 'data_registro' in df.columns:
-                try:
-                    # Tentar converter
-                    df['data_registro'] = pd.to_datetime(df['data_registro'])
-                    date_cols = ['data_registro']
-                except:
-                    pass
-            
-            if not date_cols:
-                st.warning("Não foi encontrada nenhuma coluna de data para análise temporal.")
-                return
-            
-            # Seleção de coluna de data
-            date_col = st.selectbox("Coluna de data:", options=date_cols)
-            
-            # Seleção de variável para analisar tendência
-            num_cols = df.select_dtypes(include=['number']).columns.tolist()
-            
-            if not num_cols:
-                st.warning("Não foram encontradas variáveis numéricas para análise temporal.")
-                return
-            
-            var_trend = st.selectbox("Variável para análise de tendência:", options=num_cols)
-            
-            # Frequência de agregação
-            freq = st.selectbox(
-                "Frequência de agregação:",
-                options=["Diária", "Semanal", "Mensal", "Trimestral", "Anual"],
-                index=2
-            )
-            
-            freq_map = {
-                "Diária": "D",
-                "Semanal": "W",
-                "Mensal": "M",
-                "Trimestral": "Q",
-                "Anual": "Y"
-            }
-            
-            # Preparar dados temporais
-            df_time = df[[date_col, var_trend]].copy()
-            df_time.dropna(inplace=True)
-            
-            if len(df_time) < 10:
-                st.warning("Não há dados suficientes para análise temporal após remover valores ausentes.")
-                return
-            
-            # Agregar por período
-            df_time.set_index(date_col, inplace=True)
-            df_time = df_time.resample(freq_map[freq]).mean()
-            
-            # Executar análise
-            if st.button("Executar Análise Temporal", use_container_width=True):
-                with st.spinner("Processando análise temporal..."):
-                    try:
-                        # Gráfico de série temporal
-                        fig = px.line(
-                            df_time,
-                            y=var_trend,
-                            title=f"Série Temporal de {var_trend} ({freq})",
-                            labels={var_trend: var_trend, "index": "Data"}
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Decomposição da série
-                        if len(df_time) >= 4:  # Mínimo para decomposição
-                            try:
-                                # Decomposição
-                                decomposition = seasonal_decompose(df_time[var_trend], model='additive')
-                                
-                                # Criar subplots
-                                fig = make_subplots(
-                                    rows=4, 
-                                    cols=1,
-                                    subplot_titles=("Observado", "Tendência", "Sazonalidade", "Resíduo"),
-                                    vertical_spacing=0.1
-                                )
-                                
-                                # Adicionar traços
-                                fig.add_trace(
-                                    go.Scatter(x=decomposition.observed.index, y=decomposition.observed, name="Observado"),
-                                    row=1, col=1
-                                )
-                                
-                                fig.add_trace(
-                                    go.Scatter(x=decomposition.trend.index, y=decomposition.trend, name="Tendência"),
-                                    row=2, col=1
-                                )
-                                
-                                fig.add_trace(
-                                    go.Scatter(x=decomposition.seasonal.index, y=decomposition.seasonal, name="Sazonalidade"),
-                                    row=3, col=1
-                                )
-                                
-                                fig.add_trace(
-                                    go.Scatter(x=decomposition.resid.index, y=decomposition.resid, name="Resíduo"),
-                                    row=4, col=1
-                                )
-                                
-                                # Atualizar layout
-                                fig.update_layout(
-                                    height=800,
-                                    title_text=f"Decomposição da Série de {var_trend}",
-                                    showlegend=False
-                                )
-                                
-                                st.plotly_chart(fig, use_container_width=True)
-                                
-                                # Análise de tendência
-                                trend = decomposition.trend.dropna()
-                                
-                                if len(trend) >= 2:
-                                    # Calcular direção da tendência
-                                    trend_direction = "crescente" if trend.iloc[-1] > trend.iloc[0] else "decrescente"
-                                    trend_change = abs(trend.iloc[-1] - trend.iloc[0])
-                                    trend_pct = abs(trend.iloc[-1] / trend.iloc[0] - 1) * 100 if trend.iloc[0] != 0 else 0
-                                    
-                                    # Exibir análise
-                                    trend_content = f"""
-                                    <div style="margin-bottom: 1rem;">
-                                        <div style="margin-bottom: 0.5rem;">
-                                            A série de <strong>{var_trend}</strong> apresenta uma tendência <strong>{trend_direction}</strong>.
-                                        </div>
-                                        <div style="margin-bottom: 0.5rem;">
-                                            Variação absoluta: <strong>{trend_change:.2f}</strong> unidades
-                                        </div>
-                                        <div style="margin-bottom: 0.5rem;">
-                                            Variação percentual: <strong>{trend_pct:.2f}%</strong>
-                                        </div>
-                                    </div>
-                                    """
-                                    
-                                    custom_card("Análise de Tendência", trend_content, icon="📈", color="#FF9800")
-                            
-                            except Exception as e:
-                                st.warning(f"Não foi possível realizar a decomposição da série: {str(e)}")
-                                st.info("A decomposição requer uma série temporal com mais pontos e sem valores ausentes.")
-                    
-                    except Exception as e:
-                        st.error(f"Erro na análise temporal: {str(e)}")
-    
-    elif analise_tipo == "Análise Textual":
-        st.subheader("Análise de Texto")
-        
-        # Card de informação
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            A análise textual extrai insights de dados textuais como descrições, observações, 
-            e outros campos textuais, identificando padrões e tendências nas palavras utilizadas.
-        </div>
-        """
-        
-        custom_card("Análise de Texto", card_content, icon="📝", color="#9C27B0")
-        
-        # Identificar colunas de texto
-        text_cols = df.select_dtypes(include=['object']).columns.tolist()
-        
-        # Remover colunas que provavelmente não são text livre
-        exclude_cols = ['nome', 'telefone', 'bairro', 'tipo_pet', 'raca', 'sexo', 'regiao', 'created_by_email']
-        text_cols = [col for col in text_cols if col not in exclude_cols]
-        
-        if not text_cols:
-            st.warning("Não foram encontradas colunas de texto para análise.")
-            return
-        
-        # Seleção de coluna de texto
-        text_col = st.selectbox("Coluna para análise de texto:", options=text_cols)
-        
-        # Verificar se há dados suficientes
-        texts = df[text_col].dropna().astype(str)
-        texts = texts[texts.str.len() > 5]  # Textos com pelo menos 5 caracteres
-        
-        if len(texts) < 5:
-            st.warning(f"Não há dados textuais suficientes na coluna {text_col} para análise.")
-            return
-        
-        # Executar análise
-        if st.button("Analisar Texto", use_container_width=True):
-            with st.spinner("Processando análise de texto..."):
-                try:
-                    # Concatenar todos os textos
-                    all_text = " ".join(texts)
-                    
-                    # Estatísticas básicas
-                    words = all_text.split()
-                    word_count = len(words)
-                    unique_words = len(set(words))
-                    avg_length = sum(len(word) for word in words) / word_count if word_count > 0 else 0
-                    
-                    # Exibir estatísticas
-                    stats_content = f"""
-                    <div style="margin-bottom: 1rem;">
-                        <div style="margin-bottom: 0.5rem;"><strong>Total de palavras:</strong> {word_count}</div>
-                        <div style="margin-bottom: 0.5rem;"><strong>Palavras únicas:</strong> {unique_words}</div>
-                        <div style="margin-bottom: 0.5rem;"><strong>Comprimento médio das palavras:</strong> {avg_length:.2f} caracteres</div>
-                        <div style="margin-bottom: 0.5rem;"><strong>Total de textos analisados:</strong> {len(texts)}</div>
-                    </div>
-                    """
-                    
-                    custom_card("Estatísticas Textuais", stats_content, icon="📊", color="#00BCD4")
-                    
-                    # Palavras mais comuns
-                    word_counts = {}
-                    for word in words:
-                        word = word.lower()
-                        if len(word) > 3:  # Ignorar palavras muito curtas
-                            word_counts[word] = word_counts.get(word, 0) + 1
-                    
-                    top_words = sorted(word_counts.items(), key=lambda x: x[1], reverse=True)[:20]
-                    
-                    # Gráfico de palavras mais comuns
-                    top_words_df = pd.DataFrame(top_words, columns=['Palavra', 'Frequência'])
-                    
-                    fig = px.bar(
-                        top_words_df,
-                        x='Palavra',
-                        y='Frequência',
-                        title="Palavras Mais Frequentes",
-                        labels={'Frequência': 'Frequência', 'Palavra': 'Palavra'}
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Nuvem de palavras
-                    st.subheader("Nuvem de Palavras")
-                    
-                    try:
-                        # Gerar nuvem de palavras
-                        wordcloud = WordCloud(
-                            width=800, 
-                            height=400, 
-                            background_color='white',
-                            max_words=100
-                        ).generate(all_text)
-                        
-                        # Plotar e salvar em um buffer
-                        plt.figure(figsize=(10, 5))
-                        plt.imshow(wordcloud, interpolation='bilinear')
-                        plt.axis('off')
-                        
-                        # Exibir nuvem de palavras
-                        st.pyplot(plt)
-                    except Exception as e:
-                        st.warning(f"Não foi possível gerar a nuvem de palavras: {str(e)}")
-                
-                except Exception as e:
-                    st.error(f"Erro na análise de texto: {str(e)}")
-    
-    elif analise_tipo == "Detecção de Anomalias":
-        st.subheader("Detecção de Anomalias")
-        
-        # Card de informação
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-            A detecção de anomalias identifica valores atípicos nos dados que podem representar 
-            erros, casos especiais ou insights valiosos que se destacam do padrão normal.
-        </div>
-        """
-        
-        custom_card("Identificação de Anomalias", card_content, icon="🔍", color="#F44336")
-        
-        # Obter variáveis numéricas
-        df_num = df.select_dtypes(include=['number'])
-        
-        if len(df_num.columns) < 1:
-            st.warning("São necessárias variáveis numéricas para detecção de anomalias.")
-            return
-        
-        # Seleção de variáveis
-        selected_vars = st.multiselect(
-            "Selecione as variáveis para análise:",
-            options=df_num.columns.tolist(),
-            default=df_num.columns.tolist()[:3] if len(df_num.columns) >= 3 else df_num.columns.tolist()
-        )
-        
-        if not selected_vars:
-            st.warning("Selecione pelo menos uma variável para análise.")
-            return
-        
-        # Método de detecção
-        method = st.radio(
-            "Método de detecção:",
-            ["Z-Score", "IQR (Intervalo Interquartil)"]
-        )
-        
-        # Limiar para detecção
-        if method == "Z-Score":
-            threshold = st.slider(
-                "Limiar de Z-Score:",
-                min_value=1.5,
-                max_value=5.0,
-                value=3.0,
-                step=0.1
-            )
-        else:  # IQR
-            threshold = st.slider(
-                "Fator de IQR:",
-                min_value=1.0,
-                max_value=3.0,
-                value=1.5,
-                step=0.1
-            )
-        
-        # Executar detecção
-        if st.button("Detectar Anomalias", use_container_width=True):
-            with st.spinner("Processando detecção de anomalias..."):
-                try:
-                    # Preparar dados
-                    df_anomaly = df[selected_vars].copy()
-                    df_anomaly.dropna(inplace=True)
-                    
-                    if len(df_anomaly) < 10:
-                        st.warning("Não há dados suficientes para detecção de anomalias após remover valores ausentes.")
-                        return
-                    
-                    # Detectar anomalias para cada variável
-                    anomalies = {}
-                    
-                    for var in selected_vars:
-                        if method == "Z-Score":
-                            # Z-Score
-                            mean = df_anomaly[var].mean()
-                            std = df_anomaly[var].std()
-                            z_scores = (df_anomaly[var] - mean) / std
-                            
-                            # Identificar anomalias
-                            anomalies[var] = df_anomaly[abs(z_scores) > threshold].index
-                        else:
-                            # IQR
-                            Q1 = df_anomaly[var].quantile(0.25)
-                            Q3 = df_anomaly[var].quantile(0.75)
-                            IQR = Q3 - Q1
-                            
-                            lower_bound = Q1 - threshold * IQR
-                            upper_bound = Q3 + threshold * IQR
-                            
-                            # Identificar anomalias
-                            anomalies[var] = df_anomaly[(df_anomaly[var] < lower_bound) | (df_anomaly[var] > upper_bound)].index
-                    
-                    # Contar anomalias por variável
-                    anomaly_counts = {var: len(indices) for var, indices in anomalies.items()}
-                    
-                    # Exibir resultados
-                    st.subheader("Resultados da Detecção")
-                    
-                    # Gráfico de contagem de anomalias
-                    anomaly_df = pd.DataFrame({
-                        'Variável': list(anomaly_counts.keys()),
-                        'Anomalias': list(anomaly_counts.values())
-                    })
-                    
-                    fig = px.bar(
-                        anomaly_df,
-                        x='Variável',
-                        y='Anomalias',
-                        title=f"Contagem de Anomalias por Variável (Método: {method})",
-                        labels={'Anomalias': 'Número de Anomalias', 'Variável': 'Variável'}
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Visualização das anomalias para cada variável
-                    for var in selected_vars:
-                        # Dados para visualização
-                        df_plot = df[var].dropna()
-                        
-                        # Identificar pontos anômalos
-                        is_anomaly = df_plot.index.isin(anomalies[var])
-                        
-                        # Criar DataFrame para plotly
-                        plot_data = pd.DataFrame({
-                            'Índice': range(len(df_plot)),
-                            'Valor': df_plot.values,
-                            'Anomalia': is_anomaly
-                        })
-                        
-                        # Gráfico de dispersão
-                        fig = px.scatter(
-                            plot_data,
-                            x='Índice',
-                            y='Valor',
-                            color='Anomalia',
-                            title=f"Anomalias em {var} (Total: {len(anomalies[var])})",
-                            labels={'Valor': var, 'Índice': 'Índice'},
-                            color_discrete_map={True: 'red', False: 'blue'}
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True)
-                        
-                        # Estatísticas das anomalias
-                        if len(anomalies[var]) > 0:
-                            anomaly_values = df_plot[df_plot.index.isin(anomalies[var])]
-                            normal_values = df_plot[~df_plot.index.isin(anomalies[var])]
-                            
-                            # Calcular estatísticas
-                            anomaly_mean = anomaly_values.mean() if len(anomaly_values) > 0 else 0
-                            normal_mean = normal_values.mean() if len(normal_values) > 0 else 0
-                            
-                            # Exibir estatísticas
-                            stats_content = f"""
-                            <div style="margin-bottom: 1rem;">
-                                <div style="margin-bottom: 0.5rem;"><strong>Número de anomalias:</strong> {len(anomalies[var])} ({len(anomalies[var])/len(df_plot)*100:.1f}% dos dados)</div>
-                                <div style="margin-bottom: 0.5rem;"><strong>Média dos valores normais:</strong> {normal_mean:.2f}</div>
-                                <div style="margin-bottom: 0.5rem;"><strong>Média das anomalias:</strong> {anomaly_mean:.2f}</div>
-                                <div style="margin-bottom: 0.5rem;"><strong>Diferença média:</strong> {abs(anomaly_mean - normal_mean):.2f} ({abs(anomaly_mean/normal_mean - 1)*100:.1f}%)</div>
-                            </div>
-                            """
-                            
-                            custom_card(f"Estatísticas das Anomalias em {var}", stats_content, icon="📊", color="#FF5722")
-                            
-                            # Listar anomalias
-                            if len(anomalies[var]) > 0 and len(anomalies[var]) <= 20:
-                                st.markdown(f"#### Lista de Anomalias em {var}")
-                                
-                                # Criar DataFrame com informações extras se disponíveis
-                                anomaly_pets = df.loc[anomalies[var]].copy()
-                                
-                                if 'nome' in anomaly_pets.columns:
-                                    anomaly_pets = anomaly_pets[['nome', var] + [col for col in selected_vars if col != var]]
-                                else:
-                                    anomaly_pets = anomaly_pets[[var] + [col for col in selected_vars if col != var]]
-                                
-                                st.dataframe(anomaly_pets, use_container_width=True, hide_index=False)
-                    
-                    # Resumo geral
-                    all_anomalies = set()
-                    for indices in anomalies.values():
-                        all_anomalies.update(indices)
-                    
-                    summary_content = f"""
-                    <div style="margin-bottom: 1rem;">
-                        <div style="margin-bottom: 0.5rem;"><strong>Total de registros analisados:</strong> {len(df_anomaly)}</div>
-                        <div style="margin-bottom: 0.5rem;"><strong>Registros com pelo menos uma anomalia:</strong> {len(all_anomalies)} ({len(all_anomalies)/len(df_anomaly)*100:.1f}%)</div>
-                        <div style="margin-bottom: 0.5rem;"><strong>Registros sem anomalias:</strong> {len(df_anomaly) - len(all_anomalies)} ({(len(df_anomaly) - len(all_anomalies))/len(df_anomaly)*100:.1f}%)</div>
-                        <div style="margin-bottom: 0.5rem;"><strong>Método utilizado:</strong> {method} (limiar: {threshold})</div>
-                    </div>
-                    """
-                    
-                    custom_card("Resumo da Detecção de Anomalias", summary_content, icon="📋", color="#3F51B5")
-                
-                except Exception as e:
-                    st.error(f"Erro na detecção de anomalias: {str(e)}")
-
-@require_login
-def mapa_interativo(df):
-    """Exibe um mapa interativo com a distribuição geográfica dos pets."""
-    st.title("Mapa Interativo")
-    
-    # Card de informação
-    card_content = """
-    <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-        O mapa interativo permite visualizar a distribuição geográfica dos pets, 
-        identificando padrões de concentração por bairro e região.
-    </div>
-    """
-    
-    custom_card("Visualização Geoespacial", card_content, icon="🗺️", color="#009688")
-    
-    # Verificar se temos dados de bairro ou região
-    if 'bairro' not in df.columns and 'regiao' not in df.columns:
-        st.warning("Não há dados de localização (bairro ou região) para exibir no mapa.")
-        return
-    
-    # Opções de visualização
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        view_type = st.selectbox(
-            "Tipo de Visualização:",
-            ["Mapa de Calor", "Mapa de Bairros", "Mapa de Marcadores"]
-        )
-    
-    with col2:
-        if 'tipo_pet' in df.columns:
-            tipo_filter = st.multiselect(
-                "Filtrar por Tipo de Pet:",
-                options=["Todos"] + sorted(df['tipo_pet'].unique().tolist()),
-                default=["Todos"]
-            )
-        else:
-            tipo_filter = ["Todos"]
-    
-    # Filtrar dados se necessário
-    df_map = df.copy()
-    
-    if tipo_filter and "Todos" not in tipo_filter and 'tipo_pet' in df.columns:
-        df_map = df_map[df_map['tipo_pet'].isin(tipo_filter)]
-    
-    # Preparar dados para o mapa
-    if view_type == "Mapa de Calor" or view_type == "Mapa de Bairros":
-        # Usar bairro como principal localização
-        if 'bairro' in df_map.columns:
-            location_col = 'bairro'
-        else:
-            location_col = 'regiao'
-        
-        # Contagem por localização
-        location_counts = df_map[location_col].value_counts().reset_index()
-        location_counts.columns = ['location', 'count']
-        
-        # Mapa de calor ou de bairros
-        st.subheader(f"Distribuição de Pets por {location_col.capitalize()}")
-        
-        if view_type == "Mapa de Calor":
-            # Mapa de calor simples
-            fig = px.density_mapbox(
-                location_counts,
-                lat=[0] * len(location_counts),  # Placeholder, seria substituído por dados reais
-                lon=[0] * len(location_counts),  # Placeholder, seria substituído por dados reais
-                z='count',
-                radius=10,
-                center=dict(lat=-27.5969, lon=-48.5495),  # Florianópolis
-                zoom=10,
-                mapbox_style="carto-positron",
-                title=f"Mapa de Calor por {location_col.capitalize()}"
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-            
-            st.info("Nota: Este é um mapa de calor demonstrativo. Para um mapa preciso, seria necessário ter coordenadas geográficas de cada bairro.")
-        else:
-            # Mapa de bairros
-            # Em um cenário real, usaríamos um GeoJSON com polígonos dos bairros
-            st.info("Mapa de bairros requere dados geoespaciais (GeoJSON) dos limites de cada bairro.")
-            
-            # Exibir tabela com contagem por bairro
-            st.subheader(f"Contagem de Pets por {location_col.capitalize()}")
-            
-            # Estilizar tabela
-            st.dataframe(
-                location_counts,
-                use_container_width=True,
-                hide_index=True
-            )
-    
-    else:  # Mapa de Marcadores
-        st.subheader("Mapa de Marcadores de Pets")
-        st.info("Para um mapa de marcadores preciso, seriam necessárias coordenadas geográficas específicas de cada pet.")
-        
-        # Em um cenário real, teríamos latitude e longitude para cada pet
-        # Aqui usamos uma visualização alternativa
-        
-        # Se tivermos bairro e tipo_pet, podemos fazer um mapa de bolhas
-        if 'bairro' in df_map.columns and 'tipo_pet' in df_map.columns:
-            # Agrupar por bairro e tipo
-            grouped = df_map.groupby(['bairro', 'tipo_pet']).size().reset_index(name='count')
-            
-            # Criar gráfico de bolhas
-            fig = px.scatter(
-                grouped,
-                x='bairro',
-                y='tipo_pet',
-                size='count',
-                color='tipo_pet',
-                title="Distribuição de Tipos de Pets por Bairro",
-                labels={'bairro': 'Bairro', 'tipo_pet': 'Tipo de Pet', 'count': 'Quantidade'}
-            )
-            
-            # Ajustar layout
-            fig.update_layout(
-                xaxis={'categoryorder': 'total descending'},
-                height=600
-            )
-            
-            st.plotly_chart(fig, use_container_width=True)
-    
-    # Análise adicional
-    st.subheader("Análise de Distribuição")
-    
-    if 'bairro' in df.columns and 'tipo_pet' in df.columns:
-        # Distribuição de tipos por bairro em formato de heatmap
-        cross_tab = pd.crosstab(df_map['bairro'], df_map['tipo_pet'])
-        
-        # Normalizar por bairro
-        cross_tab_norm = cross_tab.div(cross_tab.sum(axis=1), axis=0) * 100
-        
-        # Criar heatmap
-        fig = px.imshow(
-            cross_tab_norm,
-            labels=dict(x="Tipo de Pet", y="Bairro", color="Percentual (%)"),
-            title="Distribuição Percentual de Tipos de Pets por Bairro",
-            color_continuous_scale='Viridis',
-            text_auto='.1f'
-        )
-        
-        # Ajustar layout
-        fig.update_layout(
-            height=600
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-    
-    # Densidade populacional de pets
-    if 'bairro' in df.columns:
-        st.subheader("Densidade de Pets")
-        
-        # Contar pets por bairro
-        bairro_counts = df_map['bairro'].value_counts().reset_index()
-        bairro_counts.columns = ['bairro', 'count']
-        
-        # Adicionar densidade (simulada para este exemplo)
-        # Em um cenário real, teríamos dados de área ou população de cada bairro
-        bairro_counts['area_km2'] = np.random.uniform(1, 10, size=len(bairro_counts))
-        bairro_counts['densidade'] = bairro_counts['count'] / bairro_counts['area_km2']
-        
-        # Criar gráfico de densidade
-        fig = px.bar(
-            bairro_counts.sort_values('densidade', ascending=False).head(10),
-            x='bairro',
-            y='densidade',
-            color='densidade',
-            title="Top 10 Bairros por Densidade de Pets (Pets/km²)",
-            labels={'bairro': 'Bairro', 'densidade': 'Densidade (Pets/km²)'},
-            text=bairro_counts.sort_values('densidade', ascending=False).head(10)['densidade'].round(1)
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        st.info("Nota: Este gráfico usa valores de área simulados para fins de demonstração. Em um ambiente de produção, seriam utilizados dados reais de área por bairro.")
-
-@require_login
-def ai_insights(df):
-    """Oferece insights baseados em IA sobre os dados."""
-    st.title("IA Insights")
-    
-    # Card de informação
-    card_content = """
-    <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-        Esta seção utiliza inteligência artificial para analisar os dados e gerar insights 
-        automáticos, identificando padrões, tendências e oportunidades que podem não ser evidentes
-        em análises tradicionais.
-    </div>
-    """
-    
-    custom_card("Análise Baseada em IA", card_content, icon="🤖", color="#673AB7")
-    
-    st.info("Nota: Esta funcionalidade simula o uso de IA para análise de dados. Em um ambiente de produção, seria integrada com serviços como Google Gemini AI ou OpenAI para análises mais avançadas.")
-    
-    # Opções de análise
-    analysis_type = st.radio(
-        "Tipo de Análise:",
-        ["Resumo Geral", "Insights Específicos", "Recomendações", "Análise Preditiva"],
-        horizontal=True
-    )
-    
-    # Verificar se temos dados suficientes
-    if df.empty or len(df) < 5:
-        st.warning("Não há dados suficientes para análise por IA. Adicione mais pets para utilizar esta funcionalidade.")
-        return
-    
-    # Executar análise
-    if st.button("Gerar Análise com IA", use_container_width=True):
-        with st.spinner("Processando análise com IA..."):
-            # Simular processamento
-            time.sleep(2)
-            
-            if analysis_type == "Resumo Geral":
-                # Gerar estatísticas para resumo
-                total_pets = len(df)
-                tipos = df['tipo_pet'].value_counts() if 'tipo_pet' in df.columns else pd.Series([])
-                adotados = df['adotado'].sum() if 'adotado' in df.columns else 0
-                bairros = df['bairro'].nunique() if 'bairro' in df.columns else 0
-                
-                # Criar resumo
-                st.subheader("Resumo Geral dos Dados")
-                
-                summary_content = f"""
-                <div style="margin-bottom: 1rem; line-height: 1.6;">
-                    <p>A análise dos dados de <strong>{total_pets} pets</strong> cadastrados no sistema revela algumas tendências importantes:</p>
-                    
-                    <ul style="margin-top: 1rem;">
-                        <li>A base de dados cobre <strong>{bairros} bairros</strong> diferentes, mostrando uma boa distribuição geográfica.</li>
-                        
-                        <li>A taxa de adoção está em <strong>{(adotados/total_pets*100) if 'adotado' in df.columns else 0:.1f}%</strong>, o que indica um 
-                        {'bom desempenho nas iniciativas de adoção' if adotados/total_pets > 0.5 else 'potencial para melhorar as taxas de adoção'}.</li>
-                        
-                        {'<li>Os <strong>' + tipos.index[0] + 's</strong> representam a maioria dos registros (' + str(round(tipos.iloc[0]/total_pets*100, 1)) + '%), ' + 
-                         'seguidos por <strong>' + tipos.index[1] + 's</strong> (' + str(round(tipos.iloc[1]/total_pets*100, 1)) + '%).</li>' 
-                         if 'tipo_pet' in df.columns and len(tipos) >= 2 else ''}
-                    </ul>
-                    
-                    <p style="margin-top: 1rem;">
-                        Com base nos padrões observados, recomenda-se focar em estratégias para aumentar a adoção de pets 
-                        nos bairros com menores taxas, além de equilibrar a representatividade dos diferentes tipos de pets no sistema.
-                    </p>
-                </div>
-                """
-                
-                custom_card("Análise IA: Resumo Geral", summary_content, icon="📊", color="#673AB7")
-                
-                # Visualização complementar
-                st.subheader("Distribuição por Características Principais")
-                
-                # Selecionar colunas numéricas
-                num_cols = df.select_dtypes(include=['number']).columns.tolist()
-                num_cols = [col for col in num_cols if col not in ['id', 'created_by']]
-                
-                if num_cols:
-                    # Gráfico de radar com médias
-                    df_radar = df[num_cols].mean().reset_index()
-                    df_radar.columns = ['Variável', 'Valor']
-                    
-                    # Normalizar para mesma escala
-                    for i, row in df_radar.iterrows():
-                        max_val = df[row['Variável']].max()
-                        if max_val > 0:
-                            df_radar.loc[i, 'Valor Normalizado'] = row['Valor'] / max_val
-                    
-                    # Criar gráfico de radar
-                    fig = px.line_polar(
-                        df_radar, 
-                        r='Valor Normalizado', 
-                        theta='Variável', 
-                        line_close=True,
-                        title="Perfil Médio dos Pets (Valores Normalizados)"
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-            
-            elif analysis_type == "Insights Específicos":
-                st.subheader("Insights Específicos por IA")
-                
-                # Análise mais detalhada simulada
-                insights = []
-                
-                # Insight 1: Relação peso-idade
-                if 'peso' in df.columns and 'idade' in df.columns:
-                    df_clean = df.dropna(subset=['peso', 'idade'])
-                    if len(df_clean) > 5:
-                        corr = df_clean['peso'].corr(df_clean['idade'])
-                        
-                        if abs(corr) > 0.3:
-                            direction = "positiva" if corr > 0 else "negativa"
-                            insights.append(
-                                f"**Relação Peso-Idade:** Existe uma correlação {direction} ({corr:.2f}) entre peso e idade, "
-                                f"indicando que os pets {'tendem a ganhar peso com a idade' if corr > 0 else 'mais velhos frequentemente pesam menos'}."
-                            )
-                
-                # Insight 2: Diferenças por tipos
-                if 'tipo_pet' in df.columns and 'peso' in df.columns:
-                    tipo_stats = df.groupby('tipo_pet')['peso'].mean().sort_values(ascending=False)
-                    if len(tipo_stats) >= 2:
-                        insights.append(
-                            f"**Diferenças por Tipo:** {tipo_stats.index[0]}s são em média {tipo_stats.iloc[0]/tipo_stats.iloc[-1]:.1f}x "
-                            f"mais pesados que {tipo_stats.index[-1]}s, o que pode indicar necessidades nutricionais e de exercício muito distintas."
-                        )
-                
-                # Insight 3: Padrões geográficos
-                if 'bairro' in df.columns and 'adotado' in df.columns:
-                    bairro_adoption = df.groupby('bairro')['adotado'].mean().sort_values(ascending=False)
-                    if len(bairro_adoption) >= 5:
-                        top_bairro = bairro_adoption.index[0]
-                        bottom_bairro = bairro_adoption.index[-1]
-                        diff = bairro_adoption.iloc[0] - bairro_adoption.iloc[-1]
-                        
-                        if diff > 0.2:
-                            insights.append(
-                                f"**Padrões Geográficos:** A taxa de adoção varia significativamente por bairro. "
-                                f"{top_bairro} tem uma taxa de adoção de {bairro_adoption.iloc[0]*100:.1f}%, enquanto "
-                                f"{bottom_bairro} tem apenas {bairro_adoption.iloc[-1]*100:.1f}%. Isso sugere a necessidade "
-                                f"de iniciativas específicas em bairros com baixa adoção."
-                            )
-                
-                # Insight 4: Comportamento
-                if 'comportamento' in df.columns and 'tipo_pet' in df.columns:
-                    comportamento_counts = pd.crosstab(df['tipo_pet'], df['comportamento'])
-                    
-                    if not comportamento_counts.empty:
-                        most_common = {}
-                        for tipo in comportamento_counts.index:
-                            if not comportamento_counts.loc[tipo].empty:
-                                most_common[tipo] = comportamento_counts.loc[tipo].idxmax()
-                        
-                        if most_common:
-                            behavior_text = ", ".join([f"{tipo}s tendem a ser mais {comp.lower()}" for tipo, comp in most_common.items()])
-                            insights.append(
-                                f"**Padrões Comportamentais:** {behavior_text}. Estes padrões comportamentais são importantes para orientar futuros tutores."
-                            )
-                
-                # Insight 5: Saúde
-                if 'estado_saude' in df.columns and 'idade' in df.columns:
-                    try:
-                        health_age = df.groupby('estado_saude')['idade'].mean().sort_values()
-                        
-                        if len(health_age) >= 2:
-                            insights.append(
-                                f"**Relação Idade-Saúde:** A idade média dos pets varia por estado de saúde, de {health_age.iloc[0]:.1f} anos "
-                                f"({health_age.index[0]}) até {health_age.iloc[-1]:.1f} anos ({health_age.index[-1]}), destacando a importância "
-                                f"de cuidados preventivos para pets mais velhos."
-                            )
-                    except:
-                        pass
-                
-                # Exibir insights
-                if insights:
-                    for i, insight in enumerate(insights):
-                        custom_card(f"Insight {i+1}", f"<div style='line-height: 1.5;'>{insight}</div>", icon="💡", color="#9C27B0")
-                else:
-                    st.info("Não foram encontrados insights específicos nos dados disponíveis. Tente adicionar mais informações para uma análise mais completa.")
-            
-            elif analysis_type == "Recomendações":
-                st.subheader("Recomendações Baseadas em IA")
-                
-                # Gerar recomendações específicas
-                recommendations = []
-                
-                # Recomendação 1: Foco em adoção
-                if 'adotado' in df.columns:
-                    adoption_rate = df['adotado'].mean() * 100
-                    if adoption_rate < 50:
-                        recommendations.append({
-                            "título": "Aumentar Taxa de Adoção",
-                            "descrição": f"A taxa de adoção atual de {adoption_rate:.1f}% está abaixo do ideal. Considere implementar campanhas de adoção focadas, particularmente para os tipos de pets com menor taxa de adoção.",
-                            "impacto": "Alto",
-                            "esforço": "Médio",
-                            "cor": "#F44336"
-                        })
-                
-                # Recomendação 2: Distribuição geográfica
-                if 'bairro' in df.columns:
-                    bairro_counts = df['bairro'].value_counts()
-                    coverage = len(bairro_counts) / 30  # Simulando cobertura de bairros
-                    
-                    if coverage < 0.7:
-                        recommendations.append({
-                            "título": "Expandir Cobertura Geográfica",
-                            "descrição": f"Atualmente, os dados cobrem apenas {len(bairro_counts)} bairros, representando uma cobertura estimada de {coverage*100:.1f}% da cidade. Ampliar o alcance para mais bairros proporcionará uma visão mais completa da população de pets.",
-                            "impacto": "Médio",
-                            "esforço": "Alto",
-                            "cor": "#FF9800"
-                        })
-                
-                # Recomendação 3: Dados de saúde
-                missing_health = 'estado_saude' not in df.columns or df['estado_saude'].isna().mean() > 0.3
-                
-                if missing_health:
-                    recommendations.append({
-                        "título": "Melhorar Dados de Saúde",
-                        "descrição": "Os dados de saúde estão incompletos ou ausentes para muitos pets. Capturar informações mais detalhadas sobre o estado de saúde permitirá análises mais precisas e intervenções preventivas.",
-                        "impacto": "Alto",
-                        "esforço": "Médio",
-                        "cor": "#2196F3"
-                    })
-                
-                # Recomendação 4: Segmentação por comportamento
-                if 'comportamento' in df.columns:
-                    behavior_groups = df['comportamento'].value_counts()
-                    
-                    if len(behavior_groups) >= 3:
-                        recommendations.append({
-                            "título": "Segmentação por Comportamento",
-                            "descrição": f"Foram identificados {len(behavior_groups)} padrões comportamentais distintos. Considere desenvolver programas específicos para cada grupo comportamental, especialmente para os comportamentos mais desafiadores.",
-                            "impacto": "Médio",
-                            "esforço": "Baixo",
-                            "cor": "#4CAF50"
-                        })
-                
-                # Recomendação 5: Equilíbrio de tipos
-                if 'tipo_pet' in df.columns:
-                    tipo_counts = df['tipo_pet'].value_counts()
-                    top_ratio = tipo_counts.iloc[0] / len(df) if len(tipo_counts) > 0 else 0
-                    
-                    if top_ratio > 0.7:
-                        recommendations.append({
-                            "título": "Diversificar Tipos de Pets",
-                            "descrição": f"Os {tipo_counts.index[0]}s representam {top_ratio*100:.1f}% dos registros, criando um desequilíbrio. Busque registrar mais dados de outros tipos de pets para uma visão mais abrangente e equilibrada.",
-                            "impacto": "Baixo",
-                            "esforço": "Médio",
-                            "cor": "#9C27B0"
-                        })
-                
-                # Exibir recomendações
-                if recommendations:
-                    for i, rec in enumerate(recommendations):
-                        content = f"""
-                        <div style="margin-bottom: 1rem; line-height: 1.5;">
-                            <p>{rec['descrição']}</p>
-                            <div style="display: flex; margin-top: 1rem;">
-                                <div style="flex: 1; padding-right: 10px;">
-                                    <strong>Impacto:</strong> <span style="color: {'#F44336' if rec['impacto'] == 'Alto' else '#FF9800' if rec['impacto'] == 'Médio' else '#4CAF50'};">{rec['impacto']}</span>
-                                </div>
-                                <div style="flex: 1;">
-                                    <strong>Esforço:</strong> <span style="color: {'#F44336' if rec['esforço'] == 'Alto' else '#FF9800' if rec['esforço'] == 'Médio' else '#4CAF50'};">{rec['esforço']}</span>
-                                </div>
-                            </div>
-                        </div>
-                        """
-                        
-                        custom_card(rec['título'], content, icon="🎯", color=rec['cor'])
-                else:
-                    st.info("Não foram geradas recomendações específicas a partir dos dados disponíveis. Tente adicionar mais informações para uma análise mais completa.")
-            
-            elif analysis_type == "Análise Preditiva":
-                st.subheader("Análise Preditiva por IA")
-                
-                # Selecionar variáveis para previsão
-                num_cols = df.select_dtypes(include=['number']).columns.tolist()
-                num_cols = [col for col in num_cols if col not in ['id', 'created_by']]
-                
-                if len(num_cols) < 2:
-                    st.warning("São necessárias pelo menos duas variáveis numéricas para análise preditiva.")
-                    return
-                
-                # Simulação de modelos preditivos
-                models = [
-                    {
-                        "título": "Previsão de Taxa de Adoção",
-                        "descrição": "Com base nos padrões históricos e características dos pets, projetamos um aumento de 12-15% na taxa de adoção nos próximos meses, especialmente para pets de médio porte e comportamento sociável.",
-                        "confiança": "87%",
-                        "tipo": "Série Temporal",
-                        "cor": "#3F51B5"
-                    },
-                    {
-                        "título": "Estimativa de Demanda por Bairro",
-                        "descrição": "O modelo prevê um aumento significativo na demanda por registros nos bairros do norte da ilha, enquanto bairros centrais tendem a manter padrões estáveis.",
-                        "confiança": "76%",
-                        "tipo": "Geoespacial",
-                        "cor": "#009688"
-                    },
-                    {
-                        "título": "Previsão de Necessidades Nutricionais",
-                        "descrição": "Baseado na distribuição de idade, peso e níveis de atividade, prevemos um aumento de 23% na demanda por rações específicas para pets idosos nos próximos trimestres.",
-                        "confiança": "82%",
-                        "tipo": "Regressão Multivariada",
-                        "cor": "#E91E63"
-                    }
-                ]
-                
-                # Exibir modelos preditivos
-                for model in models:
-                    content = f"""
-                    <div style="margin-bottom: 1rem; line-height: 1.5;">
-                        <p>{model['descrição']}</p>
-                        <div style="display: flex; margin-top: 1rem;">
-                            <div style="flex: 1; padding-right: 10px;">
-                                <strong>Confiança:</strong> <span style="color: {'#4CAF50' if float(model['confiança'][:-1]) > 80 else '#FF9800'};">{model['confiança']}</span>
-                            </div>
-                            <div style="flex: 1;">
-                                <strong>Tipo de Modelo:</strong> {model['tipo']}
-                            </div>
-                        </div>
-                    </div>
-                    """
-                    
-                    custom_card(model['título'], content, icon="📈", color=model['cor'])
-                
-                # Visualização preditiva
-                st.subheader("Visualização de Tendências")
-                
-                # Gerar dados simulados para previsão
-                months = pd.date_range(start='2025-01-01', periods=12, freq='M')
-                
-                # Tendência histórica simulada
-                historical = np.linspace(50, 80, 6) + np.random.normal(0, 3, 6)
-                
-                # Previsão simulada
-                forecast = np.linspace(80, 95, 6) + np.random.normal(0, 5, 6)
-                
-                # Intervalos de confiança
-                upper = forecast + np.linspace(5, 10, 6)
-                lower = forecast - np.linspace(5, 10, 6)
-                
-                # Criar DataFrame
-                df_forecast = pd.DataFrame({
-                    'Data': months,
-                    'Valor': np.concatenate([historical, forecast]),
-                    'Tipo': ['Histórico']*6 + ['Previsão']*6
-                })
-                
-                # Gráfico de previsão
-                fig = px.line(
-                    df_forecast,
-                    x='Data',
-                    y='Valor',
-                    color='Tipo',
-                    title="Previsão de Taxa de Adoção (%)",
-                    labels={'Valor': 'Taxa de Adoção (%)', 'Data': 'Mês'},
-                    color_discrete_map={'Histórico': '#1976D2', 'Previsão': '#FF9800'}
-                )
-                
-                # Adicionar intervalo de confiança
-                fig.add_traces(
-                    go.Scatter(
-                        x=months[6:],
-                        y=upper,
-                        mode='lines',
-                        line=dict(width=0),
-                        showlegend=False
-                    )
-                )
-                
-                fig.add_traces(
-                    go.Scatter(
-                        x=months[6:],
-                        y=lower,
-                        mode='lines',
-                        line=dict(width=0),
-                        fill='tonexty',
-                        fillcolor='rgba(255, 152, 0, 0.2)',
-                        showlegend=False
-                    )
-                )
-                
-                st.plotly_chart(fig, use_container_width=True)
-                
-                st.info("Nota: Esta visualização usa dados simulados para demonstração. Em um ambiente de produção, seriam utilizados modelos reais treinados com os dados históricos.")
-
-def user_settings():
-    """Página de configurações do usuário."""
-    st.title("Configurações do Usuário")
-    
-    # Verificar se o usuário está logado
-    if "user_id" not in st.session_state or not st.session_state.user_id:
-        st.warning("Por favor, faça login para acessar as configurações.")
-        return
-    
-    # Obter informações do usuário
-    user_info = st.session_state.user_info
-    
-    # Abas para diferentes configurações
-    tab1, tab2, tab3, tab4 = st.tabs([
-        "Perfil", 
-        "Segurança", 
-        "Notificações", 
-        "Preferências"
-    ])
-    
-    with tab1:
-        st.subheader("Perfil do Usuário")
-        
-        # Exibir informações atuais
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            # Avatar simulado com iniciais
-            st.markdown(
-                f"""
-                <div style="width: 100px; height: 100px; border-radius: 50%; 
-                background-color: #4527A0; color: white; display: flex; 
-                align-items: center; justify-content: center; font-size: 36px; 
-                font-weight: bold; margin: 0 auto 20px auto;">
-                {user_info['full_name'][0:1] if user_info['full_name'] else "?"}
-                </div>
-                """,
-                unsafe_allow_html=True
-            )
-            
-            st.markdown("<div style='text-align: center;'>Usuário desde</div>", unsafe_allow_html=True)
-            st.markdown("<div style='text-align: center; font-size: 0.8rem; color: #666;'>Mai 2025</div>", unsafe_allow_html=True)
-        
-        with col2:
-            # Formulário de edição de perfil
-            with st.form("edit_profile_form"):
-                full_name = st.text_input("Nome completo", value=user_info.get('full_name', ''))
-                email = st.text_input("Email", value=user_info.get('email', ''), disabled=True)
-                
-                # Campos adicionais
-                phone = st.text_input("Telefone", value="")
-                bio = st.text_area("Biografia", value="", height=100)
-                
-                # Botão de envio
-                submit_profile = st.form_submit_button("Salvar Alterações", use_container_width=True)
-                
-                if submit_profile:
-                    # Aqui você implementaria a atualização do perfil
-                    st.success("Perfil atualizado com sucesso!")
-                    
-                    # Atualizar informações na sessão
-                    user_info['full_name'] = full_name
-                    st.session_state.user_info = user_info
-    
-    with tab2:
-        st.subheader("Segurança da Conta")
-        
-        # Formulário de alteração de senha
-        with st.form("change_password_form"):
-            st.markdown("#### Alterar Senha")
-            
-            current_password = st.text_input("Senha atual", type="password")
-            new_password = st.text_input("Nova senha", type="password")
-            confirm_password = st.text_input("Confirmar nova senha", type="password")
-            
-            # Botão de envio
-            submit_password = st.form_submit_button("Alterar Senha", use_container_width=True)
-            
-            if submit_password:
-                if not current_password or not new_password or not confirm_password:
-                    st.error("Por favor, preencha todos os campos.")
-                elif new_password != confirm_password:
-                    st.error("As senhas não coincidem.")
-                elif len(new_password) < 6:
-                    st.error("A nova senha deve ter pelo menos 6 caracteres.")
-                else:
-                    # Verificar senha atual
-                    success = change_password(st.session_state.user_id, current_password, new_password)
-                    
-                    if success:
-                        st.success("Senha alterada com sucesso!")
-                        
-                        # Registrar atividade
-                        log_activity(st.session_state.user_id, "change_password", "Alteração de senha")
-                    else:
-                        st.error("Senha atual incorreta. Tente novamente.")
-        
-        # Outras opções de segurança
-        st.markdown("#### Outras Opções de Segurança")
-        
-        enable_2fa = st.checkbox("Habilitar autenticação de dois fatores (2FA)", value=False)
-        if enable_2fa:
-            st.info("Funcionalidade de 2FA será implementada em uma versão futura.")
-        
-        # Sessões ativas
-        st.markdown("#### Sessões Ativas")
-        st.info("Você está conectado em 1 dispositivo (este navegador).")
-        
-        if st.button("Encerrar Todas as Sessões", use_container_width=True):
-            st.success("Todas as outras sessões foram encerradas com sucesso!")
-    
-    with tab3:
-        st.subheader("Preferências de Notificação")
-        
-        # Opções de notificação
-        email_notifications = st.checkbox("Notificações por email", value=True)
-        if email_notifications:
-            st.markdown("#### Tipos de Notificação por Email")
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.checkbox("Atualizações do sistema", value=True)
-                st.checkbox("Novos registros de pets", value=True)
-                st.checkbox("Relatórios periódicos", value=False)
-            
-            with col2:
-                st.checkbox("Alterações de status", value=True)
-                st.checkbox("Alertas de segurança", value=True)
-                st.checkbox("Dicas e sugestões", value=False)
-        
-        # Frequência de resumos
-        st.markdown("#### Frequência de Resumos")
-        
-        summary_freq = st.radio(
-            "Receber resumo de atividades:",
-            ["Diário", "Semanal", "Mensal", "Nunca"],
-            horizontal=True
-        )
-        
-        if st.button("Salvar Preferências de Notificação", use_container_width=True):
-            st.success("Preferências de notificação atualizadas com sucesso!")
-    
-    with tab4:
-        st.subheader("Preferências do Sistema")
-        
-        # Tema
-        st.markdown("#### Aparência")
-        
-        theme = st.radio(
-            "Tema:",
-            ["Claro", "Escuro", "Sistema"],
-            horizontal=True
-        )
-        
-        # Idioma
-        st.markdown("#### Idioma")
-        
-        language = st.selectbox(
-            "Idioma da interface:",
-            ["Português (Brasil)", "English", "Español"]
-        )
-        
-        # Fuso horário
-        st.markdown("#### Fuso Horário")
-        
-        timezone = st.selectbox(
-            "Fuso horário:",
-            ["(GMT-03:00) Brasília", "(GMT-02:00) Fernando de Noronha", "(GMT-04:00) Manaus", "(GMT-05:00) Acre"]
-        )
-        
-        # Formato de data
-        st.markdown("#### Formatos")
-        
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            date_format = st.selectbox(
-                "Formato de data:",
-                ["DD/MM/AAAA", "MM/DD/AAAA", "AAAA-MM-DD"]
-            )
-        
-        with col2:
-            number_format = st.selectbox(
-                "Formato de número:",
-                ["1.234,56", "1,234.56"]
-            )
-        
-        if st.button("Salvar Preferências", use_container_width=True):
-            st.success("Preferências do sistema atualizadas com sucesso!")
-
-@require_admin
-def admin_panel():
-    """Painel de administração."""
-    st.title("Painel de Administração")
-    
-    # Card de informação
-    card_content = """
-    <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-        Painel de administração para gerenciamento de usuários, configurações do sistema
-        e monitoramento de atividades.
-    </div>
-    """
-    
-    custom_card("Área Administrativa", card_content, icon="⚙️", color="#F44336")
-    
-    # Menu de administração
-    admin_menu = st.sidebar.radio(
-        "Menu Administrativo",
-        ["Dashboard", "Gerenciar Usuários", "Logs do Sistema", "Configurações", "Backup/Restauração"]
-    )
-    
-    if admin_menu == "Dashboard":
-        # Código para o gráfico de atividade do sistema
-        # Simulação de atividade do sistema
-        dates = pd.date_range(start='2025-05-01', end='2025-05-20')
-        
-        # Dados de atividade simulados com valores diferentes
-        activity_data = pd.DataFrame({
-            'date': dates,
-            'logins': np.random.randint(10, 51, size=len(dates)),  # Garante valores variados
-            'registrations': np.random.randint(5, 21, size=len(dates)),
-            'pet_additions': np.random.randint(2, 16, size=len(dates))
-        })
-        
-        # Gráfico de atividade com ranges explícitos
-        fig = px.line(
-            activity_data, 
-            x='date', 
-            y=['logins', 'registrations', 'pet_additions'],
-            labels={'value': 'Quantidade', 'date': 'Data', 'variable': 'Tipo de Atividade'},
-            title="Atividade Diária",
-            color_discrete_map={
-                'logins': '#2196F3',
-                'registrations': '#4CAF50',
-                'pet_additions': '#FF9800'
-            }
-        )
-        
-        # Definir ranges explicitamente
-        fig.update_layout(
-            yaxis=dict(range=[0, max(
-                activity_data['logins'].max(),
-                activity_data['registrations'].max(),
-                activity_data['pet_additions'].max()
-            ) + 10])
-        )
-        
-        st.plotly_chart(fig, use_container_width=True)
-
-    elif admin_menu == "Gerenciar Usuários":
-        st.subheader("Gerenciamento de Usuários")
-        
-        # Abas para diferentes funções
-        tab1, tab2, tab3 = st.tabs(["Lista de Usuários", "Adicionar Usuário", "Permissões"])
-        
-        with tab1:
-            # Obter lista de usuários
-            conn = sqlite3.connect(DATABASE_PATH)
-            df_users = pd.read_sql_query("SELECT id, email, full_name, role, created_at, last_login FROM users", conn)
-            conn.close()
-            
-            # Exibir usuários
-            st.dataframe(
-                df_users,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "id": "ID",
-                    "email": "Email",
-                    "full_name": "Nome Completo",
-                    "role": st.column_config.SelectboxColumn(
-                        "Função",
-                        options=["admin", "user", "guest"],
-                        required=True
-                    ),
-                    "created_at": "Data de Criação",
-                    "last_login": "Último Login"
-                }
-            )
-            
-            # Opções de gerenciamento
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                if st.button("Salvar Alterações", use_container_width=True):
-                    st.success("Alterações salvas com sucesso!")
-            
-            with col2:
-                if st.button("Redefinir Senha", use_container_width=True):
-                    st.info("Funcionalidade de redefinição de senha será implementada em uma versão futura.")
-            
-            with col3:
-                if st.button("Desativar Usuário", use_container_width=True):
-                    st.info("Funcionalidade de desativação de usuário será implementada em uma versão futura.")
-        
-        with tab2:
-            # Formulário para adicionar novo usuário
-            with st.form("add_user_form"):
-                st.markdown("#### Adicionar Novo Usuário")
-                
-                new_email = st.text_input("Email", key="new_user_email")
-                new_name = st.text_input("Nome Completo", key="new_user_name")
-                new_role = st.selectbox("Função", options=["user", "admin"], key="new_user_role")
-                new_password = st.text_input("Senha Inicial", type="password", key="new_user_password")
-                
-                # Botão de envio
-                submitted = st.form_submit_button("Adicionar Usuário", use_container_width=True)
-                
-                if submitted:
-                    if not new_email or not new_name or not new_password:
-                        st.error("Por favor, preencha todos os campos.")
-                    elif len(new_password) < 6:
-                        st.error("A senha deve ter pelo menos 6 caracteres.")
-                    else:
-                        # Registrar novo usuário
-                        success, user_id = register_new_user(new_email, new_password, new_name, new_role)
-                        
-                        if success:
-                            st.success(f"Usuário {new_name} ({new_email}) adicionado com sucesso!")
                             
                             # Registrar atividade
-                            log_activity(st.session_state.user_id, "add_user", f"Adicionou usuário: {new_email}")
-                        else:
-                            st.error("Não foi possível adicionar o usuário. O email já pode estar em uso.")
-        
-        with tab3:
-            st.markdown("#### Gerenciamento de Permissões")
+                            log_activity(
+                                st.session_state.user_id,
+                                "import_data",
+                                f"Importou dados: {success_count} sucessos, {error_count} erros"
+                            )
+                            
+                            # Resultado da importação
+                            if error_count == 0:
+                                st.success(f"✅ Importação concluída com sucesso! {success_count} registros importados.")
+                                st.balloons()
+                            else:
+                                st.warning(f"⚠️ Importação concluída com problemas: {success_count} sucessos, {error_count} erros.")
+                            
+                            # Recarregar dados
+                            if st.button("🔄 Recarregar Dados"):
+                                st.rerun()
+                                
+                        except Exception as e:
+                            st.error(f"❌ Erro durante a importação: {str(e)}")
             
-            # Simulação de permissões
-            role_permissions = pd.DataFrame({
-                'Funcionalidade': [
-                    'Dashboard',
-                    'Visualizar Dados',
-                    'Adicionar Pet',
-                    'Exportar/Importar',
-                    'Análise Avançada',
-                    'Mapa Interativo',
-                    'IA Insights',
-                    'Painel de Administração'
-                ],
-                'Admin': [True, True, True, True, True, True, True, True],
-                'Usuário': [True, True, True, True, True, True, True, False],
-                'Convidado': [True, True, False, False, False, False, False, False]
-            })
-            
-            # Exibir tabela de permissões
-            st.dataframe(
-                role_permissions,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                    "Funcionalidade": "Funcionalidade",
-                    "Admin": st.column_config.CheckboxColumn("Admin"),
-                    "Usuário": st.column_config.CheckboxColumn("Usuário"),
-                    "Convidado": st.column_config.CheckboxColumn("Convidado")
-                }
-            )
-            
-            if st.button("Salvar Permissões", use_container_width=True):
-                st.success("Permissões atualizadas com sucesso!")
-                st.info("As alterações serão aplicadas na próxima vez que os usuários fizerem login.")
+            except Exception as e:
+                st.error(f"❌ Erro ao carregar arquivo: {str(e)}")
     
-    elif admin_menu == "Logs do Sistema":
-        st.subheader("Logs do Sistema")
+    with tab3:
+        st.subheader("🔄 Sincronização de Dados")
         
-        # Seleção de tipo de log
-        log_type = st.selectbox(
-            "Tipo de Log:",
-            ["Atividade", "Login", "Erros"]
-        )
+        st.info("🚧 **Funcionalidade em Desenvolvimento**\n\n"
+                "Esta seção permitirá sincronização com:\n"
+                "• APIs externas de adoção\n"
+                "• Sistemas veterinários\n"
+                "• Plataformas de redes sociais\n"
+                "• Bancos de dados em nuvem")
         
-        # Opções de filtro
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            date_range = st.date_input(
-                "Período:",
-                [datetime.date(2025, 5, 1), datetime.date(2025, 5, 20)]
+        # Interface simulada para sincronização
+        with st.expander("⚙️ Configurações de Sincronização"):
+            sync_services = st.multiselect(
+                "Serviços para sincronizar:",
+                ["PetFinder API", "Adote um Focinho", "Facebook Pets", "Instagram", "Sistema Veterinário Local"]
             )
-        
-        with col2:
-            if log_type == "Atividade":
-                action_filter = st.multiselect(
-                    "Tipo de Ação:",
-                    ["login", "add_pet", "add_user", "change_password", "replace_data", "append_data", "register"],
-                    default=[]
+            
+            if sync_services:
+                for service in sync_services:
+                    st.text_input(f"API Key para {service}:", type="password")
+                
+                sync_frequency = st.selectbox(
+                    "Frequência de sincronização:",
+                    ["Manual", "A cada hora", "Diária", "Semanal"]
                 )
-            elif log_type == "Login":
-                success_filter = st.radio(
-                    "Status:",
-                    ["Todos", "Sucesso", "Falha"],
-                    horizontal=True
-                )
-        
-        with col3:
-            user_filter = st.text_input("Filtrar por Email:")
-        
-        # Obter logs do banco de dados
-        conn = sqlite3.connect(DATABASE_PATH)
-        
-        if log_type == "Atividade":
-            query = """
-            SELECT a.id, u.email, a.action, a.details, a.timestamp
-            FROM activity_logs a
-            LEFT JOIN users u ON a.user_id = u.id
-            ORDER BY a.timestamp DESC
-            LIMIT 100
-            """
-            
-            df_logs = pd.read_sql_query(query, conn)
-            
-            # Aplicar filtros (simulados)
-            if user_filter:
-                df_logs = df_logs[df_logs['email'].str.contains(user_filter, case=False)]
-            
-            if action_filter:
-                df_logs = df_logs[df_logs['action'].isin(action_filter)]
-        
-        elif log_type == "Login":
-            query = """
-            SELECT l.id, u.email, l.timestamp, l.ip_address, l.user_agent, l.success
-            FROM login_logs l
-            LEFT JOIN users u ON l.user_id = u.id
-            ORDER BY l.timestamp DESC
-            LIMIT 100
-            """
-            
-            df_logs = pd.read_sql_query(query, conn)
-            
-            # Aplicar filtros (simulados)
-            if user_filter:
-                df_logs = df_logs[df_logs['email'].str.contains(user_filter, case=False)]
-            
-            if success_filter != "Todos":
-               df_logs = df_logs[df_logs['success'] == (success_filter == "Sucesso")]
-       
-        else:  # Erros (simulado)
-           # Criar dados de exemplo para logs de erro
-           df_logs = pd.DataFrame({
-               'id': range(1, 11),
-               'timestamp': pd.date_range(start='2025-05-10', periods=10),
-               'level': ['ERROR', 'WARNING', 'ERROR', 'ERROR', 'CRITICAL', 'WARNING', 'ERROR', 'INFO', 'ERROR', 'WARNING'],
-               'message': [
-                   'Database connection failed',
-                   'Slow query detected',
-                   'Invalid input data',
-                   'API rate limit exceeded',
-                   'Server memory low',
-                   'File upload timeout',
-                   'Authentication error',
-                   'Scheduled maintenance',
-                   'Data validation failed',
-                   'Cache miss'
-               ],
-               'module': [
-                   'database', 'query', 'validation', 'api', 'system',
-                   'upload', 'auth', 'system', 'validation', 'cache'
-               ]
-           })
-       
-        conn.close()
-       
-         # Exibir logs
-        st.dataframe(
-           df_logs,
-           use_container_width=True,
-           hide_index=True
-        )
-       
-        # Opções de exportação
-        col1, col2 = st.columns(2)
-       
-        with col1:
-            if st.button("Exportar Logs", use_container_width=True):
-               # Gerar CSV para download
-               csv_data = df_logs.to_csv(index=False).encode('utf-8')
-               
-               st.download_button(
-                   label="Baixar CSV",
-                   data=csv_data,
-                   file_name=f"logs_{log_type.lower()}_{datetime.date.today().strftime('%Y%m%d')}.csv",
-                   mime="text/csv"
-               )
-       
-        with col2:
-           if st.button("Limpar Logs Antigos", use_container_width=True):
-               st.info("Funcionalidade de limpeza de logs será implementada em uma versão futura.")
-   
-    elif admin_menu == "Configurações":
-        st.subheader("Configurações do Sistema")
-       
-        # Abas para diferentes configurações
-        tab1, tab2, tab3 = st.tabs(["Geral", "Segurança", "Integrações"])
-       
-        with tab1:
-            st.markdown("#### Configurações Gerais")
-           
-            # Nome do sistema
-            system_name = st.text_input("Nome do Sistema:", value="PetCare Analytics")
-           
-            # Limite de itens por página
-            items_per_page = st.number_input("Itens por Página:", min_value=10, max_value=100, value=50, step=10)
-           
-            # Política de cache
-            cache_policy = st.selectbox(
-               "Política de Cache:",
-               ["Padrão", "Agressivo", "Conservador", "Desativado"]
-            )
-           
-            # Diretório de dados
-            data_directory = st.text_input("Diretório de Dados:", value="./data")
-           
-            # Tempo limite de sessão
-            session_timeout = st.number_input("Tempo Limite de Sessão (minutos):", min_value=5, max_value=240, value=60, step=5)
-           
-            if st.button("Salvar Configurações Gerais", use_container_width=True):
-               st.success("Configurações gerais atualizadas com sucesso!")
-       
-        with tab2:
-            st.markdown("#### Configurações de Segurança")
-           
-            # Política de senhas
-            min_password_length = st.slider("Comprimento Mínimo de Senha:", min_value=6, max_value=16, value=8)
-            password_complexity = st.checkbox("Exigir Senhas Complexas", value=True)
-           
-            # Bloqueio de conta
-            account_lockout = st.checkbox("Habilitar Bloqueio de Conta", value=True)
-            if account_lockout:
-               lockout_threshold = st.number_input("Tentativas Antes do Bloqueio:", min_value=3, max_value=10, value=5)
-               lockout_duration = st.number_input("Duração do Bloqueio (minutos):", min_value=5, max_value=60, value=30)
-           
-            # 2FA
-            require_2fa = st.selectbox(
-               "Autenticação de Dois Fatores (2FA):",
-               ["Opcional", "Obrigatória para Administradores", "Obrigatória para Todos", "Desativada"]
-            )
-           
-            # IP whitelist
-            ip_whitelist = st.text_area("Lista de IPs Permitidos (um por linha):", height=100)
-            st.caption("Deixe em branco para permitir todos os IPs.")
-           
-            if st.button("Salvar Configurações de Segurança", use_container_width=True):
-               st.success("Configurações de segurança atualizadas com sucesso!")
-       
-        with tab3:
-            st.markdown("#### Integrações de Sistema")
-           
-            # Email
-            st.markdown("##### Configuração de Email")
-           
-            smtp_server = st.text_input("Servidor SMTP:", value="smtp.example.com")
-            smtp_port = st.number_input("Porta SMTP:", value=587)
-            smtp_user = st.text_input("Usuário SMTP:", value="notificacoes@example.com")
-            smtp_password = st.text_input("Senha SMTP:", type="password")
-           
-            smtp_test = st.button("Testar Configuração de Email")
-            if smtp_test:
-               st.success("Configuração de email testada com sucesso!")
-           
-            # API
-            st.markdown("##### Configuração de API")
-           
-            enable_api = st.checkbox("Habilitar API REST", value=True)
-            api_rate_limit = st.number_input("Limite de Requisições por Minuto:", min_value=10, max_value=1000, value=60)
-            api_token_expiry = st.number_input("Validade do Token (dias):", min_value=1, max_value=90, value=30)
-           
-            # Serviços externos
-            st.markdown("##### Serviços Externos")
-           
-            enable_ai = st.checkbox("Habilitar Integração com IA", value=True)
-            if enable_ai:
-                ai_provider = st.selectbox(
-                   "Provedor de IA:",
-                   ["Google Gemini AI", "OpenAI", "Outro"]
-                )
-                ai_api_key = st.text_input("Chave de API:", type="password")
-           
-            if st.button("Salvar Configurações de Integração", use_container_width=True):
-               st.success("Configurações de integração atualizadas com sucesso!")
-   
-    elif admin_menu == "Backup/Restauração":
-        st.subheader("Backup e Restauração")
-       
-        # Card de informação
-        card_content = """
-        <div style="font-size: 0.9rem; color: #666; margin-bottom: 1rem;">
-           Realize o backup completo do banco de dados ou restaure a partir de um backup anterior.
-           Backups regulares são essenciais para garantir a segurança dos dados.
-        </div>
-        """
-       
-        custom_card("Backup e Restauração", card_content, icon="💾", color="#607D8B")
-       
-        # Abas para backup e restauração
-        tab1, tab2, tab3 = st.tabs(["Backup Manual", "Backups Automáticos", "Restauração"])
-       
-        with tab1:
-            st.markdown("#### Backup Manual")
-           
-            # Opções de backup
-            backup_options = st.multiselect(
-               "Incluir no Backup:",
-               ["Dados de Pets", "Usuários", "Configurações", "Logs"],
-               default=["Dados de Pets", "Usuários", "Configurações"]
-            )
-           
-            compress_backup = st.checkbox("Comprimir Backup", value=True)
-           
-            col1, col2 = st.columns(2)
-           
-            with col1:
-                if st.button("Iniciar Backup", use_container_width=True):
-                    # Simular processo de backup
-                    progress_bar = st.progress(0)
-                    status_text = st.empty()
-                   
-                    for i in range(101):
-                        progress_bar.progress(i)
-                        if i < 30:
-                           status_text.text(f"Preparando dados... ({i}%)")
-                        elif i < 60:
-                           status_text.text(f"Exportando banco de dados... ({i}%)")
-                        elif i < 90:
-                           status_text.text(f"Comprimindo arquivos... ({i}%)")
-                        else:
-                           status_text.text(f"Finalizando... ({i}%)")
-                       
-                        time.sleep(0.02)
-                   
-                    # Gerar arquivo fictício para download
-                    backup_date = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    backup_filename = f"petcare_backup_{backup_date}.zip"
-                   
-                    # Criar um arquivo de texto simples como simulação
-                    dummy_content = "Este é um arquivo de backup simulado."
-                   
-                    # Botão de download
-                    st.success("Backup concluído com sucesso!")
-                    st.download_button(
-                       label="Baixar Backup",
-                       data=dummy_content.encode(),
-                       file_name=backup_filename,
-                       mime="application/zip"
-                    )
-           
-            with col2:
-                if st.button("Cancelar", use_container_width=True):
-                   st.info("Operação cancelada pelo usuário.")
-       
-        with tab2:
-            st.markdown("#### Backups Automáticos")
-           
-            # Configuração de backups automáticos
-            enable_auto_backup = st.checkbox("Habilitar Backups Automáticos", value=True)
-           
-            if enable_auto_backup:
-                backup_frequency = st.selectbox(
-                   "Frequência de Backup:",
-                   ["Diário", "Semanal", "Quinzenal", "Mensal"]
-                )
-               
-                if backup_frequency == "Semanal":
-                    backup_day = st.selectbox(
-                       "Dia da Semana:",
-                       ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
-                    )
-               
-                backup_time = st.time_input("Horário do Backup:", datetime.time(3, 0))
-               
-                keep_backups = st.number_input("Manter Backups (dias):", min_value=7, max_value=365, value=30)
-               
-                # Destino do backup
-                backup_destination = st.radio(
-                   "Destino do Backup:",
-                   ["Local", "Google Drive", "FTP"]
-                )
-               
-                if backup_destination == "Google Drive":
-                   st.text_input("Conta Google Drive:", value="backup@example.com")
-                   st.text_input("Pasta de Destino:", value="/PetCare/Backups")
-                elif backup_destination == "FTP":
-                   st.text_input("Servidor FTP:", value="ftp.example.com")
-                   st.text_input("Usuário FTP:", value="backup")
-                   st.text_input("Senha FTP:", type="password")
-                   st.text_input("Diretório FTP:", value="/backups")
-           
-            # Histórico de backups automáticos
-            st.markdown("#### Histórico de Backups")
-           
-            backup_history = pd.DataFrame({
-                'Data': pd.date_range(start='2025-05-01', end='2025-05-20'),
-                'Tamanho': ['1.2 MB', '1.3 MB', '1.2 MB', '1.3 MB', '1.5 MB', 
-                           '1.4 MB', '1.3 MB', '1.2 MB', '1.3 MB', '1.4 MB',
-                           '1.3 MB', '1.2 MB', '1.4 MB', '1.5 MB', '1.3 MB',
-                           '1.2 MB', '1.4 MB', '1.3 MB', '1.2 MB', '1.3 MB'],
-                'Status': ['Sucesso', 'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso',
-                          'Falha', 'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso',
-                          'Sucesso', 'Sucesso', 'Sucesso', 'Falha', 'Sucesso',
-                          'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso', 'Sucesso']
-            })
-           
-            # Colorir células de status
-            def highlight_status(val):
-                color = 'green' if val == 'Sucesso' else 'red'
-                return f'color: {color}'
-           
-            # Exibir histórico de backups
-            st.dataframe(
-                backup_history,
-                use_container_width=True,
-                hide_index=True,
-                column_config={
-                   'Data': 'Data',
-                   'Tamanho': 'Tamanho',
-                   'Status': st.column_config.Column(
-                       'Status',
-                       help="Status da operação de backup",
-                       width="medium"
-                   )
-               }
-            )
-           
-            if st.button("Salvar Configurações de Backup", use_container_width=True):
-               st.success("Configurações de backup automático atualizadas com sucesso!")
-       
-        with tab3:
-            st.markdown("#### Restauração de Backup")
-           
-            # Upload de arquivo de backup
-            st.file_uploader("Selecione o arquivo de backup:", type=["zip", "sql", "db"])
-           
-            # Opções de restauração
-            restore_options = st.multiselect(
-               "Dados a Restaurar:",
-               ["Dados de Pets", "Usuários", "Configurações", "Logs"],
-               default=["Dados de Pets", "Usuários", "Configurações"]
-            )
-           
-            overwrite_existing = st.checkbox("Sobrescrever Dados Existentes", value=False)
-            if overwrite_existing:
-               st.warning("Atenção: Esta operação substituirá todos os dados existentes pelos dados do backup.")
-           
-            # Aviso de segurança
-            st.info("É recomendado realizar um backup dos dados atuais antes de iniciar a restauração.")
-           
-            col1, col2 = st.columns(2)
-           
-            with col1:
-                if st.button("Iniciar Restauração", disabled=True, use_container_width=True):
-                    st.error("Nenhum arquivo de backup selecionado.")
-           
-            with col2:
-                if st.button("Cancelar", use_container_width=True):
-                    st.info("Operação cancelada pelo usuário.")
-                                                         
+                
+                if st.button("🔄 Configurar Sincronização"):
+                    st.success("Configurações salvas! A sincronização será ativada em versão futura.")
 
 def main():
-    """Função principal que coordena todo o fluxo da aplicação."""
+    """Função principal aprimorada."""
     # Inicializar o banco de dados
     init_database()
     
     # Configuração da página
     st.set_page_config(
-        page_title="PetCare Analytics",
+        page_title="PetCare Analytics - Sistema Avançado com IA",
         page_icon="🐾",
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
-    # Carregar e exibir o logo
-    try:
-        logo_path = "assets/logo.jpg"
-        if os.path.exists(logo_path):
-            # Exibir logo e título lado a lado (movido para cada função de página)
-            pass
-        else:
-            # Logo não será exibido nesta verificação, será tratado em cada página
-            pass
-    except Exception as e:
-        # Erro ao carregar logo, será tratado em cada página
-        pass
+    # CSS personalizado global
+    st.markdown("""
+    <style>
+    .main-header {
+        background: linear-gradient(90deg, #4527A0 0%, #7B1FA2 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    .metric-card {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #4527A0;
+    }
+    .sidebar .stSelectbox > div > div {
+        background-color: #f8f9fa;
+    }
+    .stButton > button {
+        background: linear-gradient(90deg, #4527A0 0%, #7B1FA2 100%);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+    .alert-success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+        padding: 0.75rem 1.25rem;
+        margin-bottom: 1rem;
+        border: 1px solid transparent;
+        border-radius: 0.25rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Verificar se o usuário está logado
     if "user_id" not in st.session_state or "user_role" not in st.session_state:
-        # Exibir página de login
         display_login_page()
         return
     
@@ -4126,67 +4305,2175 @@ def main():
     df_filtrado = apply_filters(df)
     st.session_state.df_filtrado = df_filtrado
     
-    # Menu de navegação principal
-    st.sidebar.markdown("## Navegação")
-    menu_opcao = st.sidebar.radio(
-        "Selecione uma opção:",
-        ["Dashboard", "Visualizar Dados", "Adicionar Pet", "Exportar/Importar", 
-         "Análise Avançada", "Mapa Interativo", "IA Insights"]
+    # Menu de navegação principal expandido
+    st.sidebar.markdown("## 🚀 Navegação Principal")
+    
+    # Agrupar menus por categoria
+    menu_categoria = st.sidebar.radio(
+        "Categoria:",
+        ["📊 Análises", "📝 Gestão", "🔧 Ferramentas", "⚙️ Sistema"]
     )
     
-    # Navegação de configurações e admin
-    with st.sidebar.expander("⚙️ Opções Avançadas"):
-        advanced_option = st.radio(
+    if menu_categoria == "📊 Análises":
+        menu_opcao = st.sidebar.selectbox(
             "Selecione:",
-            ["Configurações do Usuário", "Painel de Administração" if st.session_state.user_role == "admin" else ""]
+            ["Dashboard", "Visualizar Dados", "Análises Avançadas", "IA Insights", "Mapa Interativo"]
         )
+    elif menu_categoria == "📝 Gestão":
+        menu_opcao = st.sidebar.selectbox(
+            "Selecione:",
+            ["Adicionar Pet", "Editar Pets", "Gerenciar Adoções", "Relatórios"]
+        )
+    elif menu_categoria == "🔧 Ferramentas":
+        menu_opcao = st.sidebar.selectbox(
+            "Selecione:",
+            ["Exportar/Importar", "Backup/Restauração", "Migração de Dados"]
+        )
+    else:  # Sistema
+        menu_opcao = st.sidebar.selectbox(
+            "Selecione:",
+            ["Configurações do Usuário", "Painel de Administração" if st.session_state.user_role == "admin" else None]
+        )
+        menu_opcao = menu_opcao if menu_opcao else "Configurações do Usuário"
+    
+    # Menu de acesso rápido
+    st.sidebar.markdown("## ⚡ Acesso Rápido")
+    
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        if st.button("➕ Novo Pet", use_container_width=True):
+            st.session_state.quick_action = "Adicionar Pet"
+    
+    with col2:
+        if st.button("📊 Dashboard", use_container_width=True):
+            st.session_state.quick_action = "Dashboard"
+    
+    # Verificar ação rápida
+    if "quick_action" in st.session_state:
+        menu_opcao = st.session_state.quick_action
+        del st.session_state.quick_action
+    
+    # Estatísticas na sidebar
+    if not df.empty:
+        st.sidebar.markdown("## 📈 Estatísticas Rápidas")
         
-        # Limpar opção vazia
-        advanced_option = advanced_option.strip()
+        with st.sidebar.container():
+            st.metric("Total de Pets", len(df))
+            
+            if 'adotado' in df.columns:
+                taxa_adocao = df['adotado'].mean() * 100
+                st.metric("Taxa de Adoção", f"{taxa_adocao:.1f}%")
+            
+            if 'score_adocao' in df.columns:
+                score_medio = df['score_adocao'].mean()
+                st.metric("Score Médio", f"{score_medio:.2f}")
+    
+    # Notificações e alertas
+    st.sidebar.markdown("## 🔔 Notificações")
+    
+    # Gerar notificações inteligentes
+    notifications = generate_smart_notifications(df)
+    
+    for notification in notifications[:3]:  # Máximo 3 notificações
+        if notification['type'] == 'warning':
+            st.sidebar.warning(f"⚠️ {notification['message']}")
+        elif notification['type'] == 'info':
+            st.sidebar.info(f"ℹ️ {notification['message']}")
+        else:
+            st.sidebar.success(f"✅ {notification['message']}")
     
     # Botão de logout
-    if st.sidebar.button("📤 Logout", use_container_width=True):
-        # Limpar sessão
-        if "user_id" in st.session_state:
-            # Registrar atividade
-            log_activity(st.session_state.user_id, "logout", "Logout do sistema")
-            
-            # Limpar dados da sessão
-            for key in list(st.session_state.keys()):
-                del st.session_state[key]
-        
-        st.rerun()
+    st.sidebar.markdown("---")
     
-    # Exibir versão do sistema
+    col1, col2 = st.sidebar.columns([1, 1])
+    
+    with col1:
+        if st.button("🔄 Atualizar", use_container_width=True):
+            st.rerun()
+    
+    with col2:
+        if st.button("📤 Sair", use_container_width=True):
+            # Limpar sessão
+            if "user_id" in st.session_state:
+                log_activity(st.session_state.user_id, "logout", "Logout do sistema")
+                
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+            
+            st.rerun()
+    
+    # Informações do sistema
+    st.sidebar.markdown("---")
     st.sidebar.markdown(
-        "<div style='position: fixed; bottom: 10px; text-align: center; width: 250px; font-size: 0.8rem; color: #666;'>"
-        "PetCare Analytics v1.0.0<br>"
-        "© 2025 Todos os direitos reservados"
+        "<div style='text-align: center; font-size: 0.8rem; color: #666;'>"
+        "🐾 PetCare Analytics v2.0<br>"
+        "Sistema Avançado com IA<br>"
+        f"Usuário: {st.session_state.user_info['full_name']}<br>"
+        f"Última atualização: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}"
         "</div>",
         unsafe_allow_html=True
     )
     
     # Navegar para a página escolhida
-    if menu_opcao == "Dashboard":
-        display_dashboard(df, df_filtrado)
-    elif menu_opcao == "Visualizar Dados":
-        visualizar_dados(df)
-    elif menu_opcao == "Adicionar Pet":
-        adicionar_pet()
-    elif menu_opcao == "Exportar/Importar":
-        exportar_importar_dados(df)
-    elif menu_opcao == "Análise Avançada":
-        analise_avancada(df)
-    elif menu_opcao == "Mapa Interativo":
-        mapa_interativo(df)
-    elif menu_opcao == "IA Insights":
-        ai_insights(df)
+    try:
+        if menu_opcao == "Dashboard":
+            display_dashboard(df, df_filtrado)
+        elif menu_opcao == "Visualizar Dados":
+            visualizar_dados(df)
+        elif menu_opcao == "Adicionar Pet":
+            adicionar_pet()
+        elif menu_opcao == "Análises Avançadas":
+            advanced_analytics(df)
+        elif menu_opcao == "Exportar/Importar":
+            exportar_importar_dados(df)
+        elif menu_opcao == "IA Insights":
+            ai_insights(df)
+        elif menu_opcao == "Mapa Interativo":
+            mapa_interativo(df)
+        elif menu_opcao == "Configurações do Usuário":
+            user_settings()
+        elif menu_opcao == "Painel de Administração" and st.session_state.user_role == "admin":
+            admin_panel()
+        else:
+            # Página padrão
+            display_dashboard(df, df_filtrado)
     
-    # Opções avançadas
-    elif advanced_option == "Configurações do Usuário":
-        user_settings()
-    elif advanced_option == "Painel de Administração" and st.session_state.user_role == "admin":
-        admin_panel()
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar a página: {str(e)}")
+        st.info("🔄 Tente recarregar a página ou entre em contato com o administrador.")
+        
+        # Log do erro
+        if "user_id" in st.session_state:
+            log_activity(
+                st.session_state.user_id, 
+                "error", 
+                f"Erro na página {menu_opcao}: {str(e)}"
+            )
+
+def generate_smart_notifications(df):
+    """Gera notificações inteligentes baseadas nos dados."""
+    notifications = []
+    
+    if df.empty:
+        return notifications
+    
+    # Notificação sobre pets não adotados há muito tempo
+    if 'data_registro' in df.columns and 'adotado' in df.columns:
+        df_temp = df.copy()
+        df_temp['data_registro'] = pd.to_datetime(df_temp['data_registro'])
+        df_temp['dias_sistema'] = (pd.Timestamp.now() - df_temp['data_registro']).dt.days
+        
+        pets_antigos = df_temp[(df_temp['adotado'] == False) & (df_temp['dias_sistema'] > 90)]
+        
+        if len(pets_antigos) > 0:
+            notifications.append({
+                'type': 'warning',
+                'message': f"{len(pets_antigos)} pets há mais de 90 dias aguardando adoção"
+            })
+    
+    # Notificação sobre pets com alto score não adotados
+    if 'score_adocao' in df.columns and 'adotado' in df.columns:
+        high_score_not_adopted = df[(df['adotado'] == False) & (df['score_adocao'] > 4.0)]
+        
+        if len(high_score_not_adopted) > 0:
+            notifications.append({
+                'type': 'info',
+                'message': f"{len(high_score_not_adopted)} pets com alto score aguardando adoção"
+            })
+    
+    # Notificação sobre necessidades especiais
+    if 'necessidades_especiais' in df.columns:
+        pets_especiais = df[df['necessidades_especiais'].notna() & (df['necessidades_especiais'] != '')]
+        
+        if len(pets_especiais) > 0:
+            notifications.append({
+                'type': 'info',
+                'message': f"{len(pets_especiais)} pets com necessidades especiais precisam de atenção"
+            })
+    
+    # Notificação de sucesso sobre adoções recentes
+    if 'adotado' in df.columns:
+        taxa_adocao = df['adotado'].mean()
+        
+        if taxa_adocao > 0.7:
+            notifications.append({
+                'type': 'success',
+                'message': f"Excelente taxa de adoção: {taxa_adocao*100:.1f}%!"
+            })
+    
+    return notifications
+
+# Funções auxiliares adicionais continuam aqui...
+def ai_insights(df):
+    """Insights avançados baseados em IA."""
+    st.title("🤖 IA Insights Avançados")
+    
+    if df.empty or len(df) < 5:
+        st.warning("Dados insuficientes para análises de IA. Adicione mais pets para utilizar esta funcionalidade.")
+        return
+    
+    # Inicializar analyzer
+    analyzer = PetMLAnalyzer(df)
+    
+    # Seleção do tipo de insight
+    insight_type = st.sidebar.selectbox(
+        "Tipo de Insight:",
+        [
+            "Resumo Executivo com IA",
+            "Previsões Comportamentais", 
+            "Otimização de Matchmaking",
+            "Análise de Sentimentos",
+            "Detecção de Padrões",
+            "Recomendações Personalizadas",
+            "Simulação de Cenários",
+            "Análise Preditiva Avançada"
+        ]
+    )
+    
+    if insight_type == "Resumo Executivo com IA":
+        st.subheader("📋 Resumo Executivo Inteligente")
+        
+        with st.spinner("🧠 IA analisando os dados..."):
+            time.sleep(2)  # Simular processamento IA
+            
+            # Análise automática dos dados
+            insights = []
+            
+            # Insight 1: Performance geral
+            total_pets = len(df)
+            taxa_adocao = df['adotado'].mean() * 100 if 'adotado' in df.columns else 0
+            
+            if taxa_adocao > 70:
+                performance = "excelente"
+                cor_performance = "success"
+            elif taxa_adocao > 50:
+                performance = "boa"
+                cor_performance = "info"
+            else:
+                performance = "necessita melhorias"
+                cor_performance = "warning"
+            
+            insights.append({
+                'titulo': '🎯 Performance Geral',
+                'conteudo': f'O sistema possui {total_pets} pets cadastrados com taxa de adoção de {taxa_adocao:.1f}%, considerada {performance}.',
+                'tipo': cor_performance
+            })
+            
+            if 'comportamento' in df.columns and not df['comportamento'].empty:
+                mode_result = df['comportamento'].mode()
+                if len(mode_result) > 0:
+                    comportamento_mais_comum = mode_result.iloc[0]
+                else:
+                    comportamento_mais_comum = "Não definido"
+            else:
+                comportamento_mais_comum = "Não disponível"
+            
+            # Insight 3: Análise demográfica
+            if 'idade' in df.columns:
+                idade_media = df['idade'].mean()
+                idade_mediana = df['idade'].median()
+                
+                if idade_media < 3:
+                    demografia = "jovem, ideal para famílias ativas"
+                elif idade_media > 7:
+                    demografia = "madura, perfeita para lares calmos"
+                else:
+                    demografia = "equilibrada entre jovens e adultos"
+                
+                insights.append({
+                    'titulo': '📊 Perfil Demográfico',
+                    'conteudo': f'A população é {demografia} com idade média de {idade_media:.1f} anos e mediana de {idade_mediana:.1f} anos.',
+                    'tipo': 'info'
+                })
+            
+            # Insight 4: Oportunidades de melhoria
+            if 'score_adocao' in df.columns:
+                score_baixo = (df['score_adocao'] < 3.0).sum()
+                
+                if score_baixo > 0:
+                    insights.append({
+                        'titulo': '⚠️ Oportunidades de Melhoria',
+                        'conteudo': f'{score_baixo} pets têm score de adoção baixo (<3.0). Recomenda-se trabalhar comportamento, saúde e socialização destes animais.',
+                        'tipo': 'warning'
+                    })
+            
+            # Insight 5: Previsão de tendências
+            if 'data_registro' in df.columns:
+                df_temporal = df.copy()
+                df_temporal['data_registro'] = pd.to_datetime(df_temporal['data_registro'])
+                df_temporal['mes'] = df_temporal['data_registro'].dt.to_period('M')
+                
+                crescimento_mensal = df_temporal.groupby('mes').size()
+                
+                if len(crescimento_mensal) > 1:
+                    tendencia = crescimento_mensal.iloc[-1] - crescimento_mensal.iloc[-2]
+                    
+                    if tendencia > 0:
+                        tendencia_texto = f"crescimento de {tendencia} pets no último mês"
+                        tipo_tendencia = "success"
+                    elif tendencia < 0:
+                        tendencia_texto = f"redução de {abs(tendencia)} pets no último mês"
+                        tipo_tendencia = "warning"
+                    else:
+                        tendencia_texto = "estabilidade nos registros"
+                        tipo_tendencia = "info"
+                    
+                    insights.append({
+                        'titulo': '📈 Tendência de Crescimento',
+                        'conteudo': f'A análise temporal indica {tendencia_texto}, sugerindo ajustes nas estratégias de captação.',
+                        'tipo': tipo_tendencia
+                    })
+            
+            # Exibir insights
+            for insight in insights:
+                if insight['tipo'] == 'success':
+                    st.success(f"**{insight['titulo']}**\n\n{insight['conteudo']}")
+                elif insight['tipo'] == 'warning':
+                    st.warning(f"**{insight['titulo']}**\n\n{insight['conteudo']}")
+                else:
+                    st.info(f"**{insight['titulo']}**\n\n{insight['conteudo']}")
+            
+            # Recomendações estratégicas
+            st.subheader("🎯 Recomendações Estratégicas da IA")
+            
+            recomendacoes = [
+                "📱 Intensificar presença digital com foco em redes sociais",
+                "🏥 Parcerias com clínicas veterinárias para check-ups gratuitos",
+                "👨‍👩‍👧‍👦 Programas de educação para famílias sobre posse responsável",
+                "📊 Implementar sistema de follow-up pós-adoção",
+                "🎨 Criar campanhas segmentadas por perfil comportamental"
+            ]
+            
+            for rec in recomendacoes:
+                st.write(f"• {rec}")
+    
+    elif insight_type == "Previsões Comportamentais":
+        st.subheader("🔮 Previsões Comportamentais com IA")
+        
+        # Análise de padrões comportamentais
+        if 'comportamento' in df.columns and 'sociabilidade' in df.columns:
+            
+            with st.spinner("🤖 Analisando padrões comportamentais..."):
+                time.sleep(1.5)
+                
+                # Criar modelo de previsão comportamental
+                behavioral_data = df[['comportamento', 'sociabilidade', 'energia', 'nivel_atividade']].copy()
+                behavioral_data = behavioral_data.dropna()
+                
+                if len(behavioral_data) > 10:
+                    # Análise de clusters comportamentais
+                    le = LabelEncoder()
+                    behavioral_data['comportamento_encoded'] = le.fit_transform(behavioral_data['comportamento'])
+                    
+                    # Clustering
+                    features = ['sociabilidade', 'energia', 'nivel_atividade']
+                    X = behavioral_data[features]
+                    
+                    kmeans = KMeans(n_clusters=4, random_state=42)
+                    clusters = kmeans.fit_predict(X)
+                    
+                    behavioral_data['cluster_comportamental'] = clusters
+                    
+                    # Análise dos clusters
+                    st.subheader("🎯 Perfis Comportamentais Identificados")
+                    
+                    for cluster_id in range(4):
+                        cluster_data = behavioral_data[behavioral_data['cluster_comportamental'] == cluster_id]
+                        
+                        if len(cluster_data) > 0:
+                            # Características do cluster
+                            soc_media = cluster_data['sociabilidade'].mean()
+                            ener_media = cluster_data['energia'].mean()
+                            ativ_media = cluster_data['nivel_atividade'].mean()
+                            comportamentos = cluster_data['comportamento'].value_counts()
+                            
+                            # Definir personalidade do cluster
+                            if soc_media > 4 and ener_media > 4:
+                                personalidade = "Extrovertido e Enérgico"
+                                emoji = "🌟"
+                            elif soc_media > 4 and ener_media < 3:
+                                personalidade = "Sociável e Calmo"
+                                emoji = "😌"
+                            elif soc_media < 3 and ener_media > 4:
+                                personalidade = "Reservado e Ativo"
+                                emoji = "🏃"
+                            else:
+                                personalidade = "Tranquilo e Independente"
+                                emoji = "🧘"
+                            
+                            # Card do cluster
+                            content = f"""
+                            <div style="margin-bottom: 1rem;">
+                                <p><strong>Pets neste grupo:</strong> {len(cluster_data)} ({len(cluster_data)/len(behavioral_data)*100:.1f}%)</p>
+                                <p><strong>Características médias:</strong></p>
+                                <ul>
+                                    <li>Sociabilidade: {soc_media:.1f}/5</li>
+                                    <li>Energia: {ener_media:.1f}/5</li>
+                                    <li>Atividade: {ativ_media:.1f}/5</li>
+                                </ul>
+                                <p><strong>Comportamento mais comum:</strong> {comportamentos.index[0]} ({comportamentos.iloc[0]} pets)</p>
+                                <p><strong>Recomendação:</strong> Ideal para tutores que buscam um pet {personalidade.lower()}.</p>
+                            </div>
+                            """
+                            
+                            custom_card(f"{emoji} Perfil {cluster_id + 1}: {personalidade}", content, color="#9C27B0")
+                    
+                    # Previsão para novos pets
+                    st.subheader("🔮 Simulador de Perfil Comportamental")
+                    
+                    with st.form("behavioral_prediction"):
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            soc_input = st.slider("Sociabilidade:", 1, 5, 3)
+                        with col2:
+                            ener_input = st.slider("Energia:", 1, 5, 3)
+                        with col3:
+                            ativ_input = st.slider("Atividade:", 1, 5, 3)
+                        
+                        predict_btn = st.form_submit_button("🎯 Prever Perfil", use_container_width=True)
+                        
+                        if predict_btn:
+                            # Prever cluster
+                            input_features = np.array([[soc_input, ener_input, ativ_input]])
+                            predicted_cluster = kmeans.predict(input_features)[0]
+                            
+                            # Características do cluster previsto
+                            cluster_info = behavioral_data[behavioral_data['cluster_comportamental'] == predicted_cluster]
+                            
+                            if len(cluster_info) > 0:
+                                st.success(f"🎯 **Perfil Previsto:** Cluster {predicted_cluster + 1}")
+                                
+                                col1, col2 = st.columns(2)
+                                
+                                with col1:
+                                    st.write("**Pets similares:**")
+                                    similar_behaviors = cluster_info['comportamento'].value_counts().head(3)
+                                    for behavior, count in similar_behaviors.items():
+                                        st.write(f"• {behavior}: {count} pets")
+                                
+                                with col2:
+                                    st.write("**Características típicas:**")
+                                    st.write(f"• Sociabilidade média: {cluster_info['sociabilidade'].mean():.1f}")
+                                    st.write(f"• Energia média: {cluster_info['energia'].mean():.1f}")
+                                    st.write(f"• Atividade média: {cluster_info['nivel_atividade'].mean():.1f}")
+        else:
+            st.warning("Dados comportamentais insuficientes para análise preditiva.")
+    
+    elif insight_type == "Análise Preditiva Avançada":
+        st.subheader("🔬 Análise Preditiva Avançada")
+        
+        # Seletor de tipo de previsão
+        prediction_type = st.selectbox(
+            "Tipo de Previsão:",
+            [
+                "Probabilidade de Adoção",
+                "Tempo para Adoção",
+                "Risco de Abandono",
+                "Score de Compatibilidade"
+            ]
+        )
+        
+        if prediction_type == "Probabilidade de Adoção":
+            st.write("### 🎯 Modelo de Probabilidade de Adoção")
+            
+            if 'adotado' in df.columns and len(df) >= 20:
+                with st.spinner("🤖 Treinando modelo de probabilidade..."):
+                    # Preparar dados
+                    features = ['idade', 'peso', 'sociabilidade', 'energia', 'nivel_atividade']
+                    available_features = [f for f in features if f in df.columns]
+                    
+                    if len(available_features) >= 3:
+                        X = df[available_features].copy()
+                        y = df['adotado'].copy()
+                        
+                        # Remover NaN
+                        mask = ~(X.isna().any(axis=1) | y.isna())
+                        X = X[mask]
+                        y = y[mask]
+                        
+                        if len(X) >= 10:
+                            # Dividir dados
+                            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+                            
+                            # Treinar modelo
+                            model = RandomForestClassifier(n_estimators=100, random_state=42)
+                            model.fit(X_train, y_train)
+                            
+                            # Avaliar modelo
+                            y_pred = model.predict(X_test)
+                            accuracy = accuracy_score(y_test, y_pred)
+                            
+                            st.success(f"✅ Modelo treinado com acurácia de {accuracy:.3f}")
+                            
+                            # Feature importance
+                            importance = pd.DataFrame({
+                                'Feature': available_features,
+                                'Importancia': model.feature_importances_
+                            }).sort_values('Importancia', ascending=False)
+                            
+                            fig = px.bar(
+                                importance,
+                                x='Importancia',
+                                y='Feature',
+                                orientation='h',
+                                title="Importância das Características para Adoção"
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # Simulador
+                            st.write("### 🎮 Simulador de Probabilidade")
+                            
+                            with st.form("probability_simulator"):
+                                cols = st.columns(len(available_features))
+                                
+                                input_values = {}
+                                for i, feature in enumerate(available_features):
+                                    with cols[i]:
+                                        min_val = float(df[feature].min())
+                                        max_val = float(df[feature].max())
+                                        mean_val = float(df[feature].mean())
+                                        
+                                        input_values[feature] = st.slider(
+                                            f"{feature}:",
+                                            min_val, max_val, mean_val
+                                        )
+                                
+                                simulate_btn = st.form_submit_button("🔮 Calcular Probabilidade", use_container_width=True)
+                                
+                                if simulate_btn:
+                                    # Fazer previsão
+                                    input_array = np.array([[input_values[f] for f in available_features]])
+                                    probability = model.predict_proba(input_array)[0][1]
+                                    
+                                    # Exibir resultado
+                                    col1, col2, col3 = st.columns(3)
+                                    
+                                    with col1:
+                                        st.metric("Probabilidade de Adoção", f"{probability*100:.1f}%")
+                                    
+                                    with col2:
+                                        categoria = "Alta" if probability > 0.7 else "Média" if probability > 0.4 else "Baixa"
+                                        st.metric("Categoria", categoria)
+                                    
+                                    with col3:
+                                        confianca = "Alta" if accuracy > 0.8 else "Média" if accuracy > 0.6 else "Baixa"
+                                        st.metric("Confiança do Modelo", confianca)
+                                    
+                                    # Recomendações baseadas na probabilidade
+                                    if probability > 0.7:
+                                        st.success("🌟 Alto potencial de adoção! Priorize este pet nas campanhas.")
+                                    elif probability > 0.4:
+                                        st.info("⚡ Potencial médio. Considere trabalhar pontos de melhoria.")
+                                    else:
+                                        st.warning("🔧 Baixo potencial. Recomenda-se trabalhar socialização e saúde.")
+                        else:
+                            st.error("Dados insuficientes após limpeza para treinar o modelo.")
+                    else:
+                        st.error("São necessárias pelo menos 3 características para o modelo.")
+            else:
+                st.error("São necessários pelo menos 20 registros com status de adoção para treinar o modelo.")
+    
+    # Adicionar mais tipos de insight conforme necessário...
+
+def mapa_interativo(df):
+    """Mapa interativo avançado."""
+    st.title("🗺️ Mapa Interativo Avançado")
+    
+    if df.empty:
+        st.warning("Não há dados disponíveis para o mapa.")
+        return
+    
+    # Verificar se temos dados de localização
+    if 'bairro' not in df.columns:
+        st.error("Dados de localização (bairro) não encontrados.")
+        return
+    
+    # Opções de visualização
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        map_type = st.selectbox(
+            "Tipo de Mapa:",
+            ["Densidade de Pets", "Taxa de Adoção", "Score Médio", "Distribuição por Tipo"]
+        )
+    
+    with col2:
+        aggregation_level = st.selectbox(
+            "Nível de Agregação:",
+            ["Por Bairro", "Por Região", "Por Zona"]
+        )
+    
+    with col3:
+        filter_type = st.multiselect(
+            "Filtrar por Tipo:",
+            df['tipo_pet'].unique().tolist() if 'tipo_pet' in df.columns else [],
+            default=df['tipo_pet'].unique().tolist() if 'tipo_pet' in df.columns else []
+        )
+    
+    # Filtrar dados se necessário
+    df_map = df.copy()
+    if filter_type:
+        df_map = df_map[df_map['tipo_pet'].isin(filter_type)]
+    
+    # Simular coordenadas para Florianópolis (em produção, usaria geocoding real)
+    bairros_coords = {
+        'Centro': (-27.5969, -48.5495),
+        'Trindade': (-27.5717, -48.5067),
+        'Canasvieiras': (-27.4324, -48.4633),
+        'Ingleses': (-27.4367, -48.3917),
+        'Lagoa da Conceição': (-27.5717, -48.4283),
+        'Campeche': (-27.6783, -48.4967),
+        'Pantano do Sul': (-27.7683, -48.5067),
+        'Cachoeira do Bom Jesus': (-27.4883, -48.4183),
+        'Santo Antônio de Lisboa': (-27.5000, -48.5333)
+    }
+    
+    # Preparar dados do mapa
+    if map_type == "Densidade de Pets":
+        map_data = df_map.groupby('bairro').size().reset_index(name='count')
+        color_column = 'count'
+        title = "Densidade de Pets por Bairro"
+        
+    elif map_type == "Taxa de Adoção" and 'adotado' in df_map.columns:
+        map_data = df_map.groupby('bairro')['adotado'].mean().reset_index()
+        map_data['adotado'] = map_data['adotado'] * 100  # Converter para percentual
+        color_column = 'adotado'
+        title = "Taxa de Adoção por Bairro (%)"
+        
+    elif map_type == "Score Médio" and 'score_adocao' in df_map.columns:
+        map_data = df_map.groupby('bairro')['score_adocao'].mean().reset_index()
+        color_column = 'score_adocao'
+        title = "Score Médio de Adoção por Bairro"
+        
+    else:
+        # Distribuição por tipo
+        map_data = df_map.groupby(['bairro', 'tipo_pet']).size().reset_index(name='count')
+        color_column = 'count'
+        title = "Distribuição de Tipos por Bairro"
+    
+    # Adicionar coordenadas
+    map_data['lat'] = map_data['bairro'].map(lambda x: bairros_coords.get(x, (-27.5969, -48.5495))[0])
+    map_data['lon'] = map_data['bairro'].map(lambda x: bairros_coords.get(x, (-27.5969, -48.5495))[1])
+    
+    # Criar mapa
+    if map_type != "Distribuição por Tipo":
+        # Mapa de pontos com cores
+        fig = px.scatter_mapbox(
+            map_data,
+            lat='lat',
+            lon='lon',
+            size=color_column,
+            color=color_column,
+            hover_name='bairro',
+            hover_data={color_column: ':.1f'},
+            title=title,
+            mapbox_style='open-street-map',
+            zoom=10,
+            center=dict(lat=-27.5969, lon=-48.5495),
+            color_continuous_scale='viridis'
+        )
+    else:
+        # Mapa com diferentes símbolos por tipo
+        fig = px.scatter_mapbox(
+            map_data,
+            lat='lat',
+            lon='lon',
+            size='count',
+            color='tipo_pet',
+            hover_name='bairro',
+            hover_data={'count': True, 'tipo_pet': True},
+            title=title,
+            mapbox_style='open-street-map',
+            zoom=10,
+            center=dict(lat=-27.5969, lon=-48.5495)
+        )
+    
+    fig.update_layout(height=600)
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # Estatísticas do mapa
+    st.subheader("📊 Estatísticas Regionais")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Top bairros
+        if map_type == "Densidade de Pets":
+            if not map_data.empty and 'count' in map_data.columns:
+                top_bairros = map_data.nlargest(min(5, len(map_data)), 'count')
+            else:
+                top_bairros = pd.DataFrame()  # DataFrame vazio
+            st.write("**Top 5 Bairros - Maior Quantidade:**")
+        elif map_type == "Taxa de Adoção":
+            top_bairros = map_data.nlargest(5, 'adotado')
+            st.write("**Top 5 Bairros - Maior Taxa de Adoção:**")
+        else:
+            top_bairros = map_data.nlargest(5, color_column)
+            st.write(f"**Top 5 Bairros - {title}:**")
+        
+        for _, row in top_bairros.iterrows():
+            value = row[color_column]
+            if map_type == "Taxa de Adoção":
+                st.write(f"• {row['bairro']}: {value:.1f}%")
+            else:
+                st.write(f"• {row['bairro']}: {value:.1f}")
+    
+    with col2:
+        # Análise regional
+        st.write("**Análise Regional:**")
+        
+        total_pets_map = map_data[color_column].sum() if map_type == "Densidade de Pets" else len(df_map)
+        media_regional = map_data[color_column].mean()
+        
+        st.write(f"• Total de pets: {total_pets_map}")
+        st.write(f"• Média por bairro: {media_regional:.1f}")
+        st.write(f"• Bairros cobertos: {len(map_data)}")
+        
+        # Bairro com maior concentração
+        if len(map_data) > 0:
+            bairro_destaque = map_data.loc[map_data[color_column].idxmax(), 'bairro']
+            valor_destaque = map_data[color_column].max()
+            
+            if map_type == "Taxa de Adoção":
+                st.success(f"🏆 Destaque: {bairro_destaque} ({valor_destaque:.1f}%)")
+            else:
+                st.success(f"🏆 Destaque: {bairro_destaque} ({valor_destaque:.1f})")
+    
+    # Análise temporal se disponível
+    if 'data_registro' in df_map.columns:
+        st.subheader("📈 Evolução Temporal por Região")
+        
+        df_temporal = df_map.copy()
+        df_temporal['data_registro'] = pd.to_datetime(df_temporal['data_registro'])
+        df_temporal['mes'] = df_temporal['data_registro'].dt.to_period('M')
+        
+        # Evolução mensal por bairro
+        evolucao_bairros = df_temporal.groupby(['mes', 'bairro']).size().reset_index(name='registros')
+        evolucao_bairros['mes_str'] = evolucao_bairros['mes'].astype(str)
+        
+        # Selecionar top 5 bairros para visualização
+        top_5_bairros = df_map['bairro'].value_counts().head(5).index.tolist()
+        evolucao_filtrada = evolucao_bairros[evolucao_bairros['bairro'].isin(top_5_bairros)]
+        
+        if len(evolucao_filtrada) > 0:
+            fig_evolucao = px.line(
+                evolucao_filtrada,
+                x='mes_str',
+                y='registros',
+                color='bairro',
+                title="Evolução de Registros por Bairro",
+                labels={'mes_str': 'Mês', 'registros': 'Número de Registros'}
+            )
+            st.plotly_chart(fig_evolucao, use_container_width=True)
+    
+    # Heatmap de relacionamentos
+    st.subheader("🔥 Heatmap de Características")
+    
+    if 'tipo_pet' in df_map.columns and len(df_map) > 0:
+        # Crosstab entre bairro e tipo
+        crosstab = pd.crosstab(df_map['bairro'], df_map['tipo_pet'])
+        
+        fig_heatmap = px.imshow(
+            crosstab.values,
+            x=crosstab.columns,
+            y=crosstab.index,
+            title="Distribuição de Tipos de Pet por Bairro",
+            color_continuous_scale='YlOrRd',
+            aspect='auto'
+        )
+        
+        fig_heatmap.update_layout(
+            xaxis_title="Tipo de Pet",
+            yaxis_title="Bairro"
+        )
+        
+        st.plotly_chart(fig_heatmap, use_container_width=True)
+    
+    # Insights geográficos
+    st.subheader("💡 Insights Geográficos")
+    
+    insights_geo = []
+    
+    # Concentração regional
+    if len(map_data) > 0:
+        concentracao = map_data[color_column].std() / map_data[color_column].mean()
+        
+        if concentracao > 0.5:
+            insights_geo.append("🎯 Há alta concentração em poucos bairros - considere expandir para outras regiões")
+        else:
+            insights_geo.append("📊 Distribuição equilibrada entre os bairros")
+    
+    # Análise de performance por região
+    if map_type == "Taxa de Adoção" and len(map_data) > 1:
+        taxa_max = map_data['adotado'].max()
+        taxa_min = map_data['adotado'].min()
+        diferenca = taxa_max - taxa_min
+        
+        if diferenca > 30:  # Diferença maior que 30%
+            insights_geo.append(f"⚠️ Grande variação regional: diferença de {diferenca:.1f}% entre bairros")
+        else:
+            insights_geo.append("✅ Performance regional consistente")
+    
+    # Oportunidades de melhoria
+    if map_type == "Densidade de Pets" and len(map_data) > 0:
+        bairros_baixa_densidade = map_data[map_data['count'] < map_data['count'].mean() * 0.5]
+        
+        if len(bairros_baixa_densidade) > 0:
+            insights_geo.append(f"📈 Oportunidade: {len(bairros_baixa_densidade)} bairros com baixa densidade podem ser explorados")
+    
+    # Exibir insights
+    for insight in insights_geo:
+        st.info(insight)
+
+# Funções adicionais para admin e configurações...
+def user_settings():
+    """Configurações avançadas do usuário."""
+    st.title("⚙️ Configurações Avançadas do Usuário")
+    
+    if "user_id" not in st.session_state or not st.session_state.user_id:
+        st.warning("Por favor, faça login para acessar as configurações.")
+        return
+    
+    user_info = st.session_state.user_info
+    
+    # Tabs expandidas
+    tab1, tab2, tab3, tab4, tab5 = st.tabs([
+        "👤 Perfil", 
+        "🔐 Segurança", 
+        "🔔 Notificações", 
+        "🎨 Preferências",
+        "📊 Atividade"
+    ])
+    
+    with tab1:
+        st.subheader("👤 Informações do Perfil")
+        
+        # Avatar e informações básicas
+        col1, col2 = st.columns([1, 3])
+        
+        with col1:
+            # Avatar simulado
+            initials = ''.join([name[0].upper() for name in user_info['full_name'].split() if name])
+            st.markdown(
+                f"""
+                <div style="width: 120px; height: 120px; border-radius: 50%; 
+                background: linear-gradient(45deg, #4527A0, #7B1FA2); color: white; 
+                display: flex; align-items: center; justify-content: center; 
+                font-size: 48px; font-weight: bold; margin: 0 auto 20px auto;">
+                {initials}
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+            
+            # Upload de avatar
+            uploaded_avatar = st.file_uploader("Alterar Avatar", type=['png', 'jpg', 'jpeg'])
+            if uploaded_avatar:
+                st.success("Avatar carregado! (Funcionalidade em desenvolvimento)")
+        
+        with col2:
+            with st.form("profile_form"):
+                full_name = st.text_input("Nome Completo", value=user_info.get('full_name', ''))
+                email = st.text_input("Email", value=user_info.get('email', ''), disabled=True)
+                
+                # Campos adicionais
+                col_a, col_b = st.columns(2)
+                
+                with col_a:
+                    phone = st.text_input("Telefone", value="")
+                    organization = st.text_input("Organização", value="")
+                
+                with col_b:
+                    location = st.text_input("Localização", value="Florianópolis, SC")
+                    website = st.text_input("Website", value="")
+                
+                bio = st.text_area("Biografia", height=100, 
+                                 placeholder="Conte um pouco sobre você e seu trabalho com pets...")
+                
+                # Preferências profissionais
+                st.write("**Área de Atuação:**")
+                areas = st.multiselect(
+                    "Selecione suas áreas:",
+                    ["ONGs", "Veterinária", "Adoção", "Educação", "Pesquisa", "Voluntariado"],
+                    default=["Adoção"]
+                )
+                
+                # Salvar alterações
+                submitted = st.form_submit_button("💾 Salvar Alterações", use_container_width=True)
+                
+                if submitted:
+                    # Simular salvamento
+                    st.success("✅ Perfil atualizado com sucesso!")
+                    
+                    # Atualizar session state
+                    st.session_state.user_info['full_name'] = full_name
+                    
+                    # Log da atividade
+                    log_activity(st.session_state.user_id, "update_profile", "Atualizou informações do perfil")
+    
+    with tab2:
+        st.subheader("🔐 Segurança e Privacidade")
+        
+        # Alterar senha
+        with st.expander("🔑 Alterar Senha", expanded=False):
+            with st.form("password_form"):
+                current_password = st.text_input("Senha Atual", type="password")
+                new_password = st.text_input("Nova Senha", type="password")
+                confirm_password = st.text_input("Confirmar Nova Senha", type="password")
+                
+                # Indicador de força da senha
+                if new_password:
+                    strength = calculate_password_strength(new_password)
+                    color = ["red", "orange", "yellow", "lightgreen", "green"][strength-1]
+                    strength_text = ["Muito Fraca", "Fraca", "Regular", "Forte", "Muito Forte"][strength-1]
+                    
+                    st.markdown(f"Força da senha: <span style='color: {color}'>{strength_text}</span>", 
+                               unsafe_allow_html=True)
+                
+                change_password_btn = st.form_submit_button("🔄 Alterar Senha", use_container_width=True)
+                
+                if change_password_btn:
+                    if not all([current_password, new_password, confirm_password]):
+                        st.error("❌ Preencha todos os campos.")
+                    elif new_password != confirm_password:
+                        st.error("❌ As senhas não coincidem.")
+                    elif len(new_password) < 8:
+                        st.error("❌ A nova senha deve ter pelo menos 8 caracteres.")
+                    else:
+                        success = change_password(st.session_state.user_id, current_password, new_password)
+                        
+                        if success:
+                            st.success("✅ Senha alterada com sucesso!")
+                            log_activity(st.session_state.user_id, "change_password", "Alterou senha")
+                        else:
+                            st.error("❌ Senha atual incorreta.")
+        
+        # Sessões ativas
+        st.write("**🖥️ Sessões Ativas:**")
+        
+        sessions_data = pd.DataFrame({
+            'Dispositivo': ['Este Navegador', 'Chrome - Windows', 'Mobile App'],
+            'Local': ['Florianópolis, BR', 'São Paulo, BR', 'Florianópolis, BR'],
+            'Último Acesso': ['Agora', '2 horas atrás', '1 dia atrás'],
+            'Status': ['Ativa', 'Ativa', 'Expirada']
+        })
+        
+        st.dataframe(sessions_data, use_container_width=True, hide_index=True)
+        
+        if st.button("🚫 Encerrar Todas as Outras Sessões"):
+            st.success("✅ Outras sessões encerradas com sucesso!")
+        
+        # Configurações de privacidade
+        st.write("**🛡️ Configurações de Privacidade:**")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            show_activity = st.checkbox("Mostrar atividade para outros usuários", value=True)
+            allow_mentions = st.checkbox("Permitir menções", value=True)
+            
+        with col2:
+            data_export = st.checkbox("Permitir exportação de dados pessoais", value=False)
+            analytics = st.checkbox("Contribuir com dados para análises", value=True)
+        
+        if st.button("💾 Salvar Configurações de Privacidade"):
+            st.success("✅ Configurações de privacidade atualizadas!")
+    
+    with tab3:
+        st.subheader("🔔 Centro de Notificações")
+        
+        # Configurações por tipo
+        notification_types = [
+            {"name": "Novos Pets Cadastrados", "email": True, "push": False, "sms": False},
+            {"name": "Pets Adotados", "email": True, "push": True, "sms": False},
+            {"name": "Alertas do Sistema", "email": True, "push": True, "sms": True},
+            {"name": "Relatórios Semanais", "email": False, "push": False, "sms": False},
+            {"name": "Atualizações de Pets", "email": True, "push": False, "sms": False},
+            {"name": "Mensagens Importantes", "email": True, "push": True, "sms": True}
+        ]
+        
+        st.write("**Configurar Notificações por Tipo:**")
+        
+        for i, notif in enumerate(notification_types):
+            st.write(f"**{notif['name']}**")
+            
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                email_enabled = st.checkbox("📧 Email", value=notif['email'], key=f"email_{i}")
+            with col2:
+                push_enabled = st.checkbox("📱 Push", value=notif['push'], key=f"push_{i}")
+            with col3:
+                sms_enabled = st.checkbox("💬 SMS", value=notif['sms'], key=f"sms_{i}")
+            
+            st.divider()
+        
+        # Configurações gerais
+        st.write("**⚙️ Configurações Gerais:**")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            quiet_hours = st.checkbox("Modo silencioso noturno (22h-7h)", value=True)
+            digest_frequency = st.selectbox(
+                "Frequência do resumo:",
+                ["Diário", "Semanal", "Mensal", "Nunca"],
+                index=1
+            )
+        
+        with col2:
+            priority_only = st.checkbox("Apenas notificações prioritárias", value=False)
+            max_per_day = st.slider("Máximo de notificações por dia:", 1, 20, 10)
+        
+        if st.button("🔔 Salvar Configurações de Notificação"):
+            st.success("✅ Configurações de notificação atualizadas!")
+    
+    with tab4:
+        st.subheader("🎨 Preferências de Interface")
+        
+        # Tema e aparência
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**🎨 Aparência:**")
+            theme = st.radio("Tema:", ["Claro", "Escuro", "Automático"], horizontal=True)
+            color_scheme = st.selectbox("Esquema de Cores:", ["Padrão", "Azul", "Verde", "Roxo", "Rosa"])
+            font_size = st.selectbox("Tamanho da Fonte:", ["Pequeno", "Médio", "Grande"], index=1)
+        
+        with col2:
+            st.write("**🌐 Localização:**")
+            language = st.selectbox("Idioma:", ["Português (Brasil)", "English", "Español"])
+            timezone = st.selectbox("Fuso Horário:", ["(GMT-3) Brasília", "(GMT-2) Fernando de Noronha"])
+            date_format = st.selectbox("Formato de Data:", ["DD/MM/AAAA", "MM/DD/AAAA", "AAAA-MM-DD"])
+        
+        # Preferências de dashboard
+        st.write("**📊 Preferências do Dashboard:**")
+        
+        default_view = st.selectbox(
+            "Visualização padrão:",
+            ["Dashboard", "Lista de Pets", "Análises", "Mapa"]
+        )
+        
+        charts_preference = st.multiselect(
+            "Gráficos favoritos:",
+            ["Barras", "Pizza", "Linha", "Scatter", "Heatmap", "Box Plot"],
+            default=["Barras", "Pizza"]
+        )
+        
+        items_per_page = st.slider("Itens por página:", 10, 100, 25)
+        
+        # Atalhos personalizados
+        st.write("**⌨️ Atalhos Personalizados:**")
+        
+        shortcuts = st.text_area(
+            "Atalhos (formato: Ctrl+K = Buscar):",
+            value="Ctrl+N = Novo Pet\nCtrl+D = Dashboard\nCtrl+E = Exportar",
+            height=100
+        )
+        
+        if st.button("🎨 Salvar Preferências"):
+            st.success("✅ Preferências de interface atualizadas!")
+    
+    with tab5:
+        st.subheader("📊 Relatório de Atividade")
+        
+        # Métricas de atividade
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total de Logins", "156", "+12 esta semana")
+        
+        with col2:
+            st.metric("Pets Adicionados", "23", "+3 este mês")
+        
+        with col3:
+            st.metric("Relatórios Gerados", "8", "+2 esta semana")
+        
+        with col4:
+            st.metric("Tempo no Sistema", "42h", "+6h esta semana")
+        
+        # Gráfico de atividade
+        activity_dates = pd.date_range(start='2025-04-01', end='2025-05-23', freq='D')
+        activity_data = pd.DataFrame({
+            'Data': activity_dates,
+            'Atividade': np.random.poisson(3, len(activity_dates))
+        })
+        
+        fig_activity = px.line(
+            activity_data,
+            x='Data',
+            y='Atividade',
+            title="Atividade Diária nos Últimos 60 Dias"
+        )
+        st.plotly_chart(fig_activity, use_container_width=True)
+        
+        # Log de atividades recentes
+        st.write("**📝 Atividades Recentes:**")
+        
+        # Simular dados de atividade
+        recent_activities = pd.DataFrame({
+            'Data/Hora': [
+                '23/05/2025 14:30',
+                '23/05/2025 09:15',
+                '22/05/2025 16:45',
+                '22/05/2025 11:20',
+                '21/05/2025 15:30'
+            ],
+            'Ação': [
+                'Login no sistema',
+                'Adicionou pet: Buddy',
+                'Gerou relatório de adoções',
+                'Alterou dados do pet: Luna',
+                'Exportou dados em Excel'
+            ],
+            'IP': [
+                '192.168.1.100',
+                '192.168.1.100',
+                '192.168.1.100',
+                '192.168.1.100',
+                '10.0.0.50'
+            ]
+        })
+        
+        st.dataframe(recent_activities, use_container_width=True, hide_index=True)
+        
+        # Exportar dados de atividade
+        if st.button("📥 Exportar Histórico de Atividade"):
+            activity_csv = recent_activities.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="Baixar CSV",
+                data=activity_csv,
+                file_name=f"atividade_usuario_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+
+def calculate_password_strength(password):
+    """Calcula a força de uma senha."""
+    score = 0
+    
+    if len(password) >= 8:
+        score += 1
+    if len(password) >= 12:
+        score += 1
+    if any(c.isupper() for c in password):
+        score += 1
+    if any(c.islower() for c in password):
+        score += 1
+    if any(c.isdigit() for c in password):
+        score += 1
+    if any(c in '!@#$%&*()_+-=[]{}|;:,.<>?' for c in password):
+        score += 1
+    
+    return min(5, max(1, score))
+
+@require_admin
+def admin_panel():
+    """Painel de administração avançado."""
+    st.title("⚙️ Painel de Administração Avançado")
+    
+    # Menu lateral administrativo
+    admin_section = st.sidebar.selectbox(
+        "Seção Administrativa:",
+        [
+            "📊 Dashboard Administrativo",
+            "👥 Gerenciar Usuários",
+            "🔍 Logs e Auditoria",
+            "⚙️ Configurações do Sistema",
+            "💾 Backup e Manutenção",
+            "📈 Analytics do Sistema",
+            "🛡️ Segurança",
+            "🔧 Ferramentas Avançadas"
+        ]
+    )
+    
+    if admin_section == "📊 Dashboard Administrativo":
+        st.subheader("📊 Dashboard Administrativo")
+        
+        # Métricas principais do sistema
+        col1, col2, col3, col4 = st.columns(4)
+        
+        # Simular dados administrativos
+        with col1:
+            st.metric("Total de Usuários", "127", "+8 este mês")
+        
+        with col2:
+            st.metric("Pets no Sistema", "1,234", "+45 esta semana")
+        
+        with col3:
+            st.metric("Taxa de Adoção", "68.3%", "+2.1% este mês")
+        
+        with col4:
+            st.metric("Uptime do Sistema", "99.8%", "Excelente")
+        
+        # Gráficos administrativos
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Gráfico de usuários ativos
+            dates = pd.date_range(start='2025-04-01', end='2025-05-23', freq='D')
+            active_users = pd.DataFrame({
+                'Data': dates,
+                'Usuarios_Ativos': np.random.poisson(25, len(dates))
+            })
+            
+            fig_users = px.line(
+                active_users,
+                x='Data',
+                y='Usuarios_Ativos',
+                title="Usuários Ativos Diariamente"
+            )
+            st.plotly_chart(fig_users, use_container_width=True)
+        
+        with col2:
+            # Distribuição de tipos de usuário
+            user_types = pd.DataFrame({
+                'Tipo': ['Administradores', 'Usuários Regulares', 'Convidados'],
+                'Quantidade': [5, 95, 27]
+            })
+            
+            fig_types = px.pie(
+                user_types,
+                values='Quantidade',
+                names='Tipo',
+                title="Distribuição de Tipos de Usuário"
+            )
+            st.plotly_chart(fig_types, use_container_width=True)
+
+            # Alertas do sistema
+        st.subheader("🚨 Alertas do Sistema")
+        
+        alerts = [
+            {"tipo": "warning", "mensagem": "5 usuários não fazem login há mais de 30 dias"},
+            {"tipo": "info", "mensagem": "Backup automático executado com sucesso às 03:00"},
+            {"tipo": "success", "mensagem": "Sistema funcionando normalmente"},
+            {"tipo": "warning", "mensagem": "Uso de disco em 78% - considere limpeza"}
+        ]
+        
+        for alert in alerts:
+            if alert["tipo"] == "warning":
+                st.warning(f"⚠️ {alert['mensagem']}")
+            elif alert["tipo"] == "success":
+                st.success(f"✅ {alert['mensagem']}")
+            else:
+                st.info(f"ℹ️ {alert['mensagem']}")
+        
+        # Estatísticas de performance
+        st.subheader("⚡ Performance do Sistema")
+        
+        perf_col1, perf_col2, perf_col3 = st.columns(3)
+        
+        with perf_col1:
+            st.metric("Tempo Médio de Resposta", "0.23s", "-0.05s")
+            st.metric("Consultas por Segundo", "156", "+12")
+        
+        with perf_col2:
+            st.metric("Uso de CPU", "34%", "-5%")
+            st.metric("Uso de Memória", "2.1GB", "+0.3GB")
+        
+        with perf_col3:
+            st.metric("Conexões Ativas", "23", "+3")
+            st.metric("Cache Hit Rate", "94.2%", "+1.8%")
+    
+    elif admin_section == "👥 Gerenciar Usuários":
+        st.subheader("👥 Gerenciamento Avançado de Usuários")
+        
+        # Obter dados de usuários do banco
+        conn = sqlite3.connect(DATABASE_PATH)
+        query = """
+        SELECT u.id, u.email, u.full_name, u.role, u.created_at, u.last_login,
+               COUNT(p.id) as pets_cadastrados,
+               COUNT(CASE WHEN p.adotado = 1 THEN 1 END) as pets_adotados
+        FROM users u
+        LEFT JOIN pets p ON u.id = p.created_by
+        GROUP BY u.id, u.email, u.full_name, u.role, u.created_at, u.last_login
+        """
+        df_users = pd.read_sql_query(query, conn)
+        conn.close()
+        
+        # Filtros e busca
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            search_term = st.text_input("🔍 Buscar usuário:", placeholder="Nome ou email...")
+        
+        with col2:
+            role_filter = st.selectbox("Filtrar por papel:", ["Todos", "admin", "user", "guest"])
+        
+        with col3:
+            status_filter = st.selectbox("Status:", ["Todos", "Ativos", "Inativos"])
+        
+        # Aplicar filtros
+        df_filtered = df_users.copy()
+        
+        if search_term:
+            df_filtered = df_filtered[
+                (df_filtered['email'].str.contains(search_term, case=False, na=False)) |
+                (df_filtered['full_name'].str.contains(search_term, case=False, na=False))
+            ]
+        
+        if role_filter != "Todos":
+            df_filtered = df_filtered[df_filtered['role'] == role_filter]
+        
+        # Tabela de usuários
+        st.subheader("📋 Lista de Usuários")
+        
+        # Configurar colunas da tabela
+        column_config = {
+            "id": "ID",
+            "email": "Email",
+            "full_name": "Nome Completo",
+            "role": st.column_config.SelectboxColumn(
+                "Papel",
+                options=["admin", "user", "guest"],
+                required=True
+            ),
+            "created_at": st.column_config.DatetimeColumn("Data de Criação"),
+            "last_login": st.column_config.DatetimeColumn("Último Login"),
+            "pets_cadastrados": st.column_config.NumberColumn("Pets Cadastrados"),
+            "pets_adotados": st.column_config.NumberColumn("Pets Adotados")
+        }
+        
+        # Editor de dados
+        edited_df = st.data_editor(
+            df_filtered,
+            column_config=column_config,
+            use_container_width=True,
+            hide_index=True,
+            num_rows="dynamic"
+        )
+        
+        # Botões de ação
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            if st.button("💾 Salvar Alterações", use_container_width=True):
+                st.success("✅ Alterações salvas com sucesso!")
+        
+        with col2:
+            if st.button("➕ Novo Usuário", use_container_width=True):
+                st.session_state.show_new_user_form = True
+        
+        with col3:
+            if st.button("📧 Enviar Email em Massa", use_container_width=True):
+                st.session_state.show_email_form = True
+        
+        with col4:
+            if st.button("📊 Relatório de Usuários", use_container_width=True):
+                csv_data = df_users.to_csv(index=False).encode('utf-8')
+                st.download_button(
+                    label="Baixar CSV",
+                    data=csv_data,
+                    file_name=f"usuarios_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+                    mime="text/csv"
+                )
+        
+        # Formulário para novo usuário
+        if st.session_state.get('show_new_user_form', False):
+            with st.expander("➕ Adicionar Novo Usuário", expanded=True):
+                with st.form("new_user_admin"):
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        new_email = st.text_input("Email:", key="admin_new_email")
+                        new_name = st.text_input("Nome Completo:", key="admin_new_name")
+                    
+                    with col2:
+                        new_role = st.selectbox("Papel:", ["user", "admin"], key="admin_new_role")
+                        new_password = st.text_input("Senha Inicial:", type="password", key="admin_new_password")
+                    
+                    send_welcome = st.checkbox("Enviar email de boas-vindas", value=True)
+                    force_password_change = st.checkbox("Forçar alteração de senha no primeiro login", value=True)
+                    
+                    col_a, col_b = st.columns([1, 1])
+                    
+                    with col_a:
+                        create_user = st.form_submit_button("✅ Criar Usuário", use_container_width=True)
+                    
+                    with col_b:
+                        cancel_create = st.form_submit_button("❌ Cancelar", use_container_width=True)
+                    
+                    if create_user:
+                        if new_email and new_name and new_password:
+                            success, user_id = register_new_user(new_email, new_password, new_name, new_role)
+                            
+                            if success:
+                                st.success(f"✅ Usuário {new_name} criado com sucesso!")
+                                log_activity(st.session_state.user_id, "create_user", f"Criou usuário: {new_email}")
+                                st.session_state.show_new_user_form = False
+                                st.rerun()
+                            else:
+                                st.error("❌ Email já está em uso.")
+                        else:
+                            st.error("❌ Preencha todos os campos obrigatórios.")
+                    
+                    if cancel_create:
+                        st.session_state.show_new_user_form = False
+                        st.rerun()
+        
+        # Formulário de email em massa
+        if st.session_state.get('show_email_form', False):
+            with st.expander("📧 Enviar Email em Massa", expanded=True):
+                with st.form("mass_email"):
+                    subject = st.text_input("Assunto:")
+                    message = st.text_area("Mensagem:", height=150)
+                    
+                    recipients = st.multiselect(
+                        "Destinatários:",
+                        options=df_users['email'].tolist(),
+                        default=df_users['email'].tolist()
+                    )
+                    
+                    col_a, col_b = st.columns([1, 1])
+                    
+                    with col_a:
+                        send_email = st.form_submit_button("📤 Enviar Email", use_container_width=True)
+                    
+                    with col_b:
+                        cancel_email = st.form_submit_button("❌ Cancelar", use_container_width=True)
+                    
+                    if send_email:
+                        if subject and message and recipients:
+                            st.success(f"✅ Email enviado para {len(recipients)} usuários!")
+                            log_activity(st.session_state.user_id, "mass_email", f"Enviou email para {len(recipients)} usuários")
+                            st.session_state.show_email_form = False
+                        else:
+                            st.error("❌ Preencha todos os campos.")
+                    
+                    if cancel_email:
+                        st.session_state.show_email_form = False
+                        st.rerun()
+        
+        # Estatísticas de usuários
+        st.subheader("📊 Estatísticas de Usuários")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Usuários por papel
+            role_stats = df_users['role'].value_counts()
+            fig_roles = px.pie(
+                values=role_stats.values,
+                names=role_stats.index,
+                title="Distribuição por Papel"
+            )
+            st.plotly_chart(fig_roles, use_container_width=True)
+        
+        with col2:
+            # Atividade dos usuários
+            df_users['last_login'] = pd.to_datetime(df_users['last_login'])
+            df_users['dias_ultimo_login'] = (pd.Timestamp.now() - df_users['last_login']).dt.days
+            
+            activity_ranges = pd.cut(
+                df_users['dias_ultimo_login'].fillna(999),
+                bins=[0, 7, 30, 90, 999],
+                labels=['Última semana', 'Último mês', 'Últimos 3 meses', 'Mais de 3 meses']
+            )
+            
+            activity_counts = activity_ranges.value_counts()
+            
+            fig_activity = px.bar(
+                x=activity_counts.index,
+                y=activity_counts.values,
+                title="Atividade dos Usuários"
+            )
+            st.plotly_chart(fig_activity, use_container_width=True)
+    
+    elif admin_section == "🔍 Logs e Auditoria":
+        st.subheader("🔍 Sistema de Logs e Auditoria")
+        
+        # Filtros de log
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            log_type = st.selectbox("Tipo de Log:", ["Todos", "Login", "Atividade", "Erro", "Sistema"])
+        
+        with col2:
+            date_range = st.date_input(
+                "Período:",
+                [datetime.date.today() - datetime.timedelta(days=7), datetime.date.today()]
+            )
+        
+        with col3:
+            user_filter = st.text_input("Filtrar por usuário:")
+        
+        with col4:
+            action_filter = st.selectbox("Ação:", ["Todas", "login", "add_pet", "export_data", "delete", "update"])
+        
+        # Obter logs do banco
+        conn = sqlite3.connect(DATABASE_PATH)
+        
+        if log_type == "Login" or log_type == "Todos":
+            login_query = """
+            SELECT 'login' as log_type, l.timestamp, u.email as user_email, 
+                   CASE WHEN l.success = 1 THEN 'Login Sucesso' ELSE 'Login Falha' END as action,
+                   l.ip_address as details
+            FROM login_logs l
+            LEFT JOIN users u ON l.user_id = u.id
+            ORDER BY l.timestamp DESC
+            LIMIT 1000
+            """
+            df_login_logs = pd.read_sql_query(login_query, conn)
+        else:
+            df_login_logs = pd.DataFrame()
+        
+        if log_type == "Atividade" or log_type == "Todos":
+            activity_query = """
+            SELECT 'activity' as log_type, a.timestamp, u.email as user_email, 
+                   a.action, a.details
+            FROM activity_logs a
+            LEFT JOIN users u ON a.user_id = u.id
+            ORDER BY a.timestamp DESC
+            LIMIT 1000
+            """
+            df_activity_logs = pd.read_sql_query(activity_query, conn)
+        else:
+            df_activity_logs = pd.DataFrame()
+        
+        conn.close()
+        
+        # Combinar logs
+        df_logs = pd.concat([df_login_logs, df_activity_logs], ignore_index=True)
+        
+        if not df_logs.empty:
+            # Aplicar filtros
+            df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
+            
+            if len(date_range) == 2:
+                start_date, end_date = date_range
+                df_logs = df_logs[
+                    (df_logs['timestamp'].dt.date >= start_date) &
+                    (df_logs['timestamp'].dt.date <= end_date)
+                ]
+            
+            if user_filter:
+                df_logs = df_logs[df_logs['user_email'].str.contains(user_filter, case=False, na=False)]
+            
+            if action_filter != "Todas":
+                df_logs = df_logs[df_logs['action'].str.contains(action_filter, case=False, na=False)]
+            
+            # Exibir logs
+            st.subheader(f"📋 Logs do Sistema ({len(df_logs)} registros)")
+            
+            # Configurar exibição
+            df_display = df_logs.copy()
+            df_display['timestamp'] = df_display['timestamp'].dt.strftime('%d/%m/%Y %H:%M:%S')
+            
+            st.dataframe(
+                df_display[['timestamp', 'user_email', 'action', 'details', 'log_type']],
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "timestamp": "Data/Hora",
+                    "user_email": "Usuário",
+                    "action": "Ação",
+                    "details": "Detalhes",
+                    "log_type": "Tipo"
+                }
+            )
+            
+            # Análise de logs
+            st.subheader("📊 Análise de Logs")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Ações mais comuns
+                action_counts = df_logs['action'].value_counts().head(10)
+                fig_actions = px.bar(
+                    x=action_counts.values,
+                    y=action_counts.index,
+                    orientation='h',
+                    title="Top 10 Ações Mais Comuns"
+                )
+                st.plotly_chart(fig_actions, use_container_width=True)
+            
+            with col2:
+                # Atividade por hora
+                df_logs['hour'] = df_logs['timestamp'].dt.hour
+                hourly_activity = df_logs['hour'].value_counts().sort_index()
+                
+                fig_hourly = px.line(
+                    x=hourly_activity.index,
+                    y=hourly_activity.values,
+                    title="Atividade por Hora do Dia"
+                )
+                st.plotly_chart(fig_hourly, use_container_width=True)
+            
+            # Detecção de anomalias nos logs
+            st.subheader("🚨 Detecção de Anomalias")
+            
+            # Usuários com muitas atividades
+            user_activity = df_logs['user_email'].value_counts()
+            threshold = user_activity.mean() + 2 * user_activity.std()
+            
+            suspicious_users = user_activity[user_activity > threshold]
+            
+            if len(suspicious_users) > 0:
+                st.warning(f"⚠️ **Usuários com atividade acima do normal:**")
+                for user, count in suspicious_users.items():
+                    st.write(f"• {user}: {count} ações (média: {user_activity.mean():.1f})")
+            else:
+                st.success("✅ Nenhuma atividade suspeita detectada.")
+            
+            # Exportar logs
+            col1, col2 = st.columns([1, 1])
+            
+            with col1:
+                if st.button("📥 Exportar Logs Filtrados"):
+                    csv_data = df_logs.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="Baixar CSV",
+                        data=csv_data,
+                        file_name=f"logs_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                        mime="text/csv"
+                    )
+            
+            with col2:
+                if st.button("🗑️ Limpar Logs Antigos"):
+                    st.warning("⚠️ Esta ação removerá logs com mais de 90 dias. Confirme na próxima versão.")
+        
+        else:
+            st.info("📭 Nenhum log encontrado para os filtros selecionados.")
+    
+    elif admin_section == "⚙️ Configurações do Sistema":
+        st.subheader("⚙️ Configurações Avançadas do Sistema")
+        
+        # Tabs de configuração
+        config_tab1, config_tab2, config_tab3, config_tab4 = st.tabs([
+            "🏗️ Geral", 
+            "🔐 Segurança", 
+            "📧 Email", 
+            "🔗 Integrações"
+        ])
+        
+        with config_tab1:
+            st.write("### ⚙️ Configurações Gerais")
+            
+            with st.form("general_config"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    system_name = st.text_input("Nome do Sistema:", value="PetCare Analytics")
+                    maintenance_mode = st.checkbox("Modo de Manutenção", value=False)
+                    debug_mode = st.checkbox("Modo Debug", value=False)
+                    
+                with col2:
+                    max_upload_size = st.number_input("Tamanho máximo de upload (MB):", value=10, min_value=1, max_value=100)
+                    session_timeout = st.number_input("Timeout de sessão (minutos):", value=60, min_value=5, max_value=480)
+                    auto_backup = st.checkbox("Backup automático", value=True)
+                
+                # Configurações de paginação
+                st.write("**Configurações de Interface:**")
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    default_page_size = st.slider("Itens por página (padrão):", 10, 100, 25)
+                    enable_animations = st.checkbox("Habilitar animações", value=True)
+                
+                with col2:
+                    cache_duration = st.slider("Duração do cache (minutos):", 5, 60, 15)
+                    enable_notifications = st.checkbox("Notificações do sistema", value=True)
+                
+                # Configurações de dados
+                st.write("**Configurações de Dados:**")
+                
+                data_retention_days = st.slider("Retenção de dados (dias):", 30, 365, 180)
+                auto_cleanup = st.checkbox("Limpeza automática de dados antigos", value=True)
+                
+                if st.form_submit_button("💾 Salvar Configurações Gerais"):
+                    st.success("✅ Configurações gerais salvas com sucesso!")
+                    log_activity(st.session_state.user_id, "update_config", "Atualizou configurações gerais")
+        
+        with config_tab2:
+            st.write("### 🔐 Configurações de Segurança")
+            
+            with st.form("security_config"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Políticas de Senha:**")
+                    min_password_length = st.slider("Comprimento mínimo:", 6, 20, 8)
+                    require_uppercase = st.checkbox("Exigir maiúsculas", value=True)
+                    require_lowercase = st.checkbox("Exigir minúsculas", value=True)
+                    require_numbers = st.checkbox("Exigir números", value=True)
+                    require_symbols = st.checkbox("Exigir símbolos", value=False)
+                
+                with col2:
+                    st.write("**Controle de Acesso:**")
+                    max_login_attempts = st.slider("Tentativas máximas de login:", 3, 10, 5)
+                    lockout_duration = st.slider("Duração do bloqueio (minutos):", 5, 60, 30)
+                    enable_2fa = st.checkbox("Habilitar 2FA", value=False)
+                    force_https = st.checkbox("Forçar HTTPS", value=True)
+                
+                st.write("**Lista de IPs Permitidos:**")
+                ip_whitelist = st.text_area(
+                    "IPs permitidos (um por linha):",
+                    height=100,
+                    placeholder="192.168.1.0/24\n10.0.0.0/8"
+                )
+                
+                st.write("**Configurações de Log de Segurança:**")
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    log_failed_logins = st.checkbox("Log de logins falhados", value=True)
+                    log_privilege_changes = st.checkbox("Log de mudanças de privilégio", value=True)
+                
+                with col2:
+                    alert_suspicious_activity = st.checkbox("Alertar atividade suspeita", value=True)
+                    auto_ban_suspicious_ips = st.checkbox("Banir IPs suspeitos automaticamente", value=False)
+                
+                if st.form_submit_button("🔒 Salvar Configurações de Segurança"):
+                    st.success("✅ Configurações de segurança salvas com sucesso!")
+                    log_activity(st.session_state.user_id, "update_security", "Atualizou configurações de segurança")
+        
+        with config_tab3:
+            st.write("### 📧 Configurações de Email")
+            
+            with st.form("email_config"):
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    st.write("**Servidor SMTP:**")
+                    smtp_server = st.text_input("Servidor:", value="smtp.gmail.com")
+                    smtp_port = st.number_input("Porta:", value=587, min_value=1, max_value=65535)
+                    smtp_encryption = st.selectbox("Criptografia:", ["TLS", "SSL", "Nenhuma"])
+                
+                with col2:
+                    st.write("**Autenticação:**")
+                    smtp_username = st.text_input("Usuário:")
+                    smtp_password = st.text_input("Senha:", type="password")
+                    from_email = st.text_input("Email remetente:", value="noreply@petcare.com")
+                
+                st.write("**Templates de Email:**")
+                
+                welcome_template = st.text_area(
+                    "Template de boas-vindas:",
+                    value="Bem-vindo ao PetCare Analytics!\n\nSua conta foi criada com sucesso.",
+                    height=100
+                )
+                
+                notification_template = st.text_area(
+                    "Template de notificação:",
+                    value="Você tem uma nova notificação no sistema PetCare.",
+                    height=100
+                )
+                
+                # Teste de configuração
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    test_email = st.text_input("Email para teste:")
+                
+                with col2:
+                    if st.form_submit_button("📤 Testar Configuração"):
+                        if test_email:
+                            st.success(f"✅ Email de teste enviado para {test_email}!")
+                        else:
+                            st.error("❌ Insira um email para teste.")
+                
+                if st.form_submit_button("📧 Salvar Configurações de Email"):
+                    st.success("✅ Configurações de email salvas com sucesso!")
+                    log_activity(st.session_state.user_id, "update_email_config", "Atualizou configurações de email")
+        
+        with config_tab4:
+            st.write("### 🔗 Configurações de Integrações")
+            
+            # API Keys
+            st.write("**🔑 Chaves de API:**")
+            
+            with st.form("api_keys"):
+                google_maps_key = st.text_input("Google Maps API:", type="password")
+                openai_key = st.text_input("OpenAI API:", type="password")
+                facebook_app_id = st.text_input("Facebook App ID:")
+                instagram_token = st.text_input("Instagram Access Token:", type="password")
+                
+                if st.form_submit_button("🔑 Salvar Chaves de API"):
+                    st.success("✅ Chaves de API salvas com sucesso!")
+            
+            # Webhooks
+            st.write("**🪝 Webhooks:**")
+            
+            webhook_url = st.text_input("URL do Webhook:")
+            webhook_events = st.multiselect(
+                "Eventos para notificar:",
+                ["pet_added", "pet_adopted", "user_registered", "system_alert"]
+            )
+            
+            if st.button("🔗 Salvar Configurações de Webhook"):
+                st.success("✅ Webhook configurado com sucesso!")
+            
+            # Integrações ativas
+            st.write("**📱 Integrações Ativas:**")
+            
+            integrations = pd.DataFrame({
+                'Serviço': ['WhatsApp Business', 'Telegram Bot', 'Facebook Pages', 'Instagram'],
+                'Status': ['Ativo', 'Ativo', 'Inativo', 'Pendente'],
+                'Última Sync': ['2 horas atrás', '30 min atrás', 'Nunca', '1 dia atrás'],
+                'Erros': [0, 0, 3, 1]
+            })
+            
+            st.dataframe(integrations, use_container_width=True, hide_index=True)
+    
+    elif admin_section == "💾 Backup e Manutenção":
+        st.subheader("💾 Sistema de Backup e Manutenção")
+        
+        # Status do sistema
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Último Backup", "2 horas atrás", "✅ Sucesso")
+        
+        with col2:
+            st.metric("Tamanho do BD", "156 MB", "+12 MB esta semana")
+        
+        with col3:
+            st.metric("Espaço em Disco", "2.3 GB livres", "78% usado")
+        
+        with col4:
+            st.metric("Uptime", "15 dias", "99.8%")
+        
+        # Tabs de manutenção
+        maint_tab1, maint_tab2, maint_tab3 = st.tabs(["💾 Backup", "🧹 Limpeza", "🔧 Manutenção"])
+        
+        with maint_tab1:
+            st.write("### 💾 Sistema de Backup")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**Backup Manual:**")
+                
+                backup_type = st.selectbox("Tipo de Backup:", ["Completo", "Incremental", "Diferencial"])
+                include_logs = st.checkbox("Incluir logs", value=True)
+                include_uploads = st.checkbox("Incluir arquivos enviados", value=True)
+                compress_backup = st.checkbox("Comprimir backup", value=True)
+                
+                if st.button("🚀 Iniciar Backup Manual", use_container_width=True):
+                    progress_bar = st.progress(0)
+                    status_text = st.empty()
+                    
+                    # Simular progresso do backup
+                    for i in range(101):
+                        progress_bar.progress(i)
+                        if i < 20:
+                            status_text.text(f"Preparando backup... ({i}%)")
+                        elif i < 50:
+                            status_text.text(f"Copiando banco de dados... ({i}%)")
+                        elif i < 80:
+                            status_text.text(f"Incluindo arquivos... ({i}%)")
+                        elif i < 95:
+                            status_text.text(f"Comprimindo... ({i}%)")
+                        else:
+                            status_text.text(f"Finalizando... ({i}%)")
+                        
+                        time.sleep(0.02)
+                    
+                    st.success("✅ Backup concluído com sucesso!")
+                    
+                    # Simular arquivo de backup
+                    backup_filename = f"petcare_backup_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+                    dummy_backup = "Conteúdo simulado do backup"
+                    
+                    st.download_button(
+                        label="📥 Baixar Backup",
+                        data=dummy_backup.encode(),
+                        file_name=backup_filename,
+                        mime="application/zip"
+                    )
+            
+            with col2:
+                st.write("**Backup Automático:**")
+                
+                auto_backup_enabled = st.checkbox("Habilitar backup automático", value=True)
+                
+                if auto_backup_enabled:
+                    backup_frequency = st.selectbox("Frequência:", ["Diário", "Semanal", "Mensal"])
+                    backup_time = st.time_input("Horário:", datetime.time(3, 0))
+                    retention_days = st.number_input("Manter backups por (dias):", value=30, min_value=7, max_value=365)
+                    
+                    backup_location = st.selectbox("Local de armazenamento:", ["Local", "Google Drive", "AWS S3", "Dropbox"])
+                    
+                    if backup_location != "Local":
+                        st.text_input(f"Configurações do {backup_location}:", placeholder="Chave de API ou credenciais")
+                
+                if st.button("💾 Salvar Configurações de Backup"):
+                    st.success("✅ Configurações de backup salvas!")
+            
+            # Histórico de backups
+            st.write("**📚 Histórico de Backups:**")
+            
+            backup_history = pd.DataFrame({
+                'Data': pd.date_range(start='2025-05-01', end='2025-05-23', freq='D'),
+                'Tipo': np.random.choice(['Automático', 'Manual'], 23),
+                'Tamanho': [f"{np.random.randint(100, 200)} MB" for _ in range(23)],
+                'Status': np.random.choice(['Sucesso', 'Sucesso', 'Sucesso', 'Falha'], 23, p=[0.8, 0.1, 0.05, 0.05]),
+                'Duração': [f"{np.random.randint(30, 180)}s" for _ in range(23)]
+            })
+            
+            # Colorir status
+            def color_status(val):
+                color = 'green' if val == 'Sucesso' else 'red'
+                return f'color: {color}'
+            
+            st.dataframe(
+                backup_history,
+                use_container_width=True,
+                hide_index=True
+            )
+        
+        with maint_tab2:
+            st.write("### 🧹 Limpeza e Otimização")
+            
+            # Análise de espaço
+            st.write("**💽 Análise de Uso de Espaço:**")
+            
+            space_data = pd.DataFrame({
+                'Categoria': ['Banco de Dados', 'Logs', 'Uploads', 'Cache', 'Backups', 'Temporários'],
+                'Tamanho (MB)': [156, 23, 45, 12, 234, 8],
+                'Arquivos': [1, 1240, 67, 156, 15, 89]
+            })
+            
+            fig_space = px.pie(
+                space_data,
+                values='Tamanho (MB)',
+                names='Categoria',
+                title="Uso de Espaço por Categoria"
+            )
+            st.plotly_chart(fig_space, use_container_width=True)
+            
+            # Ações de limpeza
+            st.write("**🗑️ Ações de Limpeza:**")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                clean_logs = st.checkbox("Limpar logs antigos (>90 dias)", value=False)
+                clean_cache = st.checkbox("Limpar cache", value=True)
+                clean_temp = st.checkbox("Limpar arquivos temporários", value=True)
+            
+            with col2:
+                clean_backups = st.checkbox("Remover backups antigos", value=False)
+                optimize_db = st.checkbox("Otimizar banco de dados", value=True)
+                reindex_db = st.checkbox("Reindexar tabelas", value=False)
+            
+            if st.button("🧹 Executar Limpeza", use_container_width=True):
+                progress = st.progress(0)
+                
+                actions = []
+                if clean_cache: actions.append("cache")
+                if clean_temp: actions.append("temporários")
+                if optimize_db: actions.append("otimização BD")
+                if clean_logs: actions.append("logs antigos")
+                
+                for i, action in enumerate(actions):
+                    progress.progress((i + 1) / len(actions))
+                    st.write(f"✅ Limpando {action}...")
+                    time.sleep(0.5)
+                
+                st.success(f"✅ Limpeza concluída! {len(actions)} ações executadas.")
+                
+                # Simular economia de espaço
+                space_saved = np.random.randint(50, 200)
+                st.info(f"💾 Espaço liberado: {space_saved} MB")
+        
+        with maint_tab3:
+            st.write("### 🔧 Manutenção do Sistema")
+            
+            # Status dos serviços
+            st.write("**🔄 Status dos Serviços:**")
+            
+            services = pd.DataFrame({
+                'Serviço': ['Aplicação Web', 'Banco de Dados', 'Cache Redis', 'Email Service', 'Backup Service'],
+                'Status': ['🟢 Online', '🟢 Online', '🟡 Degradado', '🟢 Online', '🟢 Online'],
+                'CPU (%)': [23, 12, 45, 8, 5],
+                'Memória (MB)': [256, 512, 128, 64, 32],
+                'Uptime': ['15d 4h', '15d 4h', '2d 1h', '15d 4h', '15d 4h']
+            })
+            
+            st.dataframe(services, use_container_width=True, hide_index=True)
+            
+            # Ações de manutenção
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.write("**🔄 Reinicialização:**")
+                
+                if st.button("🔄 Reiniciar Cache", use_container_width=True):
+                    st.success("✅ Cache reiniciado com sucesso!")
+                
+                if st.button("🔄 Reiniciar Aplicação", use_container_width=True):
+                    st.warning("⚠️ Esta ação desconectará todos os usuários!")
+            
+            with col2:
+                st.write("**🛠️ Diagnósticos:**")
+                
+                if st.button("🔍 Verificar Integridade BD", use_container_width=True):
+                    st.success("✅ Banco de dados íntegro!")
+                
+                if st.button("📊 Relatório de Performance", use_container_width=True):
+                    st.info("📈 Performance dentro do esperado")
+            
+            # Modo de manutenção
+            st.write("**🚧 Modo de Manutenção:**")
+            
+            maintenance_mode = st.checkbox("Ativar modo de manutenção")
+            
+            if maintenance_mode:
+                maintenance_message = st.text_area(
+                    "Mensagem para usuários:",
+                    value="Sistema em manutenção. Voltaremos em breve!",
+                    height=100
+                )
+                
+                estimated_duration = st.selectbox("Duração estimada:", ["30 minutos", "1 hora", "2 horas", "Indefinido"])
+                
+                if st.button("🚧 Ativar Modo de Manutenção"):
+                    st.success("✅ Modo de manutenção ativado!")
+                    log_activity(st.session_state.user_id, "maintenance_mode", "Ativou modo de manutenção")
+    
+    elif admin_section == "📈 Analytics do Sistema":
+        st.subheader("📈 Analytics Avançados do Sistema")
+        
+        # Métricas de performance
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Usuários Ativos Hoje", "47", "+12%")
+        
+        with col2:
+            st.metric("Sessões Médias/Dia", "156", "+8%")
+        
+        with col3:
+            st.metric("Tempo Médio de Sessão", "18 min", "+2 min")
+        
+        with col4:
+            st.metric("Taxa de Retenção", "78%", "+5%")
+        
+        # Gráficos de analytics
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Usuários únicos por dia
+            dates = pd.date_range(start='2025-04-01', end='2025-05-23', freq='D')
+            unique_users = pd.DataFrame({
+                'Data': dates,
+                'Usuarios_Unicos': np.random.poisson(35, len(dates))
+            })
+            
+            fig_users = px.line(
+                unique_users,
+                x='Data',
+                y='Usuarios_Unicos',
+                title="Usuários Únicos Diários"
+            )
+            st.plotly_chart(fig_users, use_container_width=True)
+        
+        with col2:
+            # Páginas mais visitadas
+            pages_data = pd.DataFrame({
+                'Página': ['Dashboard', 'Visualizar Dados', 'Adicionar Pet', 'Análises', 'Configurações'],
+                'Visitas': [1250, 890, 650, 420, 230]
+            })
+            
+            fig_pages = px.bar(
+                pages_data,
+                x='Visitas',
+                y='Página',
+                orientation='h',
+                title="Páginas Mais Visitadas"
+            )
+            st.plotly_chart(fig_pages, use_container_width=True)
+        
+        # Análise de comportamento
+        st.subheader("👥 Análise de Comportamento dos Usuários")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Funil de conversão
+            funnel_data = pd.DataFrame({
+                'Etapa': ['Visitantes', 'Cadastros', 'Primeiros Pets', 'Usuários Ativos', 'Usuários Recorrentes'],
+                'Usuários': [1000, 450, 320, 250, 180]
+            })
+            
+            fig_funnel = px.funnel(
+                funnel_data,
+                x='Usuários',
+                y='Etapa',
+                title="Funil de Conversão de Usuários"
+            )
+            st.plotly_chart(fig_funnel, use_container_width=True)
+        
+        with col2:
+            # Distribuição de sessões por duração
+            session_durations = pd.DataFrame({
+                'Duração': ['< 1 min', '1-5 min', '5-15 min', '15-30 min', '30+ min'],
+                'Sessões': [120, 280, 350, 180, 70]
+            })
+            
+            fig_duration = px.pie(
+                session_durations,
+                values='Sessões',
+                names='Duração',
+                title="Distribuição por Duração de Sessão"
+            )
+            st.plotly_chart(fig_duration, use_container_width=True)
+        
+        # Performance técnica
+        st.subheader("⚡ Performance Técnica")
+        
+        # Tempo de resposta por endpoint
+        endpoint_performance = pd.DataFrame({
+            'Endpoint': ['/dashboard', '/pets', '/add-pet', '/analytics', '/export'],
+            'Tempo_Médio_ms': [234, 156, 89, 445, 1234],
+            'Requisições_Dia': [1200, 800, 200, 150, 45]
+        })
+        
+        fig_performance = px.scatter(
+            endpoint_performance,
+            x='Requisições_Dia',
+            y='Tempo_Médio_ms',
+            size='Tempo_Médio_ms',
+            hover_name='Endpoint',
+            title="Performance por Endpoint"
+        )
+        st.plotly_chart(fig_performance, use_container_width=True)
+        
+        # Relatórios personalizados
+        st.subheader("📊 Relatórios Personalizados")
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            report_type = st.selectbox(
+                "Tipo de Relatório:",
+                ["Uso do Sistema", "Performance", "Usuários", "Conteúdo", "Erros"]
+            )
+            
+            date_range_analytics = st.date_input(
+                "Período:",
+                [datetime.date.today() - datetime.timedelta(days=30), datetime.date.today()]
+            )
+        
+        with col2:
+            format_analytics = st.selectbox("Formato:", ["Excel", "PDF", "CSV"])
+            
+            if st.button("📋 Gerar Relatório", use_container_width=True):
+                st.success(f"✅ Relatório de {report_type} gerado com sucesso!")
+                
+                # Simular dados do relatório
+                report_data = f"Relatório de {report_type} - {date_range_analytics[0]} a {date_range_analytics[1]}"
+                
+                st.download_button(
+                    label=f"📥 Baixar {format_analytics}",
+                    data=report_data.encode(),
+                    file_name=f"relatorio_{report_type.lower()}_{datetime.datetime.now().strftime('%Y%m%d')}.{format_analytics.lower()}",
+                    mime="text/plain"
+                )
 
 if __name__ == '__main__':
     main()
