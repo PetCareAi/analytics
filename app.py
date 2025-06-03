@@ -511,578 +511,67 @@ def verify_password(stored_hash, provided_password):
     return stored_hash == hashlib.sha256(provided_password.encode()).hexdigest()
 
 def authenticate_user(email, password):
-    """Autentica um usuário no sistema."""
+    """Autentica um usuário com email e senha."""
     try:
-        # Hash da senha fornecida
-        password_hash = generate_password_hash(password)
-        
-        # Buscar usuário no banco
-        result = supabase.table('users_analytics').select('*').eq('email', email).eq('password_hash', password_hash).execute()
+        # Buscar usuário por email
+        result = supabase.table('users_analytics').select('*').eq('email', email).execute()
         
         if result.data and len(result.data) > 0:
             user = result.data[0]
             
-            # Registrar log de login bem-sucedido
-            try:
-                log_login_attempt(user['id'], True, st.session_state.get('client_ip', 'unknown'))
-            except Exception as log_error:
-                print(f"Erro ao registrar log de login: {log_error}")
-            
-            return True, user
-        else:
-            # Registrar log de login falhado
-            try:
-                log_login_attempt(None, False, st.session_state.get('client_ip', 'unknown'), 'Credenciais inválidas')
-            except Exception as log_error:
-                print(f"Erro ao registrar log de login falho: {log_error}")
-            
-            return False, None
-            
+            if verify_password(user['password_hash'], password):
+                user_id = user['id']
+                role = user['role']
+                full_name = user['full_name']
+                
+                # Atualizar último login
+                supabase.table('users_analytics').update({
+                    'last_login': datetime.datetime.now().isoformat()
+                }).eq('id', user_id).execute()
+                
+                # Registrar login bem-sucedido
+                log_data = {
+                    'user_id': user_id,
+                    'success': True,
+                    'ip_address': '127.0.0.1'  # Em produção, obter IP real
+                }
+                supabase.table('login_logs_analytics').insert(log_data).execute()
+                
+                return True, user_id, role
+            else:
+                # Registrar tentativa de login mal-sucedida
+                log_data = {
+                    'user_id': user['id'],
+                    'success': False,
+                    'failure_reason': 'Wrong password',
+                    'ip_address': '127.0.0.1'
+                }
+                supabase.table('login_logs_analytics').insert(log_data).execute()
+        
+        return False, None, None
+        
     except Exception as e:
         print(f"Erro na autenticação: {e}")
-        return False, None
-
-def log_login_attempt(user_id, success, ip_address, failure_reason=""):
-    """Registra tentativa de login."""
-    try:
-        log_data = {
-            'user_id': user_id,
-            'success': success,
-            'ip_address': ip_address,
-            'timestamp': datetime.datetime.now().isoformat(),
-            'failure_reason': failure_reason
-        }
-        
-        result = supabase.table('login_logs_analytics').insert(log_data).execute()
-        return result.data is not None
-        
-    except Exception as e:
-        print(f"Erro ao registrar log de login: {e}")
-        return False
-
-
-def login_page():
-    """Página de login do sistema."""
-    
-    # CSS específico para login
-    st.markdown("""
-        <style>
-        .login-container {
-            max-width: 400px;
-            margin: 2rem auto;
-            padding: 2rem;
-            background: white;
-            border-radius: 10px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-        
-        .login-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-        
-        .login-header h1 {
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-        
-        .login-header p {
-            color: #666;
-            margin: 0;
-        }
-        
-        .login-form {
-            margin: 1rem 0;
-        }
-        
-        .login-footer {
-            text-align: center;
-            margin-top: 2rem;
-            padding-top: 1rem;
-            border-top: 1px solid #eee;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-    
-    # Layout centralizado
-    col1, col2, col3 = st.columns([1, 2, 1])
-    
-    with col2:
-        # Header
-        st.markdown("""
-            <div class="login-header">
-                <h1>🐾 PetCare AI Analytics</h1>
-                <p>Sistema de Gestão e Analytics para Pets</p>
-            </div>
-        """, unsafe_allow_html=True)
-        
-        # Abas de Login e Registro
-        tab1, tab2 = st.tabs(["🔑 Login", "📝 Cadastro"])
-        
-        with tab1:
-            # Formulário de Login
-            with st.form("login_form", clear_on_submit=False):
-                st.markdown("### Fazer Login")
-                
-                email = st.text_input(
-                    "Email:",
-                    placeholder="seu@email.com",
-                    key="login_email"
-                )
-                
-                password = st.text_input(
-                    "Senha:",
-                    type="password",
-                    placeholder="Digite sua senha",
-                    key="login_password"
-                )
-                
-                remember_me = st.checkbox("Lembrar de mim", key="remember_me")
-                
-                login_button = st.form_submit_button(
-                    "🔑 Entrar",
-                    use_container_width=True,
-                    type="primary"
-                )
-                
-                if login_button:
-                    if email and password:
-                        with st.spinner("Verificando credenciais..."):
-                            success, user_data = authenticate_user(email, password)
-                            
-                            if success:
-                                # Salvar dados na sessão
-                                st.session_state.logged_in = True
-                                st.session_state.user_id = user_data['id']
-                                st.session_state.user_email = user_data['email']
-                                st.session_state.user_name = user_data.get('full_name', email)
-                                st.session_state.user_role = user_data.get('role', 'user')
-                                st.session_state.session_id = str(uuid.uuid4())
-                                
-                                # Atualizar último login
-                                try:
-                                    supabase.table('users_analytics').update({
-                                        'last_login': datetime.datetime.now().isoformat()
-                                    }).eq('id', user_data['id']).execute()
-                                except:
-                                    pass  # Não crítico se falhar
-                                
-                                # Log da atividade
-                                log_activity(user_data['id'], "login", "Login realizado com sucesso")
-                                
-                                st.success("✅ Login realizado com sucesso!")
-                                time.sleep(1)
-                                st.rerun()
-                            else:
-                                st.error("❌ Email ou senha incorretos.")
-                    else:
-                        st.error("❌ Por favor, preencha todos os campos.")
-        
-        with tab2:
-            # Formulário de Registro
-            with st.form("register_form", clear_on_submit=True):
-                st.markdown("### Criar Conta")
-                
-                reg_name = st.text_input(
-                    "Nome Completo:",
-                    placeholder="Seu nome completo",
-                    key="reg_name"
-                )
-                
-                reg_email = st.text_input(
-                    "Email:",
-                    placeholder="seu@email.com",
-                    key="reg_email"
-                )
-                
-                reg_password = st.text_input(
-                    "Senha:",
-                    type="password",
-                    placeholder="Mínimo 6 caracteres",
-                    key="reg_password"
-                )
-                
-                reg_password_confirm = st.text_input(
-                    "Confirmar Senha:",
-                    type="password",
-                    placeholder="Digite a senha novamente",
-                    key="reg_password_confirm"
-                )
-                
-                terms_accepted = st.checkbox(
-                    "Aceito os termos de uso e política de privacidade",
-                    key="terms_accepted"
-                )
-                
-                register_button = st.form_submit_button(
-                    "📝 Criar Conta",
-                    use_container_width=True,
-                    type="secondary"
-                )
-                
-                if register_button:
-                    if not all([reg_name, reg_email, reg_password, reg_password_confirm]):
-                        st.error("❌ Por favor, preencha todos os campos.")
-                    elif reg_password != reg_password_confirm:
-                        st.error("❌ As senhas não coincidem.")
-                    elif len(reg_password) < 6:
-                        st.error("❌ A senha deve ter pelo menos 6 caracteres.")
-                    elif not terms_accepted:
-                        st.error("❌ Você deve aceitar os termos de uso.")
-                    elif not re.match(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$', reg_email):
-                        st.error("❌ Por favor, insira um email válido.")
-                    else:
-                        with st.spinner("Criando conta..."):
-                            success, result = register_new_user(reg_email, reg_password, reg_name, 'user')
-                            
-                            if success:
-                                st.success("✅ Conta criada com sucesso! Faça login para continuar.")
-                                time.sleep(2)
-                                st.rerun()
-                            else:
-                                if "já está em uso" in str(result):
-                                    st.error("❌ Este email já está cadastrado.")
-                                else:
-                                    st.error(f"❌ Erro ao criar conta: {result}")
-        
-        # Informações adicionais
-        st.markdown("---")
-        
-        with st.expander("ℹ️ Informações do Sistema"):
-            st.markdown("""
-            **PetCare AI Analytics** é um sistema completo para gestão de pets e análise de dados.
-            
-            **Funcionalidades:**
-            - 📊 Dashboard interativo
-            - 🐾 Cadastro completo de pets
-            - 📈 Analytics avançado com IA
-            - 📄 Relatórios personalizados
-            - 💾 Import/Export de dados
-            - 🔒 Sistema seguro de usuários
-            
-            **Suporte:** Entre em contato conosco em caso de dúvidas.
-            """)
-        
-        # Credenciais de demonstração
-        with st.expander("🎮 Credenciais de Demonstração"):
-            st.markdown("""
-            **Para testar o sistema, use:**
-            
-            **Administrador:**
-            - Email: `admin@petcare.com`
-            - Senha: `admin123`
-            
-            **Obs:** Essas credenciais são apenas para demonstração.
-            """)
-        
-        # Footer
-        st.markdown("""
-            <div class="login-footer">
-                <p style="color: #666; font-size: 0.8rem;">
-                    © 2024 PetCare AI Analytics | Versão 2.0<br>
-                    Desenvolvido com ❤️ para o cuidado animal
-                </p>
-            </div>
-        """, unsafe_allow_html=True)
-
-def logout_user():
-    """Faz logout do usuário atual."""
-    try:
-        # Registrar logout se houver usuário logado
-        if st.session_state.get('logged_in', False):
-            user_id = st.session_state.get('user_id')
-            if user_id:
-                log_activity(user_id, "logout", "Logout realizado")
-        
-        # Limpar todas as variáveis de sessão
-        keys_to_keep = []  # Pode manter algumas chaves se necessário
-        
-        for key in list(st.session_state.keys()):
-            if key not in keys_to_keep:
-                del st.session_state[key]
-        
-        # Garantir que logged_in seja False
-        st.session_state.logged_in = False
-        
-        return True
-        
-    except Exception as e:
-        print(f"Erro no logout: {e}")
-        return False
-
-
-def check_user_permissions(required_role='user'):
-    """Verifica se o usuário tem permissão para acessar uma funcionalidade."""
-    
-    if not st.session_state.get('logged_in', False):
-        return False
-    
-    user_role = st.session_state.get('user_role', 'user')
-    
-    # Hierarquia de permissões
-    role_hierarchy = {
-        'guest': 0,
-        'user': 1,
-        'admin': 2
-    }
-    
-    user_level = role_hierarchy.get(user_role, 0)
-    required_level = role_hierarchy.get(required_role, 1)
-    
-    return user_level >= required_level
-
-
-def require_login(func):
-    """Decorator para garantir que o usuário esteja logado."""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not st.session_state.get('logged_in', False):
-            st.warning("🔒 Você precisa fazer login para acessar esta página.")
-            login_page()
-            return None
-        return func(*args, **kwargs)
-    return wrapper
-
-
-def require_admin(func):
-    """Decorator para garantir que o usuário seja admin."""
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        if not check_user_permissions('admin'):
-            st.error("🚫 Acesso negado. Apenas administradores podem acessar esta funcionalidade.")
-            return None
-        return func(*args, **kwargs)
-    return wrapper
-
+        return False, None, None
 
 def log_activity(user_id, action, details="", execution_time=None):
-    """Registra atividade do usuário."""
+    """Registra uma atividade de usuário no Supabase."""
     try:
+        session_id = st.session_state.get("session_id", str(uuid.uuid4()))
+        
         log_data = {
             'user_id': user_id,
             'action': action,
             'details': details,
-            'timestamp': datetime.datetime.now().isoformat(),
-            'session_id': st.session_state.get('session_id', str(uuid.uuid4())),
-            'execution_time': execution_time
+            'session_id': session_id,
+            'execution_time': execution_time,
+            'ip_address': '127.0.0.1'  # Em produção, obter IP real
         }
         
-        result = supabase.table('activity_logs_analytics').insert(log_data).execute()
-        return result.data is not None
+        supabase.table('activity_logs_analytics').insert(log_data).execute()
         
     except Exception as e:
-        print(f"Erro ao registrar log: {e}")
-        return False
-
-def pets_list_page():
-    """Página da lista de pets."""
-    st.title("📋 Lista de Pets")
-    
-    # Carregar dados
-    df = load_pets_data()
-    
-    if df.empty:
-        st.info("📭 Nenhum pet cadastrado ainda.")
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("➕ Adicionar Primeiro Pet", use_container_width=True):
-                st.session_state.current_page = 'add_pet'
-                st.rerun()
-        
-        with col2:
-            if st.button("📥 Importar Dados", use_container_width=True):
-                st.session_state.current_page = 'import_export'
-                st.rerun()
-        return
-    
-    # Filtros
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        search_term = st.text_input("🔍 Buscar pet:", placeholder="Nome, raça, etc...")
-    
-    with col2:
-        if 'tipo_pet' in df.columns:
-            tipo_filter = st.selectbox("Tipo:", ["Todos"] + list(df['tipo_pet'].unique()))
-        else:
-            tipo_filter = "Todos"
-    
-    with col3:
-        if 'regiao' in df.columns:
-            regiao_filter = st.selectbox("Região:", ["Todas"] + list(df['regiao'].unique()))
-        else:
-            regiao_filter = "Todas"
-    
-    with col4:
-        status_filter = st.selectbox("Status:", ["Todos", "Disponível", "Adotado"])
-    
-    # Aplicar filtros
-    df_filtered = df.copy()
-    
-    if search_term:
-        search_columns = ['nome', 'raca', 'tipo_pet']
-        available_search_cols = [col for col in search_columns if col in df_filtered.columns]
-        
-        if available_search_cols:
-            mask = False
-            for col in available_search_cols:
-                mask |= df_filtered[col].str.contains(search_term, case=False, na=False)
-            df_filtered = df_filtered[mask]
-    
-    if tipo_filter != "Todos" and 'tipo_pet' in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered['tipo_pet'] == tipo_filter]
-    
-    if regiao_filter != "Todas" and 'regiao' in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered['regiao'] == regiao_filter]
-    
-    if status_filter != "Todos":
-        if 'adotado' in df_filtered.columns:
-            if status_filter == "Adotado":
-                df_filtered = df_filtered[df_filtered['adotado'] == True]
-            else:  # Disponível
-                df_filtered = df_filtered[df_filtered['adotado'] != True]
-    
-    # Exibir resultados
-    st.subheader(f"📊 {len(df_filtered)} pet(s) encontrado(s)")
-    
-    if len(df_filtered) > 0:
-        # Configurar colunas para exibição
-        display_columns = ['nome', 'tipo_pet', 'raca', 'idade', 'sexo', 'regiao']
-        available_columns = [col for col in display_columns if col in df_filtered.columns]
-        
-        # Adicionar coluna de ações
-        df_display = df_filtered[available_columns].copy()
-        
-        st.dataframe(
-            df_display,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "nome": "Nome",
-                "tipo_pet": "Tipo",
-                "raca": "Raça", 
-                "idade": st.column_config.NumberColumn("Idade", format="%d anos"),
-                "sexo": "Sexo",
-                "regiao": "Região"
-            }
-        )
-        
-        # Botões de ação
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("📊 Ver Analytics", use_container_width=True):
-                st.session_state.current_page = 'analytics'
-                st.rerun()
-        
-        with col2:
-            if st.button("📄 Gerar Relatório", use_container_width=True):
-                st.session_state.current_page = 'reports'
-                st.rerun()
-        
-        with col3:
-            if st.button("📥 Exportar Lista", use_container_width=True):
-                csv_data = df_filtered.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="Baixar CSV",
-                    data=csv_data,
-                    file_name=f"pets_lista_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv"
-                )
-    else:
-        st.info("📭 Nenhum pet encontrado com os filtros aplicados.")
-
-
-def analytics_page():
-    """Página de analytics avançado."""
-    st.title("📈 Analytics Avançado")
-    
-    df = load_pets_data()
-    
-    if df.empty:
-        st.info("📊 Dados insuficientes para análise. Adicione alguns pets primeiro.")
-        return
-    
-    st.success(f"✅ Analisando dados de {len(df)} pets")
-    
-    # Análise básica
-    st.subheader("📊 Análise Descritiva")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if 'idade' in df.columns:
-            df['idade'] = pd.to_numeric(df['idade'], errors='coerce')
-            st.write("**Estatísticas de Idade:**")
-            st.write(df['idade'].describe())
-    
-    with col2:
-        if 'peso' in df.columns:
-            df['peso'] = pd.to_numeric(df['peso'], errors='coerce')
-            st.write("**Estatísticas de Peso:**")
-            st.write(df['peso'].describe())
-    
-    # Mais análises podem ser adicionadas aqui
-    st.info("🚧 Funcionalidades avançadas de analytics em desenvolvimento.")
-
-
-def reports_page():
-    """Página de relatórios."""
-    st.title("📄 Relatórios")
-    
-    df = load_pets_data()
-    
-    if df.empty:
-        st.info("📊 Nenhum dado disponível para relatórios.")
-        return
-    
-    st.success(f"✅ Dados carregados: {len(df)} pets")
-    
-    # Opções de relatório
-    report_type = st.selectbox(
-        "Tipo de Relatório:",
-        ["Relatório Geral", "Relatório de Adoções", "Relatório por Região", "Relatório Personalizado"]
-    )
-    
-    if report_type == "Relatório Geral":
-        st.subheader("📊 Relatório Geral de Pets")
-        
-        # Estatísticas básicas
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            st.metric("Total de Pets", len(df))
-        
-        with col2:
-            if 'adotado' in df.columns:
-                adotados = df['adotado'].sum() if df['adotado'].dtype == bool else 0
-            else:
-                adotados = 0
-            st.metric("Pets Adotados", adotados)
-        
-        with col3:
-            st.metric("Disponíveis", len(df) - adotados)
-        
-        # Tabela resumida
-        st.subheader("📋 Resumo dos Dados")
-        
-        display_columns = ['nome', 'tipo_pet', 'raca', 'idade', 'sexo']
-        available_columns = [col for col in display_columns if col in df.columns]
-        
-        st.dataframe(df[available_columns], use_container_width=True, hide_index=True)
-        
-        # Download
-        csv_data = df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            "📥 Baixar Relatório Completo",
-            data=csv_data,
-            file_name=f"relatorio_geral_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
-    
-    else:
-        st.info("🚧 Este tipo de relatório será implementado em breve.")
+        print(f"Erro ao registrar atividade: {e}")
 
 def get_user_info(user_id):
     """Obtém informações do usuário pelo ID."""
@@ -1105,39 +594,28 @@ def get_user_info(user_id):
         print(f"Erro ao obter informações do usuário: {e}")
         return None
 
-def register_new_user(email, password, full_name, role='user'):
-    """Registra um novo usuário no sistema."""
+def register_new_user(email, password, full_name, role="user"):
+    """Registra um novo usuário no Supabase."""
     try:
-        # Verificar se email já existe
-        existing_user = supabase.table('users_analytics').select('id').eq('email', email).execute()
+        password_hash = hash_password(password)
         
-        if existing_user.data:
-            return False, "Email já está em uso"
-        
-        # Hash da senha
-        password_hash = generate_password_hash(password)
-        
-        # Dados do novo usuário
         user_data = {
-            'email': email,
-            'password_hash': password_hash,
-            'full_name': full_name,
-            'role': role,
-            'created_at': datetime.datetime.now().isoformat()
+            "email": email,
+            "password_hash": password_hash,
+            "full_name": full_name,
+            "role": role
         }
         
-        # Inserir no banco
         result = supabase.table('users_analytics').insert(user_data).execute()
         
         if result.data:
-            user_id = result.data[0]['id']
-            return True, user_id
+            return True, result.data[0]['id']
         else:
-            return False, "Erro ao criar usuário"
+            return False, None
             
     except Exception as e:
         print(f"Erro ao registrar usuário: {e}")
-        return False, str(e)
+        return False, None
 
 def change_password(user_id, current_password, new_password):
     """Altera a senha de um usuário após verificar a senha atual."""
@@ -4774,465 +4252,270 @@ def exportar_importar_dados(df):
                 if st.button("🔄 Configurar Sincronização"):
                     st.success("Configurações salvas! A sincronização será ativada em versão futura.")
 
-
-def inject_custom_css():
-    """Injeta CSS personalizado na aplicação."""
-    st.markdown("""
-        <style>
-        /* Estilo geral */
-        .main .block-container {
-            padding-top: 2rem;
-            padding-bottom: 2rem;
-        }
-        
-        /* Sidebar */
-        .css-1d391kg {
-            background-color: #f0f2f6;
-        }
-        
-        /* Métricas */
-        .metric-container {
-            background-color: white;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-            margin: 0.5rem 0;
-        }
-        
-        /* Cards de notificação */
-        .notification-card {
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin: 0.5rem 0;
-        }
-        
-        /* Botões customizados */
-        .stButton > button {
-            width: 100%;
-            border-radius: 0.5rem;
-            border: none;
-            padding: 0.5rem 1rem;
-            font-weight: 500;
-            transition: all 0.3s ease;
-        }
-        
-        .stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        
-        /* Tabelas */
-        .dataframe {
-            border: none !important;
-        }
-        
-        .dataframe th {
-            background-color: #f8f9fa !important;
-            border: none !important;
-            padding: 12px !important;
-            font-weight: 600 !important;
-        }
-        
-        .dataframe td {
-            border: none !important;
-            padding: 12px !important;
-        }
-        
-        /* Gráficos */
-        .plotly-graph-div {
-            border-radius: 0.5rem;
-            overflow: hidden;
-        }
-        
-        /* Formulários */
-        .stTextInput > div > div > input,
-        .stSelectbox > div > div > select,
-        .stTextArea > div > div > textarea {
-            border-radius: 0.5rem;
-            border: 1px solid #ddd;
-        }
-        
-        /* Headers personalizados */
-        .custom-header {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 1rem;
-            border-radius: 0.5rem;
-            margin: 1rem 0;
-            text-align: center;
-        }
-        
-        /* Status badges */
-        .status-badge {
-            padding: 0.25rem 0.5rem;
-            border-radius: 1rem;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-        
-        .status-disponivel {
-            background-color: #d4edda;
-            color: #155724;
-        }
-        
-        .status-adotado {
-            background-color: #cce7ff;
-            color: #004085;
-        }
-        
-        .status-pendente {
-            background-color: #fff3cd;
-            color: #856404;
-        }
-        
-        /* Animações */
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .fade-in {
-            animation: fadeIn 0.5s ease-in;
-        }
-        
-        /* Responsividade */
-        @media (max-width: 768px) {
-            .main .block-container {
-                padding-left: 1rem;
-                padding-right: 1rem;
-            }
-        }
-        
-        /* Score badges */
-        .score-high { color: #28a745; font-weight: bold; }
-        .score-medium { color: #ffc107; font-weight: bold; }
-        .score-low { color: #dc3545; font-weight: bold; }
-        
-        /* Sidebar navigation */
-        .nav-item {
-            padding: 0.5rem 1rem;
-            margin: 0.25rem 0;
-            border-radius: 0.5rem;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .nav-item:hover {
-            background-color: #e9ecef;
-        }
-        
-        .nav-item.active {
-            background-color: #007bff;
-            color: white;
-        }
-        </style>
-    """, unsafe_allow_html=True)
-
-def create_sidebar():
-    """Cria a sidebar com navegação e informações do usuário."""
-    
-    # Informações do usuário
-    st.markdown("### 👤 Usuário Logado")
-    
-    user_email = st.session_state.get('user_email', 'Usuário')
-    user_role = st.session_state.get('user_role', 'user')
-    
-    st.write(f"**Email:** {user_email}")
-    st.write(f"**Papel:** {user_role.title()}")
-    
-    st.divider()
-    
-    # Menu de navegação
-    st.markdown("### 🧭 Navegação")
-    
-    # Páginas disponíveis
-    pages = {
-        'dashboard': {'label': '📊 Dashboard', 'icon': '📊'},
-        'add_pet': {'label': '➕ Adicionar Pet', 'icon': '➕'},
-        'pets_list': {'label': '📋 Lista de Pets', 'icon': '📋'},
-        'analytics': {'label': '📈 Analytics', 'icon': '📈'},
-        'reports': {'label': '📄 Relatórios', 'icon': '📄'},
-        'import_export': {'label': '💾 Import/Export', 'icon': '💾'}
-    }
-    
-    # Adicionar páginas de admin se o usuário for admin
-    if user_role == 'admin':
-        pages['admin'] = {'label': '⚙️ Admin', 'icon': '⚙️'}
-    
-    # Página atual
-    current_page = st.session_state.get('current_page', 'dashboard')
-    
-    # Criar botões de navegação
-    for page_key, page_info in pages.items():
-        if st.button(
-            page_info['label'], 
-            key=f"nav_{page_key}",
-            use_container_width=True,
-            type="primary" if page_key == current_page else "secondary"
-        ):
-            st.session_state.current_page = page_key
-            st.rerun()
-    
-    st.divider()
-    
-    # Estatísticas rápidas
-    st.markdown("### 📊 Resumo Rápido")
-    
-    try:
-        # Buscar estatísticas básicas
-        pets_result = supabase.table('pets_analytics').select('id, adotado').execute()
-        
-        if pets_result.data:
-            total_pets = len(pets_result.data)
-            adotados = sum(1 for pet in pets_result.data if pet.get('adotado', False))
-            disponiveis = total_pets - adotados
-            
-            st.metric("Total de Pets", total_pets)
-            st.metric("Adotados", adotados)
-            st.metric("Disponíveis", disponiveis)
-        else:
-            st.info("Nenhum pet cadastrado")
-            
-    except Exception as e:
-        st.error(f"Erro ao carregar estatísticas: {e}")
-    
-    st.divider()
-    
-    # Ações rápidas
-    st.markdown("### ⚡ Ações Rápidas")
-    
-    if st.button("🔄 Atualizar Dados", use_container_width=True):
-        st.session_state.force_refresh = True
-        st.rerun()
-    
-    if st.button("📥 Backup Rápido", use_container_width=True):
-        st.session_state.current_page = 'import_export'
-        st.rerun()
-    
-    st.divider()
-    
-    # Logout
-    if st.button("🚪 Logout", use_container_width=True, type="secondary"):
-        logout_success = logout_user()
-        if logout_success:
-            st.success("✅ Logout realizado com sucesso!")
-            time.sleep(1)
-        st.rerun()
-    
-    # Versão do sistema
-    st.markdown("---")
-    st.caption("PetCare AI Analytics v2.0")
-    st.caption("Powered by Supabase")
-
-def dashboard_page(df, notifications):
-    """Página principal do dashboard."""
-    
-    # Título principal
-    st.title("🐾 PetCare AI Analytics - Dashboard")
-    
-    # Exibir notificações
-    if notifications:
-        st.subheader("🔔 Notificações do Sistema")
-        
-        for notification in notifications[:5]:  # Mostrar apenas as 5 primeiras
-            icon_map = {
-                'success': '✅',
-                'warning': '⚠️', 
-                'error': '❌',
-                'info': 'ℹ️'
-            }
-            
-            icon = icon_map.get(notification['tipo'], 'ℹ️')
-            
-            if notification['tipo'] == 'success':
-                st.success(f"{icon} **{notification['titulo']}** - {notification['descricao']}")
-            elif notification['tipo'] == 'warning':
-                st.warning(f"{icon} **{notification['titulo']}** - {notification['descricao']}")
-            elif notification['tipo'] == 'error':
-                st.error(f"{icon} **{notification['titulo']}** - {notification['descricao']}")
-            else:
-                st.info(f"{icon} **{notification['titulo']}** - {notification['descricao']}")
-    
-    # Verificar se há dados
-    if df.empty:
-        st.info("📊 **Bem-vindo ao PetCare AI Analytics!**")
-        st.write("Você ainda não tem pets cadastrados. Comece:")
-        
-        col1, col2, col3 = st.columns(3)
-        
-        with col1:
-            if st.button("➕ Adicionar Pet", use_container_width=True):
-                st.session_state.current_page = 'add_pet'
-                st.rerun()
-        
-        with col2:
-            if st.button("📥 Importar Dados", use_container_width=True):
-                st.session_state.current_page = 'import_export'
-                st.rerun()
-        
-        with col3:
-            if st.button("📖 Ver Tutorial", use_container_width=True):
-                st.session_state.show_tutorial = True
-                st.rerun()
-        
-        # Tutorial básico
-        if st.session_state.get('show_tutorial', False):
-            with st.expander("📖 Como começar", expanded=True):
-                st.write("""
-                **1. Adicionar Pets:** Use o botão "Adicionar Pet" para cadastrar seus primeiros pets.
-                
-                **2. Importar Dados:** Se você já tem uma planilha com dados, use "Importar Dados".
-                
-                **3. Análises:** Com dados cadastrados, você terá acesso a:
-                - 📊 Dashboard com estatísticas
-                - 🔍 Analytics avançado 
-                - 📈 Relatórios personalizados
-                - 🤖 Insights de IA
-                
-                **4. Gerenciamento:** Use a lista de pets para editar informações e acompanhar adoções.
-                """)
-                
-                if st.button("Fechar Tutorial"):
-                    st.session_state.show_tutorial = False
-                    st.rerun()
-        
-        return
-    
-    # KPIs principais
-    st.subheader("📊 Indicadores Principais")
-    
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        total_pets = len(df)
-        st.metric("Total de Pets", total_pets)
-    
-    with col2:
-        if 'adotado' in df.columns:
-            adotados = df['adotado'].sum() if df['adotado'].dtype == bool else len(df[df['adotado'] == True])
-        else:
-            adotados = 0
-        st.metric("Pets Adotados", adotados)
-    
-    with col3:
-        disponivel = total_pets - adotados
-        st.metric("Disponíveis", disponivel)
-    
-    with col4:
-        if adotados > 0 and total_pets > 0:
-            taxa_adocao = (adotados / total_pets) * 100
-        else:
-            taxa_adocao = 0
-        st.metric("Taxa de Adoção", f"{taxa_adocao:.1f}%")
-    
-    # Gráficos principais
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("🐕 Distribuição por Tipo")
-        if 'tipo_pet' in df.columns:
-            tipo_counts = df['tipo_pet'].value_counts()
-            fig = px.pie(values=tipo_counts.values, names=tipo_counts.index)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Dados de tipo de pet não disponíveis")
-    
-    with col2:
-        st.subheader("📍 Distribuição por Região")
-        if 'regiao' in df.columns:
-            regiao_counts = df['regiao'].value_counts()
-            fig = px.bar(x=regiao_counts.index, y=regiao_counts.values)
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.info("Dados de região não disponíveis")
-    
-    # Pets recentes
-    st.subheader("🆕 Pets Recém-Cadastrados")
-    
-    if 'created_at' in df.columns:
-        df_sorted = df.sort_values('created_at', ascending=False)
-        recent_pets = df_sorted.head(5)
-        
-        if len(recent_pets) > 0:
-            display_columns = ['nome', 'tipo_pet', 'raca', 'idade', 'created_at']
-            available_columns = [col for col in display_columns if col in recent_pets.columns]
-            
-            st.dataframe(
-                recent_pets[available_columns],
-                use_container_width=True,
-                hide_index=True
-            )
-        else:
-            st.info("Nenhum pet encontrado")
-    else:
-        st.info("Dados de data de cadastro não disponíveis")
-
 def main():
-    """Função principal da aplicação."""
-    
-    # Inicializar banco de dados
+    """Função principal aprimorada."""
+    # Inicializar o banco de dados
     init_database()
     
-    # Configurar página
+    # Configuração da página
     st.set_page_config(
-        page_title="🐾 PetCare AI Analytics",
+        page_title="PetCare Analytics - Sistema Avançado com IA",
         page_icon="🐾",
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
-    # CSS personalizado
-    inject_custom_css()
+    # Verificar se há sessão persistente
+    if "user_id" not in st.session_state:
+        # Tentar recuperar sessão do query params ou cookies simulados
+        query_params = st.query_params
+        
+        # Verificar se há um token de sessão nos query params
+        if "session_token" in query_params:
+            try:
+                # Simular validação de token (em produção, validar no banco)
+                session_token = query_params["session_token"]
+                if session_token == "demo_session":  # Token demo
+                    st.session_state.user_id = 1
+                    st.session_state.user_role = "admin"
+                    st.session_state.user_info = {
+                        "email": "admin@petcare.com",
+                        "full_name": "Administrador",
+                        "role": "admin"
+                    }
+                    st.session_state.session_id = str(uuid.uuid4())
+            except:
+                pass
+        
+        # Verificar se há lembrete de login
+        if st.session_state.get("remember_login", False):
+            # Restaurar sessão anterior (simulado)
+            last_user = st.session_state.get("last_user_id")
+            if last_user:
+                user_info = get_user_info(last_user)
+                if user_info:
+                    st.session_state.user_id = last_user
+                    st.session_state.user_role = user_info["role"]
+                    st.session_state.user_info = user_info
+                    st.session_state.session_id = str(uuid.uuid4())
     
-    # Verificar autenticação
-    if not st.session_state.get('logged_in', False):
-        login_page()
+    # CSS personalizado global
+    st.markdown("""
+    <style>
+    .main-header {
+        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+        text-align: center;
+    }
+    .metric-card {
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        border-left: 4px solid #4CAF50;
+    }
+    .sidebar .stSelectbox > div > div {
+        background-color: #f8f9fa;
+    }
+    .stButton > button {
+        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #388E3C 0%, #4CAF50 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+    }
+    .alert-success {
+        background-color: #d4edda;
+        border-color: #c3e6cb;
+        color: #155724;
+        padding: 0.75rem 1.25rem;
+        margin-bottom: 1rem;
+        border: 1px solid transparent;
+        border-radius: 0.25rem;
+    }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #e8f5e8;
+        color: #2E7D32;
+        border-radius: 8px 8px 0 0;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #4CAF50;
+        color: white;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # Verificar se o usuário está logado
+    if "user_id" not in st.session_state or "user_role" not in st.session_state:
+        display_login_page()
         return
     
-    # Sidebar
-    with st.sidebar:
-        create_sidebar()
+    # Exibir cabeçalho
+    display_header()
     
-    # Conteúdo principal baseado na página selecionada
-    page = st.session_state.get('current_page', 'dashboard')
+    # Carregar dados do banco de dados
+    df = load_data_from_db()
     
-    if page == 'dashboard':
-        # Carregar dados dos pets
-        df = load_pets_data()
+    # Adicionar barra lateral para filtros e navegação
+    df_filtrado = apply_filters(df)
+    st.session_state.df_filtrado = df_filtrado
+    
+    # Menu de navegação principal expandido
+    st.sidebar.markdown("## 🚀 Navegação Principal")
+    
+    # Agrupar menus por categoria
+    menu_categoria = st.sidebar.radio(
+        "Categoria:",
+        ["📊 Análises", "📝 Gestão", "🔧 Ferramentas", "⚙️ Sistema"]
+    )
+    
+    if menu_categoria == "📊 Análises":
+        menu_opcao = st.sidebar.selectbox(
+            "Selecione:",
+            ["Dashboard", "Visualizar Dados", "Análises Avançadas", "IA Insights", "Mapa Interativo"]
+        )
+    elif menu_categoria == "📝 Gestão":
+        menu_opcao = st.sidebar.selectbox(
+            "Selecione:",
+            ["Adicionar Pet", "Editar Pets", "Gerenciar Adoções", "Relatórios"]
+        )
+    elif menu_categoria == "🔧 Ferramentas":
+        menu_opcao = st.sidebar.selectbox(
+            "Selecione:",
+            ["Exportar/Importar", "Backup/Restauração", "Migração de Dados"]
+        )
+    else:  # Sistema
+        menu_opcao = st.sidebar.selectbox(
+            "Selecione:",
+            ["Configurações do Usuário", "Painel de Administração" if st.session_state.user_role == "admin" else None]
+        )
+        menu_opcao = menu_opcao if menu_opcao else "Configurações do Usuário"
+    
+    # Menu de acesso rápido
+    st.sidebar.markdown("## ⚡ Acesso Rápido")
+    
+    col1, col2 = st.sidebar.columns(2)
+    
+    with col1:
+        if st.button("➕ Novo Pet", use_container_width=True):
+            st.session_state.quick_action = "Adicionar Pet"
+    
+    with col2:
+        if st.button("📊 Dashboard", use_container_width=True):
+            st.session_state.quick_action = "Dashboard"
+    
+    # Verificar ação rápida
+    if "quick_action" in st.session_state:
+        menu_opcao = st.session_state.quick_action
+        del st.session_state.quick_action
+    
+    # Estatísticas na sidebar
+    if not df.empty:
+        st.sidebar.markdown("## 📈 Estatísticas Rápidas")
         
-        # Verificar se há dados antes de gerar notificações
-        if not df.empty:
-            notifications = generate_smart_notifications(df)
+        with st.sidebar.container():
+            st.metric("Total de Pets", len(df))
+            
+            if 'adotado' in df.columns:
+                taxa_adocao = df['adotado'].mean() * 100
+                st.metric("Taxa de Adoção", f"{taxa_adocao:.1f}%")
+            
+            if 'score_adocao' in df.columns:
+                score_medio = df['score_adocao'].mean()
+                st.metric("Score Médio", f"{score_medio:.2f}")
+    
+    # Notificações e alertas
+    st.sidebar.markdown("## 🔔 Notificações")
+    
+    # Gerar notificações inteligentes
+    notifications = generate_smart_notifications(df)
+    
+    for notification in notifications[:3]:  # Máximo 3 notificações
+        if notification['type'] == 'warning':
+            st.sidebar.warning(f"⚠️ {notification['message']}")
+        elif notification['type'] == 'info':
+            st.sidebar.info(f"ℹ️ {notification['message']}")
         else:
-            notifications = [{
-                'tipo': 'info',
-                'titulo': '📊 Sistema Iniciado',
-                'descricao': 'Nenhum pet cadastrado ainda. Comece adicionando alguns pets!'
-            }]
+            st.sidebar.success(f"✅ {notification['message']}")
+    
+    # Botão de logout
+    st.sidebar.markdown("---")
+    
+    col1, col2 = st.sidebar.columns([1, 1])
+    
+    with col1:
+        if st.button("🔄 Atualizar", use_container_width=True):
+            st.rerun()
+    
+    with col2:
+        if st.button("📤 Sair", use_container_width=True):
+            # Limpar sessão
+            if "user_id" in st.session_state:
+                log_activity(st.session_state.user_id, "logout", "Logout do sistema")
+                
+                for key in list(st.session_state.keys()):
+                    del st.session_state[key]
+            
+            st.rerun()
+    
+    # Informações do sistema
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(
+        "<div style='text-align: center; font-size: 0.8rem; color: #666;'>"
+        "🐾 PetCare Analytics v2.0<br>"
+        "Sistema Avançado com IA<br>"
+        f"Usuário: {st.session_state.user_info['full_name']}<br>"
+        f"Última atualização: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}"
+        "</div>",
+        unsafe_allow_html=True
+    )
+    
+    # Navegar para a página escolhida
+    try:
+        if menu_opcao == "Dashboard":
+            display_dashboard(df, df_filtrado)
+        elif menu_opcao == "Visualizar Dados":
+            visualizar_dados(df)
+        elif menu_opcao == "Adicionar Pet":
+            adicionar_pet()
+        elif menu_opcao == "Análises Avançadas":
+            advanced_analytics(df)
+        elif menu_opcao == "Exportar/Importar":
+            exportar_importar_dados(df)
+        elif menu_opcao == "IA Insights":
+            ai_insights(df)
+        elif menu_opcao == "Mapa Interativo":
+            mapa_interativo(df)
+        elif menu_opcao == "Configurações do Usuário":
+            user_settings()
+        elif menu_opcao == "Painel de Administração" and st.session_state.user_role == "admin":
+            admin_panel()
+        else:
+            # Página padrão
+            display_dashboard(df, df_filtrado)
+    
+    except Exception as e:
+        st.error(f"❌ Erro ao carregar a página: {str(e)}")
+        st.info("🔄 Tente recarregar a página ou entre em contato com o administrador.")
         
-        dashboard_page(df, notifications)
-        
-    elif page == 'add_pet':
-        add_pet_page()
-        
-    elif page == 'pets_list':
-        pets_list_page()
-        
-    elif page == 'analytics':
-        analytics_page()
-        
-    elif page == 'reports':
-        reports_page()
-        
-    elif page == 'import_export':
-        exportar_importar_dados()
-        
-    elif page == 'admin':
-        admin_panel()
-        
-    else:
-        dashboard_page(pd.DataFrame(), [])
-
+        # Log do erro
+        if "user_id" in st.session_state:
+            log_activity(
+                st.session_state.user_id, 
+                "error", 
+                f"Erro na página {menu_opcao}: {str(e)}"
+            )
 
 def generate_smart_notifications(df):
     """Gera notificações inteligentes baseadas nos dados dos pets."""
