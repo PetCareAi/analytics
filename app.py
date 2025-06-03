@@ -4311,59 +4311,269 @@ def main():
                     st.session_state.user_info = user_info
                     st.session_state.session_id = str(uuid.uuid4())
     
-    # CSS personalizado global
+    # CSS personalizado global com fundo verde claro e melhor contraste
     st.markdown("""
     <style>
+    /* Fundo principal verde claro */
+    .main .block-container {
+        background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e8 100%);
+        color: #2e2e2e !important;
+        padding: 1rem;
+        border-radius: 10px;
+    }
+    
+    /* Texto principal escuro para contraste */
+    .main, .main p, .main span, .main div, .main h1, .main h2, .main h3 {
+        color: #2e2e2e !important;
+    }
+    
+    /* Cabeçalho do sistema */
     .main-header {
         background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
-        color: white;
+        color: white !important;
         padding: 1rem;
         border-radius: 10px;
         margin-bottom: 1rem;
         text-align: center;
     }
+    
+    /* Cards de métricas com fundo branco e texto escuro */
     .metric-card {
         background: white;
         padding: 1rem;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         border-left: 4px solid #4CAF50;
+        color: #2e2e2e !important;
     }
+    
+    /* Melhorar contraste em cards personalizados */
+    .card-container {
+        background: white !important;
+        color: #2e2e2e !important;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+        border-left: 5px solid #4CAF50;
+    }
+    
+    .card-title {
+        color: #2e7d32 !important;
+        font-size: 1.2rem;
+        font-weight: bold;
+        margin-bottom: 1rem;
+    }
+    
+    .card-content {
+        color: #424242 !important;
+    }
+    
+    /* Sidebar com melhor contraste */
     .sidebar .stSelectbox > div > div {
         background-color: #f8f9fa;
+        color: #2e2e2e !important;
     }
+    
+    /* Botões com gradiente verde */
     .stButton > button {
         background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
-        color: white;
+        color: white !important;
         border: none;
         border-radius: 5px;
         transition: all 0.3s ease;
+        font-weight: 500;
     }
+    
     .stButton > button:hover {
         background: linear-gradient(135deg, #388E3C 0%, #4CAF50 100%);
         transform: translateY(-2px);
         box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
     }
+    
+    /* Inputs de formulário com melhor contraste */
+    .stTextInput > div > div > input {
+        background-color: white !important;
+        color: #2e2e2e !important;
+        border: 2px solid #e0e0e0;
+    }
+    
+    .stTextInput > div > div > input:focus {
+        border-color: #4CAF50 !important;
+        box-shadow: 0 0 0 2px rgba(76, 175, 80, 0.2);
+    }
+    
+    /* Password inputs */
+    .stTextInput input[type="password"] {
+        background-color: white !important;
+        color: #2e2e2e !important;
+    }
+    
+    /* Labels de campos */
+    .stTextInput > label, .stSelectbox > label, .stCheckbox > label {
+        color: #2e7d32 !important;
+        font-weight: 500;
+    }
+    
+    /* Alertas com melhor contraste */
     .alert-success {
         background-color: #d4edda;
         border-color: #c3e6cb;
-        color: #155724;
+        color: #155724 !important;
         padding: 0.75rem 1.25rem;
         margin-bottom: 1rem;
         border: 1px solid transparent;
         border-radius: 0.25rem;
     }
+    
+    /* Info boxes melhoradas */
+    .stInfo {
+        background-color: #e3f2fd !important;
+        color: #0d47a1 !important;
+        border-left: 4px solid #2196f3;
+    }
+    
+    .stSuccess {
+        background-color: #e8f5e9 !important;
+        color: #1b5e20 !important;
+        border-left: 4px solid #4caf50;
+    }
+    
+    .stWarning {
+        background-color: #fff3e0 !important;
+        color: #e65100 !important;
+        border-left: 4px solid #ff9800;
+    }
+    
+    .stError {
+        background-color: #ffebee !important;
+        color: #c62828 !important;
+        border-left: 4px solid #f44336;
+    }
+    
+    /* Tabs com melhor visual */
     .stTabs [data-baseweb="tab-list"] {
         gap: 2px;
     }
+    
     .stTabs [data-baseweb="tab"] {
         background-color: #e8f5e8;
-        color: #2E7D32;
+        color: #2E7D32 !important;
         border-radius: 8px 8px 0 0;
+        font-weight: 500;
     }
+    
     .stTabs [aria-selected="true"] {
         background-color: #4CAF50;
-        color: white;
+        color: white !important;
+    }
+    
+    /* Dataframes com melhor contraste */
+    .stDataFrame {
+        background-color: white;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Métricas com fundo branco */
+    .metric-container {
+        background-color: white !important;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 1rem;
+    }
+    
+    /* Expanders com melhor contraste */
+    .streamlit-expanderHeader {
+        background-color: #f1f8e9 !important;
+        color: #2e7d32 !important;
+        font-weight: 600;
+    }
+    
+    /* Checkboxes */
+    .stCheckbox > label > div {
+        color: #2e2e2e !important;
+    }
+    
+    /* Selectboxes */
+    .stSelectbox > div > div > div {
+        background-color: white !important;
+        color: #2e2e2e !important;
+    }
+    
+    /* Text areas */
+    .stTextArea > div > div > textarea {
+        background-color: white !important;
+        color: #2e2e2e !important;
+        border: 2px solid #e0e0e0;
+    }
+    
+    /* Number inputs */
+    .stNumberInput > div > div > input {
+        background-color: white !important;
+        color: #2e2e2e !important;
+        border: 2px solid #e0e0e0;
+    }
+    
+    /* Sliders */
+    .stSlider > div > div > div > div {
+        background-color: #4CAF50 !important;
+    }
+    
+    /* Melhorar contraste de texto em geral */
+    .markdown-text-container, .stMarkdown {
+        color: #2e2e2e !important;
+    }
+    
+    /* Headers específicos */
+    h1, h2, h3, h4, h5, h6 {
+        color: #2e7d32 !important;
+    }
+    
+    /* Sidebar melhorada */
+    .css-1d391kg {
+        background-color: #f8f9fa;
+    }
+    
+    /* Containers de conteúdo */
+    .css-12oz5g7 {
+        background: linear-gradient(135deg, #f1f8e9 0%, #e8f5e8 100%);
+    }
+    
+    /* Melhorar contraste em cards de insights */
+    .insight-card {
+        background: white !important;
+        color: #2e2e2e !important;
+        border: 1px solid #e0e0e0;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 0.5rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Radio buttons */
+    .stRadio > label > div {
+        color: #2e2e2e !important;
+    }
+    
+    /* File uploader */
+    .stFileUploader > div > div > div {
+        background-color: white !important;
+        color: #2e2e2e !important;
+        border: 2px dashed #4CAF50;
+    }
+    
+    /* Date inputs */
+    .stDateInput > div > div > input {
+        background-color: white !important;
+        color: #2e2e2e !important;
+    }
+    
+    /* Time inputs */
+    .stTimeInput > div > div > input {
+        background-color: white !important;
+        color: #2e2e2e !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -4534,7 +4744,7 @@ def main():
                 "error", 
                 f"Erro na página {menu_opcao}: {str(e)}"
             )
-
+            
 def generate_smart_notifications(df):
     """Gera notificações inteligentes baseadas nos dados dos pets."""
     notifications = []
