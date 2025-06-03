@@ -1503,17 +1503,21 @@ def apply_filters(df):
     with st.sidebar.expander("Filtros Básicos", expanded=True):
         # Filtro por bairro
         if 'bairro' in df.columns and not df['bairro'].empty:
-            bairros = ["Todos"] + sorted(df['bairro'].dropna().unique().tolist())
-            bairro_filtro = st.selectbox("🏘️ Bairro:", bairros)
-            if bairro_filtro != "Todos":
-                df = df[df['bairro'] == bairro_filtro]
+            bairros_unique = df['bairro'].dropna().unique()
+            if len(bairros_unique) > 0:
+                bairros = ["Todos"] + sorted(bairros_unique.tolist())
+                bairro_filtro = st.selectbox("🏘️ Bairro:", bairros)
+                if bairro_filtro != "Todos":
+                    df = df[df['bairro'] == bairro_filtro]
         
         # Filtro por tipo de pet
         if 'tipo_pet' in df.columns and not df['tipo_pet'].empty:
-            tipos_pet = ["Todos"] + sorted(df['tipo_pet'].dropna().unique().tolist())
-            tipo_pet_filtro = st.selectbox("🐕 Tipo de Pet:", tipos_pet)
-            if tipo_pet_filtro != "Todos":
-                df = df[df['tipo_pet'] == tipo_pet_filtro]
+            tipos_unique = df['tipo_pet'].dropna().unique()
+            if len(tipos_unique) > 0:
+                tipos_pet = ["Todos"] + sorted(tipos_unique.tolist())
+                tipo_pet_filtro = st.selectbox("🐕 Tipo de Pet:", tipos_pet)
+                if tipo_pet_filtro != "Todos":
+                    df = df[df['tipo_pet'] == tipo_pet_filtro]
         
         # Filtro por status de adoção
         if 'adotado' in df.columns:
@@ -1532,17 +1536,20 @@ def apply_filters(df):
                 min_idade = float(idade_values.min())
                 max_idade = float(idade_values.max())
                 
-                # Verificar se min e max são diferentes
-                if min_idade < max_idade:
+                # Verificar se min e max são diferentes e válidos
+                if min_idade < max_idade and not (pd.isna(min_idade) or pd.isna(max_idade)):
                     selected_range = st.slider(
                         "📅 Faixa de Idade:",
                         min_value=min_idade,
                         max_value=max_idade,
-                        value=(min_idade, max_idade)
+                        value=(min_idade, max_idade),
+                        step=0.1
                     )
                     df = df[(df['idade'] >= selected_range[0]) & (df['idade'] <= selected_range[1])]
-                else:
+                elif min_idade == max_idade:
                     st.info(f"📅 Idade única: {min_idade} anos")
+                else:
+                    st.info("📅 Dados de idade insuficientes")
         
         # Filtro por score de adoção
         if 'score_adocao' in df.columns and not df['score_adocao'].isna().all() and len(df['score_adocao'].dropna()) > 0:
@@ -1551,42 +1558,79 @@ def apply_filters(df):
                 min_score = float(score_values.min())
                 max_score = float(score_values.max())
                 
-                # Verificar se min e max são diferentes
-                if min_score < max_score:
+                # Verificar se min e max são diferentes e válidos
+                if min_score < max_score and not (pd.isna(min_score) or pd.isna(max_score)):
                     selected_score_range = st.slider(
                         "⭐ Score de Adoção:",
                         min_value=min_score,
                         max_value=max_score,
-                        value=(min_score, max_score)
+                        value=(min_score, max_score),
+                        step=0.1
                     )
                     df = df[(df['score_adocao'] >= selected_score_range[0]) & (df['score_adocao'] <= selected_score_range[1])]
+                elif min_score == max_score:
+                    st.info(f"⭐ Score único: {min_score:.1f}")
                 else:
-                    st.info(f"⭐ Score único: {min_score}")
+                    st.info("⭐ Dados de score insuficientes")
         
         # Filtro por características comportamentais
         if 'sociabilidade' in df.columns and not df['sociabilidade'].isna().all():
-            min_soc = st.slider("🤝 Sociabilidade mínima:", 1, 5, 1)
-            df = df[df['sociabilidade'] >= min_soc]
+            soc_values = df['sociabilidade'].dropna()
+            if len(soc_values) > 0:
+                min_soc = int(soc_values.min())
+                max_soc = int(soc_values.max())
+                
+                if min_soc < max_soc:
+                    min_soc_filter = st.slider("🤝 Sociabilidade mínima:", min_soc, max_soc, min_soc)
+                    df = df[df['sociabilidade'] >= min_soc_filter]
+                elif min_soc == max_soc:
+                    st.info(f"🤝 Sociabilidade única: {min_soc}")
         
         if 'energia' in df.columns and not df['energia'].isna().all():
-            min_energia = st.slider("⚡ Energia mínima:", 1, 5, 1)
-            df = df[df['energia'] >= min_energia]
+            ener_values = df['energia'].dropna()
+            if len(ener_values) > 0:
+                min_ener = int(ener_values.min())
+                max_ener = int(ener_values.max())
+                
+                if min_ener < max_ener:
+                    min_energia = st.slider("⚡ Energia mínima:", min_ener, max_ener, min_ener)
+                    df = df[df['energia'] >= min_energia]
+                elif min_ener == max_ener:
+                    st.info(f"⚡ Energia única: {min_ener}")
     
     with st.sidebar.expander("Filtros ML"):
         # Filtro por cluster (se existir)
         if 'cluster_comportamental' in df.columns and not df['cluster_comportamental'].isna().all():
-            clusters = ["Todos"] + sorted([str(x) for x in df['cluster_comportamental'].dropna().unique() if pd.notna(x)])
-            cluster_filtro = st.selectbox("🎯 Cluster Comportamental:", clusters)
-            if cluster_filtro != "Todos":
-                df = df[df['cluster_comportamental'] == int(cluster_filtro)]
+            cluster_values = df['cluster_comportamental'].dropna()
+            if len(cluster_values) > 0:
+                clusters_unique = sorted([str(int(x)) for x in cluster_values.unique() if pd.notna(x)])
+                if len(clusters_unique) > 0:
+                    clusters = ["Todos"] + clusters_unique
+                    cluster_filtro = st.selectbox("🎯 Cluster Comportamental:", clusters)
+                    if cluster_filtro != "Todos":
+                        df = df[df['cluster_comportamental'] == int(cluster_filtro)]
         
         # Filtro por risco de abandono
         if 'risco_abandono' in df.columns and not df['risco_abandono'].isna().all() and len(df['risco_abandono'].dropna()) > 0:
             risco_values = df['risco_abandono'].dropna()
             if len(risco_values) > 0:
+                min_risco = float(risco_values.min())
                 max_risco = float(risco_values.max())
-                risco_max = st.slider("⚠️ Risco máximo de abandono:", 0.0, max_risco, max_risco, 0.1)
-                df = df[df['risco_abandono'] <= risco_max]
+                
+                # Verificar se min e max são diferentes e válidos
+                if min_risco < max_risco and not (pd.isna(min_risco) or pd.isna(max_risco)):
+                    risco_max = st.slider(
+                        "⚠️ Risco máximo de abandono:", 
+                        min_value=min_risco, 
+                        max_value=max_risco, 
+                        value=max_risco, 
+                        step=0.01
+                    )
+                    df = df[df['risco_abandono'] <= risco_max]
+                elif min_risco == max_risco:
+                    st.info(f"⚠️ Risco único: {min_risco:.2f}")
+                else:
+                    st.info("⚠️ Dados de risco insuficientes")
     
     # Exibir contagem de resultados
     st.sidebar.markdown(f"**📊 {len(df)} pets** correspondem aos filtros.")
