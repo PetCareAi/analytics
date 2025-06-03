@@ -1,0 +1,509 @@
+# ==============================================
+# 🐾 PetCareAi - Sistema de Análise com IA
+# ==============================================
+
+# ========================================
+# 🔒 CONFIGURAÇÕES SENSÍVEIS E SECRETS
+# ========================================
+
+# Streamlit secrets
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# Variáveis de ambiente
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.env
+
+# Configurações de API
+config/secrets.py
+config/api_keys.py
+secrets.json
+credentials.json
+
+# Chaves SSH e certificados
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+
+# ========================================
+# 🐍 PYTHON
+# ========================================
+
+# Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribuição / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# IPython
+profile_default/
+ipython_config.py
+
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# Poetry
+poetry.lock
+
+# Celery
+celerybeat-schedule
+celerybeat.pid
+
+# SageMath parsed files
+*.sage.py
+
+# Spyder project settings
+.spyderproject
+.spyproject
+
+# Rope project settings
+.ropeproject
+
+# mkdocs documentation
+/site
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre type checker
+.pyre/
+
+# ========================================
+# 📊 STREAMLIT
+# ========================================
+
+# Cache do Streamlit
+.streamlit/
+
+# Sessões do Streamlit
+streamlit_session_state.json
+
+# Logs do Streamlit
+streamlit.log
+
+# Arquivos temporários do Streamlit
+.streamlit_temp/
+streamlit_temp/
+
+# ========================================
+# 🗄️ BANCOS DE DADOS
+# ========================================
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+# PostgreSQL
+*.dump
+*.sql.gz
+
+# MySQL
+*.sql
+
+# Backup de banco
+backup_*.sql
+database_backup_*
+db_backup_*
+
+# Arquivos de migração temporários
+migrations_backup/
+*.migration.bak
+
+# ========================================
+# 📁 DADOS E UPLOADS
+# ========================================
+
+# Dados CSV/Excel carregados
+uploads/
+data/raw/
+data/processed/
+data/temp/
+temp_data/
+
+# Arquivos de dados grandes
+*.csv.bak
+*.xlsx.bak
+*.json.bak
+
+# Imagens carregadas pelos usuários
+user_uploads/
+pet_images/
+uploaded_files/
+
+# Relatórios gerados
+reports/generated/
+exports/
+downloads/
+
+# Cache de dados
+data_cache/
+*.cache
+*.pkl
+*.pickle
+
+# ========================================
+# 📈 MACHINE LEARNING / IA
+# ========================================
+
+# Modelos treinados
+models/
+*.model
+*.pkl
+*.joblib
+*.h5
+*.hdf5
+*.pb
+*.onnx
+
+# Datasets
+datasets/
+training_data/
+test_data/
+
+# Logs de treinamento
+training_logs/
+tensorboard_logs/
+mlflow_logs/
+
+# Checkpoints
+checkpoints/
+*.ckpt
+
+# ========================================
+# 📝 LOGS E DEBUGGING
+# ========================================
+
+# Logs gerais
+*.log
+logs/
+log/
+debug.log
+error.log
+access.log
+app.log
+
+# Logs específicos do PetCare
+petcare.log
+petcare_*.log
+analytics.log
+ai_insights.log
+
+# Profiling
+*.prof
+*.profile
+
+# ========================================
+# 💻 IDEs E EDITORES
+# ========================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+*~
+.netrwhist
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Atom
+.atom/
+
+# JetBrains
+.idea/
+*.iml
+
+# ========================================
+# 🖥️ SISTEMA OPERACIONAL
+# ========================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# ========================================
+# 🌐 WEB E FRONTEND
+# ========================================
+
+# Node.js (se houver componentes frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn-integrity
+
+# Sass
+.sass-cache/
+
+# ========================================
+# 🐳 DOCKER E DEPLOYMENT
+# ========================================
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+.docker/
+
+# Kubernetes
+*.kubeconfig
+
+# Terraform
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
+# ========================================
+# 📦 DEPENDÊNCIAS E PACKAGES
+# ========================================
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+ENV/
+env.bak/
+venv.bak/
+
+# Conda
+.conda/
+
+# ========================================
+# 🔧 FERRAMENTAS DE BUILD
+# ========================================
+
+# setuptools
+build/
+dist/
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+
+# ========================================
+# 📋 ARQUIVOS TEMPORÁRIOS
+# ========================================
+
+# Arquivos temporários gerais
+tmp/
+temp/
+.tmp/
+.temp/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+*.save
+
+# Patch files
+*.patch
+*.diff
+
+# Compressed files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# ========================================
+# 🐾 ESPECÍFICOS DO PETCAREAI
+# ========================================
+
+# Configurações locais específicas
+local_config.py
+dev_settings.py
+
+# Dados de teste
+test_data/
+sample_data/
+mock_data/
+
+# Relatórios de teste
+test_reports/
+coverage_reports/
+
+# Arquivos de deploy
+deploy_config/
+production_settings/
+
+# Cache específico da aplicação
+petcare_cache/
+ai_model_cache/
+
+# Logs específicos
+pet_analysis.log
+adoption_tracking.log
+user_activity.log
+
+# Exportações temporárias
+temp_exports/
+bulk_exports/
+
+# Imagens processadas
+processed_images/
+image_cache/
+
+# ========================================
+# 📊 ANALYTICS E MÉTRICAS
+# ========================================
+
+# Dados de analytics
+analytics_data/
+metrics/
+usage_stats/
+
+# Relatórios gerados
+generated_reports/
+auto_reports/
+
+# ========================================
+# 🔄 BACKUP E SYNC
+# ========================================
+
+# Arquivos de backup
+*.backup
+backup_*/
+backups/
+
+# Sync folders
+.sync/
+.dropbox/
+
+# ========================================
+# 🎯 OUTROS
+# ========================================
+
+# Arquivos de lock
+*.lock
+
+# Arquivos PID
+*.pid
+
+# Sockets
+*.sock
+
+# Arquivos de configuração local
+local.ini
+local.conf
+dev.ini
