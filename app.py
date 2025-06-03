@@ -66,6 +66,36 @@ os.makedirs("exports", exist_ok=True)
 DEFAULT_ADMIN_EMAIL = "admin@petcare.com"
 DEFAULT_ADMIN_PASSWORD = "admin123"
 
+def ensure_supabase_connection():
+    """Garante que há conexão com o Supabase."""
+    global supabase
+    
+    if supabase is None:
+        try:
+            from config.database import get_supabase
+            supabase = get_supabase()
+            
+            if supabase is None:
+                st.error("❌ Não foi possível conectar ao Supabase. Usando modo offline.")
+                return False
+                
+        except Exception as e:
+            st.error(f"❌ Erro na conexão: {str(e)}")
+            return False
+    
+    return True
+
+def safe_supabase_operation(operation_func, fallback_result=None, error_message="Operação falhou"):
+    """Executa operação do Supabase com tratamento de erro."""
+    if not ensure_supabase_connection():
+        return fallback_result
+    
+    try:
+        return operation_func()
+    except Exception as e:
+        st.error(f"{error_message}: {str(e)}")
+        return fallback_result
+
 def init_database():
     """Inicializar dados padrão no Supabase."""
     try:
