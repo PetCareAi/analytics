@@ -1223,7 +1223,7 @@ def custom_metric(titulo, valor, subtexto=None, cor="#2196F3"):
     )
 
 def display_login_page():
-    """Exibe a página de login."""
+    """Exibe a página de login com funcionalidade melhorada de lembrar credenciais."""
     login_css = """
     <style>
     .login-container {
@@ -1259,6 +1259,28 @@ def display_login_page():
         border: 3px solid #4CAF50;
         box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
     }
+    .saved-login-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #4CAF50;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .saved-login-title {
+        color: #2E7D32;
+        font-weight: bold;
+        margin-bottom: 0.5rem;
+    }
+    .saved-login-email {
+        color: #666;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+    .saved-login-date {
+        color: #888;
+        font-size: 0.8rem;
+    }
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-20px); }
         to { opacity: 1; transform: translateY(0); }
@@ -1279,10 +1301,55 @@ def display_login_page():
         transform: translateY(-2px);
         box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
     }
+    .remove-saved-btn {
+        background: #f44336 !important;
+        color: white !important;
+        border: none;
+        border-radius: 5px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+    }
+    .remove-saved-btn:hover {
+        background: #d32f2f !important;
+    }
     </style>
     """
     
     st.markdown(login_css, unsafe_allow_html=True)
+    
+    # Verificar se há logins salvos
+    if "saved_logins" not in st.session_state:
+        st.session_state.saved_logins = {}
+    
+    # Verificar login automático
+    if "auto_login_enabled" not in st.session_state:
+        st.session_state.auto_login_enabled = False
+    
+    # Tentar login automático se habilitado
+    if st.session_state.auto_login_enabled and st.session_state.saved_logins:
+        last_login = max(st.session_state.saved_logins.items(), key=lambda x: x[1]['last_login'])
+        email, login_data = last_login
+        
+        with st.spinner("Entrando automaticamente..."):
+            time.sleep(0.5)
+            is_authenticated, user_id, role = authenticate_user(email, login_data['password'])
+            
+            if is_authenticated:
+                st.session_state.user_id = user_id
+                st.session_state.user_role = role
+                st.session_state.user_info = get_user_info(user_id)
+                st.session_state.session_id = str(uuid.uuid4())
+                
+                # Atualizar último login
+                st.session_state.saved_logins[email]['last_login'] = datetime.datetime.now()
+                
+                log_activity(user_id, "login", "Login automático bem-sucedido")
+                st.rerun()
+            else:
+                # Remove login inválido
+                del st.session_state.saved_logins[email]
+                st.session_state.auto_login_enabled = False
     
     col1, col2, col3 = st.columns([1, 2, 1])
     
@@ -1302,25 +1369,118 @@ def display_login_page():
         st.markdown('<div class="login-title">🐾 PetCareAi</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-subtitle">Sistema Avançado de Análise com IA</div>', unsafe_allow_html=True)
         
-        # Apenas tab de login (removida tab de registro)
-        st.markdown("### 🔐 Acesso ao Sistema")
+        # Mostrar logins salvos se existirem
+        if st.session_state.saved_logins:
+            st.markdown("### 💾 Logins Salvos")
+            
+            for email, login_data in st.session_state.saved_logins.items():
+                st.markdown(
+                    f'''
+                    <div class="saved-login-card">
+                        <div class="saved-login-title">👤 {login_data['name']}</div>
+                        <div class="saved-login-email">📧 {email}</div>
+                        <div class="saved-login-date">📅 Último acesso: {login_data['last_login'].strftime('%d/%m/%Y %H:%M')}</div>
+                    </div>
+                    ''',
+                    unsafe_allow_html=True
+                )
+                
+                col_login, col_remove = st.columns([3, 1])
+                
+                with col_login:
+                    if st.button(f"🚀 Entrar como {login_data['name']}", key=f"login_{email}", use_container_width=True):
+                        with st.spinner("Autenticando..."):
+                            time.sleep(0.5)
+                            is_authenticated, user_id, role = authenticate_user(email, login_data['password'])
+                            
+                            if is_authenticated:
+                                st.session_state.user_id = user_id
+                                st.session_state.user_role = role
+                                st.session_state.user_info = get_user_info(user_id)
+                                st.session_state.session_id = str(uuid.uuid4())
+                                
+                                # Atualizar último login
+                                st.session_state.saved_logins[email]['last_login'] = datetime.datetime.now()
+                                
+                                log_activity(user_id, "login", "Login salvo utilizado")
+                                st.success("Login realizado com sucesso!")
+                                st.rerun()
+                            else:
+                                st.error("Credenciais salvas inválidas. Removendo...")
+                                del st.session_state.saved_logins[email]
+                                time.sleep(1)
+                                st.rerun()
+                
+                with col_remove:
+                    if st.button("🗑️", key=f"remove_{email}", help="Remover login salvo"):
+                        del st.session_state.saved_logins[email]
+                        st.success("Login removido!")
+                        time.sleep(0.5)
+                        st.rerun()
+            
+            # Opções de gerenciamento
+            st.markdown("---")
+            
+            col_auto, col_clear = st.columns(2)
+            
+            with col_auto:
+                auto_login = st.checkbox(
+                    "🔄 Login automático", 
+                    value=st.session_state.auto_login_enabled,
+                    help="Entrar automaticamente com o último login usado"
+                )
+                if auto_login != st.session_state.auto_login_enabled:
+                    st.session_state.auto_login_enabled = auto_login
+                    if auto_login:
+                        st.success("Login automático ativado!")
+                    else:
+                        st.info("Login automático desativado!")
+            
+            with col_clear:
+                if st.button("🧹 Limpar Todos", help="Remover todos os logins salvos"):
+                    st.session_state.saved_logins.clear()
+                    st.session_state.auto_login_enabled = False
+                    st.success("Todos os logins foram removidos!")
+                    time.sleep(0.5)
+                    st.rerun()
+            
+            st.markdown("---")
+        
+        # Formulário de login manual
+        st.markdown("### 🔐 Novo Login")
         
         with st.form("login_form"):
-            email = st.text_input("Email", key="login_email")
-            password = st.text_input("Senha", type="password", key="login_password")
-            remember = st.checkbox("Lembrar-me", key="login_remember")
+            # Pré-preencher com último email usado se disponível
+            default_email = ""
+            if st.session_state.saved_logins:
+                last_login = max(st.session_state.saved_logins.items(), key=lambda x: x[1]['last_login'])
+                default_email = last_login[0]
+            
+            email = st.text_input("📧 Email", value=default_email, key="login_email")
+            password = st.text_input("🔒 Senha", type="password", key="login_password")
+            
+            col_remember, col_forgot = st.columns([2, 1])
+            
+            with col_remember:
+                remember = st.checkbox("💾 Lembrar este login", key="login_remember", value=True)
+            
+            with col_forgot:
+                if st.form_submit_button("❓", help="Esqueci minha senha"):
+                    st.info("Entre em contato com o administrador para redefinir sua senha.")
+                    st.write("📧 admin@petcare.com")
+                    st.write("📞 (11) 99999-9999")
             
             col1, col2 = st.columns([1, 1])
             with col1:
-                submit = st.form_submit_button("Entrar", use_container_width=True)
+                submit = st.form_submit_button("🚀 Entrar", use_container_width=True)
             with col2:
-                forgot_password = st.form_submit_button("Esqueci minha senha", use_container_width=True)
+                guest_login = st.form_submit_button("👤 Entrar como Convidado", use_container_width=True)
             
             if submit:
                 if not email or not password:
-                    st.error("Por favor, preencha todos os campos.")
+                    st.error("❌ Por favor, preencha todos os campos.")
                 else:
-                    with st.spinner("Autenticando..."):
+                    with st.spinner("🔍 Autenticando..."):
                         time.sleep(0.5)
                         is_authenticated, user_id, role = authenticate_user(email, password)
                         
@@ -1330,30 +1490,57 @@ def display_login_page():
                             st.session_state.user_info = get_user_info(user_id)
                             st.session_state.session_id = str(uuid.uuid4())
                             
+                            # Salvar login se solicitado
                             if remember:
-                                st.session_state.remember_login = True
-                                st.session_state.last_user_id = user_id
+                                user_info = get_user_info(user_id)
+                                st.session_state.saved_logins[email] = {
+                                    'password': password,
+                                    'name': user_info['full_name'],
+                                    'last_login': datetime.datetime.now(),
+                                    'role': role
+                                }
+                                st.success("✅ Login salvo com sucesso!")
                             
-                            log_activity(user_id, "login", "Login bem-sucedido")
-                            
-                            st.success("Login realizado com sucesso!")
+                            log_activity(user_id, "login", "Login manual bem-sucedido")
+                            st.success("🎉 Login realizado com sucesso!")
+                            time.sleep(0.5)
                             st.rerun()
                         else:
-                            st.error("Email ou senha incorretos.")
+                            st.error("❌ Email ou senha incorretos.")
             
-            if forgot_password:
-                st.info("Entre em contato com o administrador para redefinir sua senha.")
+            if guest_login:
+                st.session_state.user_id = None
+                st.session_state.user_role = "guest"
+                st.session_state.user_info = {"email": "guest", "full_name": "Convidado", "role": "guest"}
+                st.session_state.session_id = str(uuid.uuid4())
+                st.success("👤 Entrando como convidado...")
+                time.sleep(0.5)
+                st.rerun()
         
-        st.markdown('<div style="text-align: center; margin: 1rem 0;">ou</div>', unsafe_allow_html=True)
-        
-        if st.button("Continuar como Convidado", use_container_width=True):
-            st.session_state.user_id = None
-            st.session_state.user_role = "guest"
-            st.session_state.user_info = {"email": "guest", "full_name": "Convidado", "role": "guest"}
-            st.session_state.session_id = str(uuid.uuid4())
-            st.rerun()
+        # Informações adicionais
+        if not st.session_state.saved_logins:
+            st.markdown("---")
+            st.info(
+                "💡 **Dica:** Marque 'Lembrar este login' para não precisar digitar suas credenciais novamente!"
+            )
         
         st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Informações de segurança
+        with st.expander("🔒 Informações de Segurança"):
+            st.markdown("""
+            **Sobre os logins salvos:**
+            - 🔐 Suas credenciais são armazenadas de forma segura na sessão
+            - 🚀 Login automático facilita o acesso diário
+            - 🗑️ Você pode remover logins salvos a qualquer momento
+            - ⏰ Logins salvos expiram após 30 dias de inatividade
+            - 🔄 Use login automático para entrar sem digitar credenciais
+            
+            **Dicas de segurança:**
+            - 🔒 Não salve logins em computadores compartilhados
+            - 📱 Use senhas fortes e únicas
+            - 🚪 Sempre faça logout em dispositivos públicos
+            """)
 
 def get_logo_base64():
     """Carrega o logo e converte para base64."""
@@ -4265,7 +4452,7 @@ def exportar_importar_dados(df):
                     st.success("Configurações salvas! A sincronização será ativada em versão futura.")
 
 def main():
-    """Função principal aprimorada."""
+    """Função principal aprimorada com sistema completo de login salvo."""
     # Inicializar o banco de dados
     init_database()
     
@@ -4277,15 +4464,35 @@ def main():
         initial_sidebar_state="expanded"
     )
     
-    # Verificar se há sessão persistente
-    if "user_id" not in st.session_state:
-        # Tentar recuperar sessão do query params ou cookies simulados
+    # Inicializar sistema de logins salvos
+    if "saved_logins" not in st.session_state:
+        st.session_state.saved_logins = {}
+    
+    if "auto_login_enabled" not in st.session_state:
+        st.session_state.auto_login_enabled = False
+    
+    # Limpeza automática de logins expirados (30 dias)
+    current_time = datetime.datetime.now()
+    expired_logins = []
+    
+    for email, login_data in st.session_state.saved_logins.items():
+        if (current_time - login_data['last_login']).days > 30:
+            expired_logins.append(email)
+    
+    for email in expired_logins:
+        del st.session_state.saved_logins[email]
+    
+    if expired_logins:
+        st.session_state.login_cleanup_message = f"🧹 {len(expired_logins)} login(s) expirado(s) removido(s) automaticamente."
+    
+    # Verificar se há sessão ativa
+    if "user_id" not in st.session_state or "user_role" not in st.session_state:
+        # Tentar recuperar sessão do query params
         query_params = st.query_params
         
         # Verificar se há um token de sessão nos query params
         if "session_token" in query_params:
             try:
-                # Simular validação de token (em produção, validar no banco)
                 session_token = query_params["session_token"]
                 if session_token == "demo_session":  # Token demo
                     st.session_state.user_id = 1
@@ -4299,17 +4506,39 @@ def main():
             except:
                 pass
         
-        # Verificar se há lembrete de login
-        if st.session_state.get("remember_login", False):
-            # Restaurar sessão anterior (simulado)
-            last_user = st.session_state.get("last_user_id")
-            if last_user:
-                user_info = get_user_info(last_user)
-                if user_info:
-                    st.session_state.user_id = last_user
-                    st.session_state.user_role = user_info["role"]
-                    st.session_state.user_info = user_info
-                    st.session_state.session_id = str(uuid.uuid4())
+        # Verificar se deve fazer login automático
+        elif st.session_state.auto_login_enabled and st.session_state.saved_logins:
+            # Pegar o login mais recente
+            try:
+                last_login = max(st.session_state.saved_logins.items(), key=lambda x: x[1]['last_login'])
+                email, login_data = last_login
+                
+                # Mostrar spinner de login automático
+                with st.spinner(f"🔄 Entrando automaticamente como {login_data['name']}..."):
+                    time.sleep(1)
+                    is_authenticated, user_id, role = authenticate_user(email, login_data['password'])
+                    
+                    if is_authenticated:
+                        st.session_state.user_id = user_id
+                        st.session_state.user_role = role
+                        st.session_state.user_info = get_user_info(user_id)
+                        st.session_state.session_id = str(uuid.uuid4())
+                        
+                        # Atualizar último login
+                        st.session_state.saved_logins[email]['last_login'] = current_time
+                        
+                        # Definir mensagem de boas-vindas
+                        st.session_state.welcome_message = f"🎉 Bem-vindo de volta, {login_data['name']}!"
+                        
+                        log_activity(user_id, "auto_login", "Login automático realizado")
+                    else:
+                        # Login automático falhou, remover credenciais inválidas
+                        del st.session_state.saved_logins[email]
+                        st.session_state.auto_login_enabled = False
+                        st.session_state.auto_login_error = "⚠️ Login automático falhou. Credenciais removidas."
+            except Exception as e:
+                st.session_state.auto_login_enabled = False
+                st.session_state.auto_login_error = f"❌ Erro no login automático: {str(e)}"
     
     # CSS personalizado global com fundo verde claro e melhor contraste
     st.markdown("""
@@ -4575,13 +4804,86 @@ def main():
         background-color: white !important;
         color: #2e2e2e !important;
     }
+    
+    /* Estilos específicos para logins salvos */
+    .saved-login-info {
+        background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+        border-radius: 8px;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        border-left: 4px solid #4CAF50;
+    }
+    
+    .auto-login-status {
+        background: #e3f2fd;
+        border-radius: 5px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+        color: #1976d2;
+        display: inline-block;
+        margin: 0.25rem 0;
+    }
+    
+    /* Mensagens de sistema */
+    .system-message {
+        background: white;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        border-left: 4px solid #4CAF50;
+        color: #2e2e2e !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    /* Welcome message especial */
+    .welcome-message {
+        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+        color: white !important;
+        border-radius: 10px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        text-align: center;
+        font-weight: bold;
+        animation: fadeIn 0.8s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
     </style>
     """, unsafe_allow_html=True)
 
-    # Verificar se o usuário está logado
+    # Se não está logado, mostrar página de login
     if "user_id" not in st.session_state or "user_role" not in st.session_state:
         display_login_page()
         return
+    
+    # Mostrar mensagens do sistema se existirem
+    if "welcome_message" in st.session_state:
+        st.markdown(
+            f'<div class="welcome-message">{st.session_state.welcome_message}</div>',
+            unsafe_allow_html=True
+        )
+        # Remover mensagem após exibir
+        del st.session_state.welcome_message
+    
+    if "login_cleanup_message" in st.session_state:
+        st.info(st.session_state.login_cleanup_message)
+        del st.session_state.login_cleanup_message
+    
+    if "auto_login_error" in st.session_state:
+        st.error(st.session_state.auto_login_error)
+        del st.session_state.auto_login_error
+    
+    # Exibir informação de login salvo no header se aplicável
+    if st.session_state.saved_logins and st.session_state.auto_login_enabled:
+        current_user_email = st.session_state.user_info.get('email', '')
+        if current_user_email in st.session_state.saved_logins:
+            st.markdown(
+                '<div class="auto-login-status">🔄 Login automático ativado</div>',
+                unsafe_allow_html=True
+            )
     
     # Exibir cabeçalho
     display_header()
@@ -4599,30 +4901,38 @@ def main():
     # Agrupar menus por categoria
     menu_categoria = st.sidebar.radio(
         "Categoria:",
-        ["📊 Análises", "📝 Gestão", "🔧 Ferramentas", "⚙️ Sistema"]
+        ["📊 Análises", "📝 Gestão", "🔧 Ferramentas", "⚙️ Sistema"],
+        key="menu_categoria"
     )
     
     if menu_categoria == "📊 Análises":
         menu_opcao = st.sidebar.selectbox(
             "Selecione:",
-            ["Dashboard", "Visualizar Dados", "Análises Avançadas", "IA Insights", "Mapa Interativo"]
+            ["Dashboard", "Visualizar Dados", "Análises Avançadas", "IA Insights", "Mapa Interativo"],
+            key="menu_analises"
         )
     elif menu_categoria == "📝 Gestão":
         menu_opcao = st.sidebar.selectbox(
             "Selecione:",
-            ["Adicionar Pet", "Editar Pets", "Gerenciar Adoções", "Relatórios"]
+            ["Adicionar Pet", "Editar Pets", "Gerenciar Adoções", "Relatórios"],
+            key="menu_gestao"
         )
     elif menu_categoria == "🔧 Ferramentas":
         menu_opcao = st.sidebar.selectbox(
             "Selecione:",
-            ["Exportar/Importar", "Backup/Restauração", "Migração de Dados"]
+            ["Exportar/Importar", "Backup/Restauração", "Migração de Dados"],
+            key="menu_ferramentas"
         )
     else:  # Sistema
+        opcoes_sistema = ["Configurações do Usuário", "Gerenciar Logins Salvos"]
+        if st.session_state.user_role == "admin":
+            opcoes_sistema.append("Painel de Administração")
+        
         menu_opcao = st.sidebar.selectbox(
             "Selecione:",
-            ["Configurações do Usuário", "Painel de Administração" if st.session_state.user_role == "admin" else None]
+            opcoes_sistema,
+            key="menu_sistema"
         )
-        menu_opcao = menu_opcao if menu_opcao else "Configurações do Usuário"
     
     # Menu de acesso rápido
     st.sidebar.markdown("## ⚡ Acesso Rápido")
@@ -4630,11 +4940,11 @@ def main():
     col1, col2 = st.sidebar.columns(2)
     
     with col1:
-        if st.button("➕ Novo Pet", use_container_width=True):
+        if st.button("➕ Novo Pet", use_container_width=True, key="quick_new_pet"):
             st.session_state.quick_action = "Adicionar Pet"
     
     with col2:
-        if st.button("📊 Dashboard", use_container_width=True):
+        if st.button("📊 Dashboard", use_container_width=True, key="quick_dashboard"):
             st.session_state.quick_action = "Dashboard"
     
     # Verificar ação rápida
@@ -4647,15 +4957,42 @@ def main():
         st.sidebar.markdown("## 📈 Estatísticas Rápidas")
         
         with st.sidebar.container():
-            st.metric("Total de Pets", len(df))
+            # Criar métricas com containers visuais
+            col1, col2 = st.sidebar.columns(2)
+            
+            with col1:
+                st.metric("🐾 Total de Pets", len(df))
+            
+            with col2:
+                pets_filtrados = len(df_filtrado)
+                st.metric("🔍 Filtrados", pets_filtrados)
             
             if 'adotado' in df.columns:
-                taxa_adocao = df['adotado'].mean() * 100
-                st.metric("Taxa de Adoção", f"{taxa_adocao:.1f}%")
+                adotados = df['adotado'].sum()
+                taxa_adocao = (adotados / len(df)) * 100 if len(df) > 0 else 0
+                
+                col1, col2 = st.sidebar.columns(2)
+                with col1:
+                    st.metric("❤️ Adotados", adotados)
+                with col2:
+                    st.metric("📊 Taxa (%)", f"{taxa_adocao:.1f}")
             
-            if 'score_adocao' in df.columns:
+            if 'score_adocao' in df.columns and not df['score_adocao'].isna().all():
                 score_medio = df['score_adocao'].mean()
-                st.metric("Score Médio", f"{score_medio:.2f}")
+                st.metric("⭐ Score Médio", f"{score_medio:.2f}")
+    
+    # Informações de login salvo
+    if st.session_state.saved_logins:
+        st.sidebar.markdown("## 💾 Login Salvo")
+        
+        total_logins = len(st.session_state.saved_logins)
+        auto_status = "🔄 Ativo" if st.session_state.auto_login_enabled else "⏸️ Inativo"
+        
+        st.sidebar.markdown(f"**Logins salvos:** {total_logins}")
+        st.sidebar.markdown(f"**Auto-login:** {auto_status}")
+        
+        if st.sidebar.button("⚙️ Gerenciar Logins", use_container_width=True):
+            st.session_state.quick_action = "Gerenciar Logins Salvos"
     
     # Notificações e alertas
     st.sidebar.markdown("## 🔔 Notificações")
@@ -4677,35 +5014,65 @@ def main():
             if 'descricao' in notification:
                 st.sidebar.caption(notification['descricao'])
     
-    # Botão de logout
-    st.sidebar.markdown("---")
+    # Ações do sistema
+    st.sidebar.markdown("## 🔧 Ações do Sistema")
     
     col1, col2 = st.sidebar.columns([1, 1])
     
     with col1:
-        if st.button("🔄 Atualizar", use_container_width=True):
+        if st.button("🔄 Atualizar", use_container_width=True, key="system_refresh"):
+            st.cache_data.clear()
+            st.success("✅ Sistema atualizado!")
+            time.sleep(0.5)
             st.rerun()
     
     with col2:
-        if st.button("📤 Sair", use_container_width=True):
-            # Limpar sessão
-            if "user_id" in st.session_state:
-                log_activity(st.session_state.user_id, "logout", "Logout do sistema")
-                
-                for key in list(st.session_state.keys()):
+        if st.button("📤 Sair", use_container_width=True, key="system_logout"):
+            # Limpar sessão mas manter logins salvos
+            user_id = st.session_state.get("user_id")
+            saved_logins = st.session_state.get("saved_logins", {})
+            auto_login_enabled = st.session_state.get("auto_login_enabled", False)
+            
+            if user_id:
+                log_activity(user_id, "logout", "Logout do sistema")
+            
+            # Limpar tudo exceto configurações de login
+            for key in list(st.session_state.keys()):
+                if key not in ["saved_logins", "auto_login_enabled"]:
                     del st.session_state[key]
             
+            # Restaurar configurações de login
+            st.session_state.saved_logins = saved_logins
+            st.session_state.auto_login_enabled = auto_login_enabled
+            
+            st.success("👋 Logout realizado com sucesso!")
+            time.sleep(1)
             st.rerun()
     
     # Informações do sistema
     st.sidebar.markdown("---")
+    
+    # Status do sistema
+    system_status = "🟢 Online"
+    if df.empty:
+        system_status = "🟡 Sem dados"
+    
+    user_name = st.session_state.user_info.get('full_name', 'Usuário')
+    user_role = st.session_state.user_info.get('role', 'user').title()
+    
     st.sidebar.markdown(
-        "<div style='text-align: center; font-size: 0.8rem; color: #666;'>"
-        "🐾 PetCare Analytics v2.0<br>"
-        "Sistema Avançado com IA<br>"
-        f"Usuário: {st.session_state.user_info['full_name']}<br>"
-        f"Última atualização: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}"
-        "</div>",
+        f"""
+        <div style='text-align: center; font-size: 0.8rem; color: #666; 
+                    background: white; padding: 0.5rem; border-radius: 5px; margin-top: 1rem;'>
+        <strong>🐾 PetCare Analytics v2.0</strong><br>
+        Sistema Avançado com IA<br><br>
+        <strong>👤 {user_name}</strong><br>
+        🔑 {user_role}<br>
+        {system_status}<br><br>
+        📅 {datetime.datetime.now().strftime('%d/%m/%Y')}<br>
+        🕒 {datetime.datetime.now().strftime('%H:%M:%S')}
+        </div>
+        """,
         unsafe_allow_html=True
     )
     
@@ -4727,15 +5094,53 @@ def main():
             mapa_interativo(df)
         elif menu_opcao == "Configurações do Usuário":
             user_settings()
+        elif menu_opcao == "Gerenciar Logins Salvos":
+            manage_saved_logins()
         elif menu_opcao == "Painel de Administração" and st.session_state.user_role == "admin":
             admin_panel()
+        elif menu_opcao == "Editar Pets":
+            editar_pets(df)
+        elif menu_opcao == "Gerenciar Adoções":
+            gerenciar_adocoes(df)
+        elif menu_opcao == "Relatórios":
+            gerar_relatorios(df)
+        elif menu_opcao == "Backup/Restauração":
+            backup_restauracao()
+        elif menu_opcao == "Migração de Dados":
+            migracao_dados()
         else:
             # Página padrão
             display_dashboard(df, df_filtrado)
     
     except Exception as e:
         st.error(f"❌ Erro ao carregar a página: {str(e)}")
-        st.info("🔄 Tente recarregar a página ou entre em contato com o administrador.")
+        
+        # Detalhes do erro para admins
+        if st.session_state.user_role == "admin":
+            with st.expander("🔍 Detalhes do Erro (Admin)"):
+                st.code(f"""
+Página solicitada: {menu_opcao}
+Categoria: {menu_categoria}
+Usuário: {st.session_state.user_info.get('email', 'N/A')}
+Erro: {str(e)}
+Timestamp: {datetime.datetime.now()}
+                """)
+        
+        st.info("🔄 Tente uma das seguintes opções:")
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("🏠 Ir para Dashboard", use_container_width=True):
+                st.session_state.quick_action = "Dashboard"
+                st.rerun()
+        
+        with col2:
+            if st.button("🔄 Recarregar", use_container_width=True):
+                st.rerun()
+        
+        with col3:
+            if st.button("📧 Reportar Erro", use_container_width=True):
+                st.info("Entre em contato: admin@petcare.com")
         
         # Log do erro
         if "user_id" in st.session_state:
@@ -4744,7 +5149,123 @@ def main():
                 "error", 
                 f"Erro na página {menu_opcao}: {str(e)}"
             )
+    
+    # Footer com informações adicionais
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        if not df.empty:
+            st.caption(f"📊 Base de dados: {len(df)} registros")
+    
+    with col2:
+        st.caption(f"🔄 Última atualização: {datetime.datetime.now().strftime('%H:%M:%S')}")
+    
+    with col3:
+        session_duration = datetime.datetime.now() - st.session_state.get('session_start', datetime.datetime.now())
+        st.caption(f"⏱️ Sessão: {str(session_duration).split('.')[0]}")
+
+# Função auxiliar para inicializar sessão
+if "session_start" not in st.session_state:
+    st.session_state.session_start = datetime.datetime.now()
+
+def manage_saved_logins():
+    """Gerencia logins salvos e configurações de segurança."""
+    st.markdown("## 💾 Gerenciamento de Logins Salvos")
+    
+    if not st.session_state.saved_logins:
+        st.info("📝 Nenhum login salvo encontrado.")
+        return
+    
+    # Estatísticas dos logins salvos
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric("Total de Logins", len(st.session_state.saved_logins))
+    
+    with col2:
+        if st.session_state.saved_logins:
+            last_used = max(st.session_state.saved_logins.values(), key=lambda x: x['last_login'])
+            days_ago = (datetime.datetime.now() - last_used['last_login']).days
+            st.metric("Último Uso", f"{days_ago} dias")
+    
+    with col3:
+        auto_status = "Ativado" if st.session_state.auto_login_enabled else "Desativado"
+        st.metric("Login Automático", auto_status)
+    
+    # Lista detalhada de logins salvos
+    st.markdown("### 📋 Logins Salvos Detalhados")
+    
+    for email, login_data in st.session_state.saved_logins.items():
+        with st.expander(f"👤 {login_data['name']} ({email})"):
+            col1, col2 = st.columns([2, 1])
             
+            with col1:
+                st.write(f"**📧 Email:** {email}")
+                st.write(f"**👤 Nome:** {login_data['name']}")
+                st.write(f"**🔑 Função:** {login_data['role']}")
+                st.write(f"**📅 Último acesso:** {login_data['last_login'].strftime('%d/%m/%Y %H:%M')}")
+                
+                days_since_login = (datetime.datetime.now() - login_data['last_login']).days
+                if days_since_login > 7:
+                    st.warning(f"⚠️ Não usado há {days_since_login} dias")
+                elif days_since_login == 0:
+                    st.success("✅ Usado hoje")
+                else:
+                    st.info(f"ℹ️ Usado há {days_since_login} dia(s)")
+            
+            with col2:
+                if st.button(f"🗑️ Remover", key=f"remove_detailed_{email}"):
+                    del st.session_state.saved_logins[email]
+                    st.success(f"Login de {email} removido!")
+                    st.rerun()
+    
+    # Configurações de segurança
+    st.markdown("### 🔒 Configurações de Segurança")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        auto_login = st.checkbox(
+            "🔄 Ativar login automático",
+            value=st.session_state.auto_login_enabled,
+            help="Entrar automaticamente com o último login usado"
+        )
+        
+        if auto_login != st.session_state.auto_login_enabled:
+            st.session_state.auto_login_enabled = auto_login
+            if auto_login:
+                st.success("✅ Login automático ativado!")
+            else:
+                st.info("ℹ️ Login automático desativado!")
+    
+    with col2:
+        if st.button("🧹 Limpar Todos os Logins", type="secondary"):
+            if st.button("⚠️ Confirmar Limpeza", type="primary"):
+                st.session_state.saved_logins.clear()
+                st.session_state.auto_login_enabled = False
+                st.success("🗑️ Todos os logins foram removidos!")
+                st.rerun()
+    
+    # Exportar/Importar configurações
+    st.markdown("### 📤 Backup de Configurações")
+    
+    if st.button("💾 Exportar Configurações"):
+        config_data = {
+            'saved_logins': {email: {k: v.isoformat() if isinstance(v, datetime.datetime) else v 
+                                   for k, v in data.items()} 
+                           for email, data in st.session_state.saved_logins.items()},
+            'auto_login_enabled': st.session_state.auto_login_enabled
+        }
+        
+        st.download_button(
+            label="📁 Baixar arquivo de configuração",
+            data=json.dumps(config_data, indent=2),
+            file_name=f"petcare_login_config_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.json",
+            mime="application/json"
+        )
+
+
 def generate_smart_notifications(df):
     """Gera notificações inteligentes baseadas nos dados dos pets."""
     notifications = []
