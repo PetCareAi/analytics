@@ -4538,8 +4538,10 @@ def generate_smart_notifications(df):
             df_temp['created_at'] = pd.to_datetime(df_temp['created_at'], errors='coerce')
             # Usar created_at como data_registro
             df_temp['data_registro'] = df_temp['created_at']
+        elif 'data_registro' in df_temp.columns:
+            df_temp['data_registro'] = pd.to_datetime(df_temp['data_registro'], errors='coerce')
         else:
-            # Se não tiver created_at, criar uma data padrão
+            # Se não tiver nenhuma, criar uma data padrão
             df_temp['data_registro'] = pd.Timestamp.now()
         
         # Garantir que data_registro seja datetime
@@ -4554,21 +4556,22 @@ def generate_smart_notifications(df):
         # 1. Pets há muito tempo sem adoção
         pets_antigos = df_temp[
             (df_temp['dias_sistema'] > 90) & 
-            (df_temp.get('status', '').str.lower() != 'adotado')
+            ((df_temp.get('status', '').str.lower() != 'adotado') | (df_temp.get('adotado', False) == False))
         ]
         
         if len(pets_antigos) > 0:
+            pets_names = pets_antigos["nome"].head(3).tolist() if 'nome' in pets_antigos.columns else ['pets']
             notifications.append({
                 'tipo': 'warning',
                 'titulo': f'🕐 {len(pets_antigos)} pet(s) há mais de 90 dias sem adoção',
-                'descricao': f'Considere revisar estratégias de divulgação para: {", ".join(pets_antigos["nome"].head(3).tolist())}'
+                'descricao': f'Considere revisar estratégias de divulgação para: {", ".join(pets_names)}'
             })
         
         # 2. Pets com score de adoção baixo
         if 'score_adocao' in df_temp.columns:
             df_temp['score_adocao'] = pd.to_numeric(df_temp['score_adocao'], errors='coerce')
             pets_baixo_score = df_temp[
-                (df_temp['score_adocao'] < 0.3) & 
+                (df_temp['score_adocao'] < 2.5) & 
                 (df_temp['score_adocao'].notna())
             ]
             
@@ -4631,7 +4634,7 @@ def generate_smart_notifications(df):
         # 6. Status de vacinação
         if 'status_vacinacao' in df_temp.columns:
             nao_vacinados = df_temp[
-                df_temp['status_vacinacao'].str.lower().isin(['incompleta', 'não vacinado', 'pendente'])
+                df_temp['status_vacinacao'].str.lower().str.contains('incompleta|não vacinado|pendente|atrasado', na=False)
             ]
             
             if len(nao_vacinados) > 0:
@@ -4652,14 +4655,12 @@ def generate_smart_notifications(df):
             })
         
         # 8. Tendência geral
-        if len(df_temp) > 0:
-            # Verificar se há muitos pets cadastrados
-            if len(df_temp) > 50:
-                notifications.append({
-                    'tipo': 'info',
-                    'titulo': f'📈 Sistema com {len(df_temp)} pets cadastrados',
-                    'descricao': 'Grande volume de pets pode indicar necessidade de mais campanhas de adoção.'
-                })
+        if len(df_temp) > 50:
+            notifications.append({
+                'tipo': 'info',
+                'titulo': f'📈 Sistema com {len(df_temp)} pets cadastrados',
+                'descricao': 'Grande volume de pets pode indicar necessidade de mais campanhas de adoção.'
+            })
         
     except Exception as e:
         print(f"Erro ao gerar notificações: {e}")
