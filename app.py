@@ -1353,54 +1353,6 @@ def display_login_page():
             st.session_state.session_id = str(uuid.uuid4())
             st.rerun()
         
-        # Seção de registro comentada
-        """
-        # SEÇÃO DE REGISTRO COMENTADA - Para reativar, descomente este bloco
-        
-        with tab2:
-            with st.form("register_form"):
-                st.caption("Crie uma conta para acessar todos os recursos")
-                
-                full_name = st.text_input("Nome completo", key="register_name")
-                new_email = st.text_input("Email", key="register_email")
-                new_password = st.text_input("Senha", type="password", key="register_password")
-                confirm_password = st.text_input("Confirmar senha", type="password", key="register_confirm")
-                
-                terms = st.checkbox("Eu concordo com os Termos de Serviço", key="register_terms")
-                
-                register = st.form_submit_button("Criar Conta", use_container_width=True)
-                
-                if register:
-                    if not full_name or not new_email or not new_password:
-                        st.error("Por favor, preencha todos os campos.")
-                    elif new_password != confirm_password:
-                        st.error("As senhas não coincidem.")
-                    elif not terms:
-                        st.error("Você precisa concordar com os Termos de Serviço.")
-                    elif not re.match(r"[^@]+@[^@]+\.[^@]+", new_email):
-                        st.error("Por favor, insira um email válido.")
-                    elif len(new_password) < 6:
-                        st.error("A senha deve ter pelo menos 6 caracteres.")
-                    else:
-                        with st.spinner("Criando conta..."):
-                            time.sleep(0.5)
-                            success, user_id = register_new_user(new_email, new_password, full_name)
-                            
-                            if success:
-                                st.success("Conta criada com sucesso!")
-                                
-                                st.session_state.user_id = user_id
-                                st.session_state.user_role = "user"
-                                st.session_state.user_info = get_user_info(user_id)
-                                st.session_state.session_id = str(uuid.uuid4())
-                                
-                                log_activity(user_id, "register", "Novo registro de usuário")
-                                
-                                st.rerun()
-                            else:
-                                st.error("Este email já está em uso.")
-        """
-        
         st.markdown('</div>', unsafe_allow_html=True)
 
 def get_logo_base64():
