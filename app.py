@@ -4252,323 +4252,402 @@ def exportar_importar_dados(df):
                 if st.button("🔄 Configurar Sincronização"):
                     st.success("Configurações salvas! A sincronização será ativada em versão futura.")
 
+
+def dashboard_page(df, notifications):
+    """Página principal do dashboard."""
+    
+    # Título principal
+    st.title("🐾 PetCare AI Analytics - Dashboard")
+    
+    # Exibir notificações
+    if notifications:
+        st.subheader("🔔 Notificações do Sistema")
+        
+        for notification in notifications[:5]:  # Mostrar apenas as 5 primeiras
+            icon_map = {
+                'success': '✅',
+                'warning': '⚠️', 
+                'error': '❌',
+                'info': 'ℹ️'
+            }
+            
+            icon = icon_map.get(notification['tipo'], 'ℹ️')
+            
+            if notification['tipo'] == 'success':
+                st.success(f"{icon} **{notification['titulo']}** - {notification['descricao']}")
+            elif notification['tipo'] == 'warning':
+                st.warning(f"{icon} **{notification['titulo']}** - {notification['descricao']}")
+            elif notification['tipo'] == 'error':
+                st.error(f"{icon} **{notification['titulo']}** - {notification['descricao']}")
+            else:
+                st.info(f"{icon} **{notification['titulo']}** - {notification['descricao']}")
+    
+    # Verificar se há dados
+    if df.empty:
+        st.info("📊 **Bem-vindo ao PetCare AI Analytics!**")
+        st.write("Você ainda não tem pets cadastrados. Comece:")
+        
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("➕ Adicionar Pet", use_container_width=True):
+                st.session_state.current_page = 'add_pet'
+                st.rerun()
+        
+        with col2:
+            if st.button("📥 Importar Dados", use_container_width=True):
+                st.session_state.current_page = 'import_export'
+                st.rerun()
+        
+        with col3:
+            if st.button("📖 Ver Tutorial", use_container_width=True):
+                st.session_state.show_tutorial = True
+                st.rerun()
+        
+        # Tutorial básico
+        if st.session_state.get('show_tutorial', False):
+            with st.expander("📖 Como começar", expanded=True):
+                st.write("""
+                **1. Adicionar Pets:** Use o botão "Adicionar Pet" para cadastrar seus primeiros pets.
+                
+                **2. Importar Dados:** Se você já tem uma planilha com dados, use "Importar Dados".
+                
+                **3. Análises:** Com dados cadastrados, você terá acesso a:
+                - 📊 Dashboard com estatísticas
+                - 🔍 Analytics avançado 
+                - 📈 Relatórios personalizados
+                - 🤖 Insights de IA
+                
+                **4. Gerenciamento:** Use a lista de pets para editar informações e acompanhar adoções.
+                """)
+                
+                if st.button("Fechar Tutorial"):
+                    st.session_state.show_tutorial = False
+                    st.rerun()
+        
+        return
+    
+    # KPIs principais
+    st.subheader("📊 Indicadores Principais")
+    
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        total_pets = len(df)
+        st.metric("Total de Pets", total_pets)
+    
+    with col2:
+        if 'adotado' in df.columns:
+            adotados = df['adotado'].sum() if df['adotado'].dtype == bool else len(df[df['adotado'] == True])
+        else:
+            adotados = 0
+        st.metric("Pets Adotados", adotados)
+    
+    with col3:
+        disponivel = total_pets - adotados
+        st.metric("Disponíveis", disponivel)
+    
+    with col4:
+        if adotados > 0 and total_pets > 0:
+            taxa_adocao = (adotados / total_pets) * 100
+        else:
+            taxa_adocao = 0
+        st.metric("Taxa de Adoção", f"{taxa_adocao:.1f}%")
+    
+    # Gráficos principais
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("🐕 Distribuição por Tipo")
+        if 'tipo_pet' in df.columns:
+            tipo_counts = df['tipo_pet'].value_counts()
+            fig = px.pie(values=tipo_counts.values, names=tipo_counts.index)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Dados de tipo de pet não disponíveis")
+    
+    with col2:
+        st.subheader("📍 Distribuição por Região")
+        if 'regiao' in df.columns:
+            regiao_counts = df['regiao'].value_counts()
+            fig = px.bar(x=regiao_counts.index, y=regiao_counts.values)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Dados de região não disponíveis")
+    
+    # Pets recentes
+    st.subheader("🆕 Pets Recém-Cadastrados")
+    
+    if 'created_at' in df.columns:
+        df_sorted = df.sort_values('created_at', ascending=False)
+        recent_pets = df_sorted.head(5)
+        
+        if len(recent_pets) > 0:
+            display_columns = ['nome', 'tipo_pet', 'raca', 'idade', 'created_at']
+            available_columns = [col for col in display_columns if col in recent_pets.columns]
+            
+            st.dataframe(
+                recent_pets[available_columns],
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("Nenhum pet encontrado")
+    else:
+        st.info("Dados de data de cadastro não disponíveis")
+
 def main():
-    """Função principal aprimorada."""
-    # Inicializar o banco de dados
+    """Função principal da aplicação."""
+    
+    # Inicializar banco de dados
     init_database()
     
-    # Configuração da página
+    # Configurar página
     st.set_page_config(
-        page_title="PetCare Analytics - Sistema Avançado com IA",
+        page_title="🐾 PetCare AI Analytics",
         page_icon="🐾",
         layout="wide",
         initial_sidebar_state="expanded"
     )
     
-    # Verificar se há sessão persistente
-    if "user_id" not in st.session_state:
-        # Tentar recuperar sessão do query params ou cookies simulados
-        query_params = st.query_params
-        
-        # Verificar se há um token de sessão nos query params
-        if "session_token" in query_params:
-            try:
-                # Simular validação de token (em produção, validar no banco)
-                session_token = query_params["session_token"]
-                if session_token == "demo_session":  # Token demo
-                    st.session_state.user_id = 1
-                    st.session_state.user_role = "admin"
-                    st.session_state.user_info = {
-                        "email": "admin@petcare.com",
-                        "full_name": "Administrador",
-                        "role": "admin"
-                    }
-                    st.session_state.session_id = str(uuid.uuid4())
-            except:
-                pass
-        
-        # Verificar se há lembrete de login
-        if st.session_state.get("remember_login", False):
-            # Restaurar sessão anterior (simulado)
-            last_user = st.session_state.get("last_user_id")
-            if last_user:
-                user_info = get_user_info(last_user)
-                if user_info:
-                    st.session_state.user_id = last_user
-                    st.session_state.user_role = user_info["role"]
-                    st.session_state.user_info = user_info
-                    st.session_state.session_id = str(uuid.uuid4())
+    # CSS personalizado
+    inject_custom_css()
     
-    # CSS personalizado global
-    st.markdown("""
-    <style>
-    .main-header {
-        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
-        color: white;
-        padding: 1rem;
-        border-radius: 10px;
-        margin-bottom: 1rem;
-        text-align: center;
-    }
-    .metric-card {
-        background: white;
-        padding: 1rem;
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-left: 4px solid #4CAF50;
-    }
-    .sidebar .stSelectbox > div > div {
-        background-color: #f8f9fa;
-    }
-    .stButton > button {
-        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
-        color: white;
-        border: none;
-        border-radius: 5px;
-        transition: all 0.3s ease;
-    }
-    .stButton > button:hover {
-        background: linear-gradient(135deg, #388E3C 0%, #4CAF50 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
-    }
-    .alert-success {
-        background-color: #d4edda;
-        border-color: #c3e6cb;
-        color: #155724;
-        padding: 0.75rem 1.25rem;
-        margin-bottom: 1rem;
-        border: 1px solid transparent;
-        border-radius: 0.25rem;
-    }
-    .stTabs [data-baseweb="tab-list"] {
-        gap: 2px;
-    }
-    .stTabs [data-baseweb="tab"] {
-        background-color: #e8f5e8;
-        color: #2E7D32;
-        border-radius: 8px 8px 0 0;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: #4CAF50;
-        color: white;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # Verificar se o usuário está logado
-    if "user_id" not in st.session_state or "user_role" not in st.session_state:
-        display_login_page()
+    # Verificar autenticação
+    if not st.session_state.get('logged_in', False):
+        login_page()
         return
     
-    # Exibir cabeçalho
-    display_header()
+    # Sidebar
+    with st.sidebar:
+        create_sidebar()
     
-    # Carregar dados do banco de dados
-    df = load_data_from_db()
+    # Conteúdo principal baseado na página selecionada
+    page = st.session_state.get('current_page', 'dashboard')
     
-    # Adicionar barra lateral para filtros e navegação
-    df_filtrado = apply_filters(df)
-    st.session_state.df_filtrado = df_filtrado
-    
-    # Menu de navegação principal expandido
-    st.sidebar.markdown("## 🚀 Navegação Principal")
-    
-    # Agrupar menus por categoria
-    menu_categoria = st.sidebar.radio(
-        "Categoria:",
-        ["📊 Análises", "📝 Gestão", "🔧 Ferramentas", "⚙️ Sistema"]
-    )
-    
-    if menu_categoria == "📊 Análises":
-        menu_opcao = st.sidebar.selectbox(
-            "Selecione:",
-            ["Dashboard", "Visualizar Dados", "Análises Avançadas", "IA Insights", "Mapa Interativo"]
-        )
-    elif menu_categoria == "📝 Gestão":
-        menu_opcao = st.sidebar.selectbox(
-            "Selecione:",
-            ["Adicionar Pet", "Editar Pets", "Gerenciar Adoções", "Relatórios"]
-        )
-    elif menu_categoria == "🔧 Ferramentas":
-        menu_opcao = st.sidebar.selectbox(
-            "Selecione:",
-            ["Exportar/Importar", "Backup/Restauração", "Migração de Dados"]
-        )
-    else:  # Sistema
-        menu_opcao = st.sidebar.selectbox(
-            "Selecione:",
-            ["Configurações do Usuário", "Painel de Administração" if st.session_state.user_role == "admin" else None]
-        )
-        menu_opcao = menu_opcao if menu_opcao else "Configurações do Usuário"
-    
-    # Menu de acesso rápido
-    st.sidebar.markdown("## ⚡ Acesso Rápido")
-    
-    col1, col2 = st.sidebar.columns(2)
-    
-    with col1:
-        if st.button("➕ Novo Pet", use_container_width=True):
-            st.session_state.quick_action = "Adicionar Pet"
-    
-    with col2:
-        if st.button("📊 Dashboard", use_container_width=True):
-            st.session_state.quick_action = "Dashboard"
-    
-    # Verificar ação rápida
-    if "quick_action" in st.session_state:
-        menu_opcao = st.session_state.quick_action
-        del st.session_state.quick_action
-    
-    # Estatísticas na sidebar
-    if not df.empty:
-        st.sidebar.markdown("## 📈 Estatísticas Rápidas")
+    if page == 'dashboard':
+        # Carregar dados dos pets
+        df = load_pets_data()
         
-        with st.sidebar.container():
-            st.metric("Total de Pets", len(df))
-            
-            if 'adotado' in df.columns:
-                taxa_adocao = df['adotado'].mean() * 100
-                st.metric("Taxa de Adoção", f"{taxa_adocao:.1f}%")
-            
-            if 'score_adocao' in df.columns:
-                score_medio = df['score_adocao'].mean()
-                st.metric("Score Médio", f"{score_medio:.2f}")
-    
-    # Notificações e alertas
-    st.sidebar.markdown("## 🔔 Notificações")
-    
-    # Gerar notificações inteligentes
-    notifications = generate_smart_notifications(df)
-    
-    for notification in notifications[:3]:  # Máximo 3 notificações
-        if notification['type'] == 'warning':
-            st.sidebar.warning(f"⚠️ {notification['message']}")
-        elif notification['type'] == 'info':
-            st.sidebar.info(f"ℹ️ {notification['message']}")
+        # Verificar se há dados antes de gerar notificações
+        if not df.empty:
+            notifications = generate_smart_notifications(df)
         else:
-            st.sidebar.success(f"✅ {notification['message']}")
-    
-    # Botão de logout
-    st.sidebar.markdown("---")
-    
-    col1, col2 = st.sidebar.columns([1, 1])
-    
-    with col1:
-        if st.button("🔄 Atualizar", use_container_width=True):
-            st.rerun()
-    
-    with col2:
-        if st.button("📤 Sair", use_container_width=True):
-            # Limpar sessão
-            if "user_id" in st.session_state:
-                log_activity(st.session_state.user_id, "logout", "Logout do sistema")
-                
-                for key in list(st.session_state.keys()):
-                    del st.session_state[key]
-            
-            st.rerun()
-    
-    # Informações do sistema
-    st.sidebar.markdown("---")
-    st.sidebar.markdown(
-        "<div style='text-align: center; font-size: 0.8rem; color: #666;'>"
-        "🐾 PetCare Analytics v2.0<br>"
-        "Sistema Avançado com IA<br>"
-        f"Usuário: {st.session_state.user_info['full_name']}<br>"
-        f"Última atualização: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M')}"
-        "</div>",
-        unsafe_allow_html=True
-    )
-    
-    # Navegar para a página escolhida
-    try:
-        if menu_opcao == "Dashboard":
-            display_dashboard(df, df_filtrado)
-        elif menu_opcao == "Visualizar Dados":
-            visualizar_dados(df)
-        elif menu_opcao == "Adicionar Pet":
-            adicionar_pet()
-        elif menu_opcao == "Análises Avançadas":
-            advanced_analytics(df)
-        elif menu_opcao == "Exportar/Importar":
-            exportar_importar_dados(df)
-        elif menu_opcao == "IA Insights":
-            ai_insights(df)
-        elif menu_opcao == "Mapa Interativo":
-            mapa_interativo(df)
-        elif menu_opcao == "Configurações do Usuário":
-            user_settings()
-        elif menu_opcao == "Painel de Administração" and st.session_state.user_role == "admin":
-            admin_panel()
-        else:
-            # Página padrão
-            display_dashboard(df, df_filtrado)
-    
-    except Exception as e:
-        st.error(f"❌ Erro ao carregar a página: {str(e)}")
-        st.info("🔄 Tente recarregar a página ou entre em contato com o administrador.")
+            notifications = [{
+                'tipo': 'info',
+                'titulo': '📊 Sistema Iniciado',
+                'descricao': 'Nenhum pet cadastrado ainda. Comece adicionando alguns pets!'
+            }]
         
-        # Log do erro
-        if "user_id" in st.session_state:
-            log_activity(
-                st.session_state.user_id, 
-                "error", 
-                f"Erro na página {menu_opcao}: {str(e)}"
-            )
+        dashboard_page(df, notifications)
+        
+    elif page == 'add_pet':
+        add_pet_page()
+        
+    elif page == 'pets_list':
+        pets_list_page()
+        
+    elif page == 'analytics':
+        analytics_page()
+        
+    elif page == 'reports':
+        reports_page()
+        
+    elif page == 'import_export':
+        exportar_importar_dados()
+        
+    elif page == 'admin':
+        admin_panel()
+        
+    else:
+        dashboard_page(pd.DataFrame(), [])
 
 def generate_smart_notifications(df):
-    """Gera notificações inteligentes baseadas nos dados."""
+    """Gera notificações inteligentes baseadas nos dados dos pets."""
     notifications = []
     
     if df.empty:
         return notifications
     
-    # Notificação sobre pets não adotados há muito tempo
-    if 'data_registro' in df.columns and 'adotado' in df.columns:
+    try:
         df_temp = df.copy()
-        df_temp['data_registro'] = pd.to_datetime(df_temp['data_registro'])
+        
+        # Converter created_at para datetime se existir
+        if 'created_at' in df_temp.columns:
+            df_temp['created_at'] = pd.to_datetime(df_temp['created_at'], errors='coerce')
+            # Usar created_at como data_registro
+            df_temp['data_registro'] = df_temp['created_at']
+        else:
+            # Se não tiver created_at, criar uma data padrão
+            df_temp['data_registro'] = pd.Timestamp.now()
+        
+        # Garantir que data_registro seja datetime
+        df_temp['data_registro'] = pd.to_datetime(df_temp['data_registro'], errors='coerce')
+        
+        # Preencher valores nulos com data atual
+        df_temp['data_registro'] = df_temp['data_registro'].fillna(pd.Timestamp.now())
+        
+        # Calcular dias no sistema
         df_temp['dias_sistema'] = (pd.Timestamp.now() - df_temp['data_registro']).dt.days
         
-        pets_antigos = df_temp[(df_temp['adotado'] == False) & (df_temp['dias_sistema'] > 90)]
+        # 1. Pets há muito tempo sem adoção
+        pets_antigos = df_temp[
+            (df_temp['dias_sistema'] > 90) & 
+            (df_temp.get('status', '').str.lower() != 'adotado')
+        ]
         
         if len(pets_antigos) > 0:
             notifications.append({
-                'type': 'warning',
-                'message': f"{len(pets_antigos)} pets há mais de 90 dias aguardando adoção"
+                'tipo': 'warning',
+                'titulo': f'🕐 {len(pets_antigos)} pet(s) há mais de 90 dias sem adoção',
+                'descricao': f'Considere revisar estratégias de divulgação para: {", ".join(pets_antigos["nome"].head(3).tolist())}'
             })
-    
-    # Notificação sobre pets com alto score não adotados
-    if 'score_adocao' in df.columns and 'adotado' in df.columns:
-        high_score_not_adopted = df[(df['adotado'] == False) & (df['score_adocao'] > 4.0)]
         
-        if len(high_score_not_adopted) > 0:
-            notifications.append({
-                'type': 'info',
-                'message': f"{len(high_score_not_adopted)} pets com alto score aguardando adoção"
-            })
-    
-    # Notificação sobre necessidades especiais
-    if 'necessidades_especiais' in df.columns:
-        pets_especiais = df[df['necessidades_especiais'].notna() & (df['necessidades_especiais'] != '')]
+        # 2. Pets com score de adoção baixo
+        if 'score_adocao' in df_temp.columns:
+            df_temp['score_adocao'] = pd.to_numeric(df_temp['score_adocao'], errors='coerce')
+            pets_baixo_score = df_temp[
+                (df_temp['score_adocao'] < 0.3) & 
+                (df_temp['score_adocao'].notna())
+            ]
+            
+            if len(pets_baixo_score) > 0:
+                notifications.append({
+                    'tipo': 'info',
+                    'titulo': f'📊 {len(pets_baixo_score)} pet(s) com score de adoção baixo',
+                    'descricao': 'Pets que podem precisar de atenção especial ou melhor perfil.'
+                })
         
-        if len(pets_especiais) > 0:
-            notifications.append({
-                'type': 'info',
-                'message': f"{len(pets_especiais)} pets com necessidades especiais precisam de atenção"
-            })
-    
-    # Notificação de sucesso sobre adoções recentes
-    if 'adotado' in df.columns:
-        taxa_adocao = df['adotado'].mean()
+        # 3. Distribuição por região
+        if 'regiao' in df_temp.columns:
+            regiao_counts = df_temp['regiao'].value_counts()
+            if len(regiao_counts) > 0:
+                regiao_dominante = regiao_counts.index[0]
+                porcentagem = (regiao_counts.iloc[0] / len(df_temp)) * 100
+                
+                if porcentagem > 60:
+                    notifications.append({
+                        'tipo': 'info',
+                        'titulo': f'📍 Concentração regional alta',
+                        'descricao': f'{porcentagem:.1f}% dos pets estão na região {regiao_dominante}'
+                    })
         
-        if taxa_adocao > 0.7:
+        # 4. Pets com necessidades especiais
+        if 'necessidades_especiais' in df_temp.columns:
+            pets_especiais = df_temp[
+                df_temp['necessidades_especiais'].notna() & 
+                (df_temp['necessidades_especiais'].str.strip() != '') &
+                (df_temp['necessidades_especiais'].str.lower() != 'nenhuma')
+            ]
+            
+            if len(pets_especiais) > 0:
+                notifications.append({
+                    'tipo': 'info',
+                    'titulo': f'💝 {len(pets_especiais)} pet(s) com necessidades especiais',
+                    'descricao': 'Pets que podem precisar de cuidados específicos.'
+                })
+        
+        # 5. Análise de idade
+        if 'idade' in df_temp.columns:
+            df_temp['idade'] = pd.to_numeric(df_temp['idade'], errors='coerce')
+            pets_idosos = df_temp[df_temp['idade'] > 7]
+            pets_filhotes = df_temp[df_temp['idade'] < 1]
+            
+            if len(pets_idosos) > 0:
+                notifications.append({
+                    'tipo': 'warning',
+                    'titulo': f'🐾 {len(pets_idosos)} pet(s) idoso(s)',
+                    'descricao': 'Pets mais velhos podem precisar de estratégias especiais de adoção.'
+                })
+            
+            if len(pets_filhotes) > 0:
+                notifications.append({
+                    'tipo': 'success',
+                    'titulo': f'🐱 {len(pets_filhotes)} filhote(s) disponível(is)',
+                    'descricao': 'Filhotes tendem a ter maior demanda para adoção.'
+                })
+        
+        # 6. Status de vacinação
+        if 'status_vacinacao' in df_temp.columns:
+            nao_vacinados = df_temp[
+                df_temp['status_vacinacao'].str.lower().isin(['incompleta', 'não vacinado', 'pendente'])
+            ]
+            
+            if len(nao_vacinados) > 0:
+                notifications.append({
+                    'tipo': 'warning',
+                    'titulo': f'💉 {len(nao_vacinados)} pet(s) com vacinação pendente',
+                    'descricao': 'Importante completar vacinação antes da adoção.'
+                })
+        
+        # 7. Pets recém-cadastrados
+        pets_novos = df_temp[df_temp['dias_sistema'] <= 7]
+        
+        if len(pets_novos) > 0:
             notifications.append({
-                'type': 'success',
-                'message': f"Excelente taxa de adoção: {taxa_adocao*100:.1f}%!"
+                'tipo': 'success',
+                'titulo': f'✨ {len(pets_novos)} pet(s) recém-cadastrado(s)',
+                'descricao': 'Novos pets adicionados na última semana.'
             })
+        
+        # 8. Tendência geral
+        if len(df_temp) > 0:
+            # Verificar se há muitos pets cadastrados
+            if len(df_temp) > 50:
+                notifications.append({
+                    'tipo': 'info',
+                    'titulo': f'📈 Sistema com {len(df_temp)} pets cadastrados',
+                    'descricao': 'Grande volume de pets pode indicar necessidade de mais campanhas de adoção.'
+                })
+        
+    except Exception as e:
+        print(f"Erro ao gerar notificações: {e}")
+        # Retornar notificação de erro se houver problema
+        notifications.append({
+            'tipo': 'error',
+            'titulo': '⚠️ Erro no sistema de notificações',
+            'descricao': 'Não foi possível gerar todas as notificações automáticas.'
+        })
     
     return notifications
+
+def load_pets_data():
+    """Carrega dados dos pets do Supabase."""
+    try:
+        result = supabase.table('pets_analytics').select('*').execute()
+        
+        if result.data:
+            df = pd.DataFrame(result.data)
+            
+            # Garantir que as colunas de data sejam datetime
+            date_columns = ['created_at', 'updated_at']
+            for col in date_columns:
+                if col in df.columns:
+                    df[col] = pd.to_datetime(df[col], errors='coerce')
+            
+            # Garantir que colunas numéricas sejam tratadas corretamente
+            numeric_columns = ['idade', 'peso', 'score_adocao', 'custo_mensal', 'risco_abandono']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            
+            # Garantir que colunas booleanas sejam tratadas corretamente
+            boolean_columns = ['adotado', 'castrado', 'microchip', 'compatibilidade_criancas', 'compatibilidade_pets']
+            for col in boolean_columns:
+                if col in df.columns:
+                    df[col] = df[col].astype(bool, errors='ignore')
+            
+            return df
+        else:
+            # Retornar DataFrame vazio com colunas padrão
+            return pd.DataFrame(columns=[
+                'id', 'nome', 'tipo_pet', 'raca', 'idade', 'peso', 'sexo',
+                'created_at', 'updated_at'
+            ])
+            
+    except Exception as e:
+        print(f"Erro ao carregar dados dos pets: {e}")
+        return pd.DataFrame()
 
 # Funções auxiliares adicionais continuam aqui...
 def ai_insights(df):
