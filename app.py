@@ -213,6 +213,10 @@ def get_pets_data():
         st.error(f"Erro ao carregar dados: {e}")
         return pd.DataFrame()
 
+def generate_password_hash(password):
+    """Gera um hash SHA-256 para a senha."""
+    return hashlib.sha256(password.encode()).hexdigest()
+
 def import_csv_data(df):
     """Importa dados do CSV para o Supabase."""
     
@@ -1077,7 +1081,8 @@ def generate_sample_data(n_samples=200):
             idade_max = 10
         
         idade = max(0.1, min(idade_max, np.random.exponential(3)))
-        peso = max(0.1, peso_base + np.random.normal(0, peso_base * 0.2))
+        peso_std = max(0.1, abs(peso_base * 0.2))  # Garantir que o desvio padrão seja positivo
+        peso = max(0.1, peso_base + np.random.normal(0, peso_std))
         
         # Dados expandidos
         sociabilidade = np.random.randint(1, 6)
@@ -1350,7 +1355,7 @@ def display_login_page():
                                     st.session_state.remember_login = True
                                     st.session_state.last_user_id = user_id
                                     # Adicionar token na URL para persistir sessão
-                                    st.experimental_set_query_params(session_token="demo_session")
+                                    # st.experimental_set_query_params(session_token="demo_session")
                                 
                                 log_activity(user_id, "login", "Login bem-sucedido")
                                 
@@ -4284,13 +4289,13 @@ def main():
     # Verificar se há sessão persistente
     if "user_id" not in st.session_state:
         # Tentar recuperar sessão do query params ou cookies simulados
-        query_params = st.experimental_get_query_params()
+        query_params = st.query_params
         
         # Verificar se há um token de sessão nos query params
         if "session_token" in query_params:
             try:
                 # Simular validação de token (em produção, validar no banco)
-                session_token = query_params["session_token"][0]
+                session_token = query_params["session_token"]
                 if session_token == "demo_session":  # Token demo
                     st.session_state.user_id = 1
                     st.session_state.user_role = "admin"
