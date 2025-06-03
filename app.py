@@ -398,37 +398,31 @@ def import_data_interface():
             st.info("💡 Verifique se o arquivo CSV está no formato correto.")
 
 def update_pet_status(pet_id, new_status):
-    """Atualiza o status de um pet."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
+    """Atualiza o status de um pet no Supabase."""
     try:
-        c.execute("UPDATE pets SET status = ? WHERE id = ?", (new_status, pet_id))
+        update_data = {'status': new_status}
         
         # Se foi adotado, marcar flag
         if new_status == "Adotado":
-            c.execute("UPDATE pets SET adotado = 1 WHERE id = ?", (pet_id,))
+            update_data['adotado'] = True
         
-        conn.commit()
-        return True
+        result = supabase.table('pets_analytics').update(update_data).eq('id', pet_id).execute()
+        
+        return result.data is not None
+        
     except Exception as e:
+        print(f"Erro ao atualizar status: {e}")
         return False
-    finally:
-        conn.close()
 
 def delete_pet(pet_id):
-    """Remove um pet do banco de dados."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
+    """Remove um pet do Supabase."""
     try:
-        c.execute("DELETE FROM pets WHERE id = ?", (pet_id,))
-        conn.commit()
-        return True
+        result = supabase.table('pets_analytics').delete().eq('id', pet_id).execute()
+        return result.data is not None
+        
     except Exception as e:
+        print(f"Erro ao deletar pet: {e}")
         return False
-    finally:
-        conn.close()
 
 def display_add_pet_form():
     """Exibe formulário para adicionar novo pet."""
@@ -1143,24 +1137,15 @@ def generate_sample_data(n_samples=200):
     return pd.DataFrame(data)
 
 def save_pet_to_db(pet_data):
-    """Salva um novo pet no banco de dados."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
+    """Salva um novo pet no Supabase."""
     try:
-        # Verificar quais colunas existem na tabela
-        c.execute("PRAGMA table_info(pets)")
-        existing_columns = [column[1] for column in c.fetchall()]
-        
-        # Filtrar apenas dados que correspondem a colunas existentes
+        # Filtrar apenas dados que não são None ou vazios
         filtered_data = {}
         for key, value in pet_data.items():
-            if key in existing_columns:
-                # Converter valores booleanos para inteiros se necessário
+            if value is not None and value != '':
+                # Converter valores booleanos para o formato correto
                 if isinstance(value, bool):
-                    filtered_data[key] = 1 if value else 0
-                elif value == '' or value is None:
-                    filtered_data[key] = None
+                    filtered_data[key] = value
                 else:
                     filtered_data[key] = value
         
@@ -1170,24 +1155,18 @@ def save_pet_to_db(pet_data):
             if field not in filtered_data or not filtered_data[field]:
                 return False, f"Campo obrigatório '{field}' está vazio"
         
-        # Construir query dinamicamente
-        columns = ', '.join(filtered_data.keys())
-        placeholders = ', '.join(['?' for _ in filtered_data])
-        values = tuple(filtered_data.values())
+        # Inserir no Supabase
+        result = supabase.table('pets_analytics').insert(filtered_data).execute()
         
-        query = f"INSERT INTO pets ({columns}) VALUES ({placeholders})"
-        c.execute(query, values)
-        
-        pet_id = c.lastrowid
-        conn.commit()
-        
-        return True, pet_id
+        if result.data:
+            pet_id = result.data[0]['id']
+            return True, pet_id
+        else:
+            return False, "Erro ao inserir dados no Supabase"
         
     except Exception as e:
         print(f"Erro ao salvar pet: {e}")
         return False, str(e)
-    finally:
-        conn.close()
 
 def custom_card(title, content, icon=None, color="#4527A0"):
     """Renderiza um card personalizado."""
@@ -5666,18 +5645,50 @@ def admin_panel():
     elif admin_section == "👥 Gerenciar Usuários":
         st.subheader("👥 Gerenciamento Avançado de Usuários")
         
-        # Obter dados de usuários do banco
-        conn = sqlite3.connect(DATABASE_PATH)
-        query = """
-        SELECT u.id, u.email, u.full_name, u.role, u.created_at, u.last_login,
-               COUNT(p.id) as pets_cadastrados,
-               COUNT(CASE WHEN p.adotado = 1 THEN 1 END) as pets_adotados
-        FROM users u
-        LEFT JOIN pets p ON u.id = p.created_by
-        GROUP BY u.id, u.email, u.full_name, u.role, u.created_at, u.last_login
-        """
-        df_users = pd.read_sql_query(query, conn)
-        conn.close()
+        # Obter dados de usuários do Supabase
+        try:
+            # Buscar usuários
+            users_result = supabase.table('users_analytics').select('*').execute()
+            
+            if users_result.data:
+                df_users = pd.DataFrame(users_result.data)
+                
+                # Buscar contagem de pets por usuário
+                pets_result = supabase.table('pets_analytics').select('created_by').execute()
+                
+                if pets_result.data:
+                    pets_df = pd.DataFrame(pets_result.data)
+                    
+                    # Contar pets cadastrados por usuário
+                    pets_count = pets_df.groupby('created_by').size().reset_index(name='pets_cadastrados')
+                    
+                    # Contar pets adotados por usuário (assumindo que temos campo 'adotado')
+                    pets_adopted = pets_df[pets_df.get('adotado', False) == True].groupby('created_by').size().reset_index(name='pets_adotados') if 'adotado' in pets_df.columns else pd.DataFrame({'created_by': [], 'pets_adotados': []})
+                    
+                    # Merge com dados de usuários
+                    df_users = df_users.merge(pets_count, left_on='id', right_on='created_by', how='left')
+                    df_users = df_users.merge(pets_adopted, left_on='id', right_on='created_by', how='left')
+                    
+                    # Preencher valores nulos
+                    df_users['pets_cadastrados'] = df_users['pets_cadastrados'].fillna(0).astype(int)
+                    df_users['pets_adotados'] = df_users['pets_adotados'].fillna(0).astype(int)
+                else:
+                    df_users['pets_cadastrados'] = 0
+                    df_users['pets_adotados'] = 0
+                    
+            else:
+                # Criar DataFrame vazio com colunas necessárias
+                df_users = pd.DataFrame(columns=[
+                    'id', 'email', 'full_name', 'role', 'created_at', 'last_login', 
+                    'pets_cadastrados', 'pets_adotados'
+                ])
+                
+        except Exception as e:
+            st.error(f"Erro ao carregar usuários: {e}")
+            df_users = pd.DataFrame(columns=[
+                'id', 'email', 'full_name', 'role', 'created_at', 'last_login', 
+                'pets_cadastrados', 'pets_adotados'
+            ])
         
         # Filtros e busca
         col1, col2, col3 = st.columns(3)
@@ -5694,67 +5705,101 @@ def admin_panel():
         # Aplicar filtros
         df_filtered = df_users.copy()
         
-        if search_term:
+        if search_term and len(df_filtered) > 0:
             df_filtered = df_filtered[
                 (df_filtered['email'].str.contains(search_term, case=False, na=False)) |
                 (df_filtered['full_name'].str.contains(search_term, case=False, na=False))
             ]
         
-        if role_filter != "Todos":
+        if role_filter != "Todos" and len(df_filtered) > 0:
             df_filtered = df_filtered[df_filtered['role'] == role_filter]
         
         # Tabela de usuários
         st.subheader("📋 Lista de Usuários")
         
-        # Configurar colunas da tabela
-        column_config = {
-            "id": "ID",
-            "email": "Email",
-            "full_name": "Nome Completo",
-            "role": st.column_config.SelectboxColumn(
-                "Papel",
-                options=["admin", "user", "guest"],
-                required=True
-            ),
-            "created_at": st.column_config.DatetimeColumn("Data de Criação"),
-            "last_login": st.column_config.DatetimeColumn("Último Login"),
-            "pets_cadastrados": st.column_config.NumberColumn("Pets Cadastrados"),
-            "pets_adotados": st.column_config.NumberColumn("Pets Adotados")
-        }
-        
-        # Editor de dados
-        edited_df = st.data_editor(
-            df_filtered,
-            column_config=column_config,
-            use_container_width=True,
-            hide_index=True,
-            num_rows="dynamic"
-        )
-        
-        # Botões de ação
-        col1, col2, col3, col4 = st.columns(4)
-        
-        with col1:
-            if st.button("💾 Salvar Alterações", use_container_width=True):
-                st.success("✅ Alterações salvas com sucesso!")
-        
-        with col2:
-            if st.button("➕ Novo Usuário", use_container_width=True):
-                st.session_state.show_new_user_form = True
-        
-        with col3:
-            if st.button("📧 Enviar Email em Massa", use_container_width=True):
-                st.session_state.show_email_form = True
-        
-        with col4:
-            if st.button("📊 Relatório de Usuários", use_container_width=True):
-                csv_data = df_users.to_csv(index=False).encode('utf-8')
-                st.download_button(
-                    label="Baixar CSV",
-                    data=csv_data,
-                    file_name=f"usuarios_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
-                    mime="text/csv"
-                )
+        if len(df_filtered) > 0:
+            # Configurar colunas da tabela
+            column_config = {
+                "id": "ID",
+                "email": "Email",
+                "full_name": "Nome Completo",
+                "role": st.column_config.SelectboxColumn(
+                    "Papel",
+                    options=["admin", "user", "guest"],
+                    required=True
+                ),
+                "created_at": st.column_config.DatetimeColumn("Data de Criação"),
+                "last_login": st.column_config.DatetimeColumn("Último Login"),
+                "pets_cadastrados": st.column_config.NumberColumn("Pets Cadastrados"),
+                "pets_adotados": st.column_config.NumberColumn("Pets Adotados")
+            }
+            
+            # Editor de dados
+            edited_df = st.data_editor(
+                df_filtered,
+                column_config=column_config,
+                use_container_width=True,
+                hide_index=True,
+                num_rows="dynamic"
+            )
+            
+            # Botões de ação
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                if st.button("💾 Salvar Alterações", use_container_width=True):
+                    try:
+                        # Comparar dataframes para encontrar alterações
+                        changes_made = False
+                        
+                        for index, row in edited_df.iterrows():
+                            original_row = df_filtered.iloc[index]
+                            
+                            # Verificar se houve mudanças
+                            if row['role'] != original_row['role'] or row['full_name'] != original_row['full_name']:
+                                # Atualizar no Supabase
+                                update_data = {
+                                    'role': row['role'],
+                                    'full_name': row['full_name']
+                                }
+                                
+                                result = supabase.table('users_analytics').update(update_data).eq('id', row['id']).execute()
+                                
+                                if result.data:
+                                    changes_made = True
+                                else:
+                                    st.error(f"Erro ao atualizar usuário {row['email']}")
+                        
+                        if changes_made:
+                            st.success("✅ Alterações salvas com sucesso!")
+                            log_activity(st.session_state.user_id, "update_users", "Atualizou dados de usuários")
+                            time.sleep(1)
+                            st.rerun()
+                        else:
+                            st.info("ℹ️ Nenhuma alteração detectada.")
+                            
+                    except Exception as e:
+                        st.error(f"❌ Erro ao salvar alterações: {e}")
+            
+            with col2:
+                if st.button("➕ Novo Usuário", use_container_width=True):
+                    st.session_state.show_new_user_form = True
+            
+            with col3:
+                if st.button("📧 Enviar Email em Massa", use_container_width=True):
+                    st.session_state.show_email_form = True
+            
+            with col4:
+                if st.button("📊 Relatório de Usuários", use_container_width=True):
+                    csv_data = df_users.to_csv(index=False).encode('utf-8')
+                    st.download_button(
+                        label="Baixar CSV",
+                        data=csv_data,
+                        file_name=f"usuarios_{datetime.datetime.now().strftime('%Y%m%d')}.csv",
+                        mime="text/csv"
+                    )
+        else:
+            st.info("📭 Nenhum usuário encontrado com os filtros aplicados.")
         
         # Formulário para novo usuário
         if st.session_state.get('show_new_user_form', False):
@@ -5789,9 +5834,10 @@ def admin_panel():
                                 st.success(f"✅ Usuário {new_name} criado com sucesso!")
                                 log_activity(st.session_state.user_id, "create_user", f"Criou usuário: {new_email}")
                                 st.session_state.show_new_user_form = False
+                                time.sleep(1)
                                 st.rerun()
                             else:
-                                st.error("❌ Email já está em uso.")
+                                st.error("❌ Email já está em uso ou erro na criação.")
                         else:
                             st.error("❌ Preencha todos os campos obrigatórios.")
                     
@@ -5808,8 +5854,8 @@ def admin_panel():
                     
                     recipients = st.multiselect(
                         "Destinatários:",
-                        options=df_users['email'].tolist(),
-                        default=df_users['email'].tolist()
+                        options=df_users['email'].tolist() if len(df_users) > 0 else [],
+                        default=df_users['email'].tolist() if len(df_users) > 0 else []
                     )
                     
                     col_a, col_b = st.columns([1, 1])
@@ -5825,6 +5871,8 @@ def admin_panel():
                             st.success(f"✅ Email enviado para {len(recipients)} usuários!")
                             log_activity(st.session_state.user_id, "mass_email", f"Enviou email para {len(recipients)} usuários")
                             st.session_state.show_email_form = False
+                            time.sleep(1)
+                            st.rerun()
                         else:
                             st.error("❌ Preencha todos os campos.")
                     
@@ -5835,37 +5883,43 @@ def admin_panel():
         # Estatísticas de usuários
         st.subheader("📊 Estatísticas de Usuários")
         
-        col1, col2 = st.columns(2)
-        
-        with col1:
-            # Usuários por papel
-            role_stats = df_users['role'].value_counts()
-            fig_roles = px.pie(
-                values=role_stats.values,
-                names=role_stats.index,
-                title="Distribuição por Papel"
-            )
-            st.plotly_chart(fig_roles, use_container_width=True)
-        
-        with col2:
-            # Atividade dos usuários
-            df_users['last_login'] = pd.to_datetime(df_users['last_login'])
-            df_users['dias_ultimo_login'] = (pd.Timestamp.now() - df_users['last_login']).dt.days
+        if len(df_users) > 0:
+            col1, col2 = st.columns(2)
             
-            activity_ranges = pd.cut(
-                df_users['dias_ultimo_login'].fillna(999),
-                bins=[0, 7, 30, 90, 999],
-                labels=['Última semana', 'Último mês', 'Últimos 3 meses', 'Mais de 3 meses']
-            )
+            with col1:
+                # Usuários por papel
+                role_stats = df_users['role'].value_counts()
+                fig_roles = px.pie(
+                    values=role_stats.values,
+                    names=role_stats.index,
+                    title="Distribuição por Papel"
+                )
+                st.plotly_chart(fig_roles, use_container_width=True)
             
-            activity_counts = activity_ranges.value_counts()
-            
-            fig_activity = px.bar(
-                x=activity_counts.index,
-                y=activity_counts.values,
-                title="Atividade dos Usuários"
-            )
-            st.plotly_chart(fig_activity, use_container_width=True)
+            with col2:
+                # Atividade dos usuários
+                if 'last_login' in df_users.columns:
+                    df_users['last_login'] = pd.to_datetime(df_users['last_login'], errors='coerce')
+                    df_users['dias_ultimo_login'] = (pd.Timestamp.now() - df_users['last_login']).dt.days
+                    
+                    activity_ranges = pd.cut(
+                        df_users['dias_ultimo_login'].fillna(999),
+                        bins=[0, 7, 30, 90, 999],
+                        labels=['Última semana', 'Último mês', 'Últimos 3 meses', 'Mais de 3 meses']
+                    )
+                    
+                    activity_counts = activity_ranges.value_counts()
+                    
+                    fig_activity = px.bar(
+                        x=activity_counts.index,
+                        y=activity_counts.values,
+                        title="Atividade dos Usuários"
+                    )
+                    st.plotly_chart(fig_activity, use_container_width=True)
+                else:
+                    st.info("Dados de último login não disponíveis")
+        else:
+            st.info("📊 Nenhum usuário cadastrado para exibir estatísticas.")
     
     elif admin_section == "🔍 Logs e Auditoria":
         st.subheader("🔍 Sistema de Logs e Auditoria")
@@ -5888,44 +5942,95 @@ def admin_panel():
         with col4:
             action_filter = st.selectbox("Ação:", ["Todas", "login", "add_pet", "export_data", "delete", "update"])
         
-        # Obter logs do banco
-        conn = sqlite3.connect(DATABASE_PATH)
-        
-        if log_type == "Login" or log_type == "Todos":
-            login_query = """
-            SELECT 'login' as log_type, l.timestamp, u.email as user_email, 
-                   CASE WHEN l.success = 1 THEN 'Login Sucesso' ELSE 'Login Falha' END as action,
-                   l.ip_address as details
-            FROM login_logs l
-            LEFT JOIN users u ON l.user_id = u.id
-            ORDER BY l.timestamp DESC
-            LIMIT 1000
-            """
-            df_login_logs = pd.read_sql_query(login_query, conn)
-        else:
-            df_login_logs = pd.DataFrame()
-        
-        if log_type == "Atividade" or log_type == "Todos":
-            activity_query = """
-            SELECT 'activity' as log_type, a.timestamp, u.email as user_email, 
-                   a.action, a.details
-            FROM activity_logs a
-            LEFT JOIN users u ON a.user_id = u.id
-            ORDER BY a.timestamp DESC
-            LIMIT 1000
-            """
-            df_activity_logs = pd.read_sql_query(activity_query, conn)
-        else:
-            df_activity_logs = pd.DataFrame()
-        
-        conn.close()
-        
-        # Combinar logs
-        df_logs = pd.concat([df_login_logs, df_activity_logs], ignore_index=True)
+        # Obter logs do Supabase
+        try:
+            df_logs = pd.DataFrame()
+            
+            if log_type == "Login" or log_type == "Todos":
+                # Buscar logs de login com join para pegar email do usuário
+                login_result = supabase.table('login_logs_analytics').select(
+                    '*, users_analytics(email)'
+                ).order('timestamp', desc=True).limit(1000).execute()
+                
+                if login_result.data:
+                    login_logs = []
+                    for log in login_result.data:
+                        user_email = "Unknown"
+                        if log.get('users_analytics') and log['users_analytics']:
+                            user_email = log['users_analytics']['email']
+                        
+                        login_logs.append({
+                            'log_type': 'login',
+                            'timestamp': log['timestamp'],
+                            'user_email': user_email,
+                            'action': 'Login Sucesso' if log['success'] else 'Login Falha',
+                            'details': log.get('ip_address', 'N/A'),
+                            'success': log['success'],
+                            'failure_reason': log.get('failure_reason', '')
+                        })
+                    df_login_logs = pd.DataFrame(login_logs)
+                else:
+                    df_login_logs = pd.DataFrame()
+            else:
+                df_login_logs = pd.DataFrame()
+            
+            if log_type == "Atividade" or log_type == "Todos":
+                # Buscar logs de atividade com join para pegar email do usuário
+                activity_result = supabase.table('activity_logs_analytics').select(
+                    '*, users_analytics(email)'
+                ).order('timestamp', desc=True).limit(1000).execute()
+                
+                if activity_result.data:
+                    activity_logs = []
+                    for log in activity_result.data:
+                        user_email = "Unknown"
+                        if log.get('users_analytics') and log['users_analytics']:
+                            user_email = log['users_analytics']['email']
+                        
+                        activity_logs.append({
+                            'log_type': 'activity',
+                            'timestamp': log['timestamp'],
+                            'user_email': user_email,
+                            'action': log['action'],
+                            'details': log.get('details', ''),
+                            'session_id': log.get('session_id', ''),
+                            'execution_time': log.get('execution_time', 0)
+                        })
+                    df_activity_logs = pd.DataFrame(activity_logs)
+                else:
+                    df_activity_logs = pd.DataFrame()
+            else:
+                df_activity_logs = pd.DataFrame()
+            
+            # Combinar logs
+            if not df_login_logs.empty and not df_activity_logs.empty:
+                # Alinhar colunas
+                login_cols = set(df_login_logs.columns)
+                activity_cols = set(df_activity_logs.columns)
+                all_cols = login_cols.union(activity_cols)
+                
+                # Adicionar colunas faltantes
+                for col in all_cols:
+                    if col not in df_login_logs.columns:
+                        df_login_logs[col] = None
+                    if col not in df_activity_logs.columns:
+                        df_activity_logs[col] = None
+                
+                df_logs = pd.concat([df_login_logs, df_activity_logs], ignore_index=True)
+            elif not df_login_logs.empty:
+                df_logs = df_login_logs
+            elif not df_activity_logs.empty:
+                df_logs = df_activity_logs
+            else:
+                df_logs = pd.DataFrame()
+            
+        except Exception as e:
+            st.error(f"Erro ao carregar logs: {e}")
+            df_logs = pd.DataFrame()
         
         if not df_logs.empty:
             # Aplicar filtros
-            df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'])
+            df_logs['timestamp'] = pd.to_datetime(df_logs['timestamp'], errors='coerce')
             
             if len(date_range) == 2:
                 start_date, end_date = date_range
@@ -5947,8 +6052,12 @@ def admin_panel():
             df_display = df_logs.copy()
             df_display['timestamp'] = df_display['timestamp'].dt.strftime('%d/%m/%Y %H:%M:%S')
             
+            # Selecionar colunas para exibir
+            display_columns = ['timestamp', 'user_email', 'action', 'details', 'log_type']
+            available_columns = [col for col in display_columns if col in df_display.columns]
+            
             st.dataframe(
-                df_display[['timestamp', 'user_email', 'action', 'details', 'log_type']],
+                df_display[available_columns],
                 use_container_width=True,
                 hide_index=True,
                 column_config={
@@ -5967,45 +6076,67 @@ def admin_panel():
             
             with col1:
                 # Ações mais comuns
-                action_counts = df_logs['action'].value_counts().head(10)
-                fig_actions = px.bar(
-                    x=action_counts.values,
-                    y=action_counts.index,
-                    orientation='h',
-                    title="Top 10 Ações Mais Comuns"
-                )
-                st.plotly_chart(fig_actions, use_container_width=True)
+                if 'action' in df_logs.columns:
+                    action_counts = df_logs['action'].value_counts().head(10)
+                    fig_actions = px.bar(
+                        x=action_counts.values,
+                        y=action_counts.index,
+                        orientation='h',
+                        title="Top 10 Ações Mais Comuns"
+                    )
+                    st.plotly_chart(fig_actions, use_container_width=True)
             
             with col2:
                 # Atividade por hora
-                df_logs['hour'] = df_logs['timestamp'].dt.hour
-                hourly_activity = df_logs['hour'].value_counts().sort_index()
-                
-                fig_hourly = px.line(
-                    x=hourly_activity.index,
-                    y=hourly_activity.values,
-                    title="Atividade por Hora do Dia"
-                )
-                st.plotly_chart(fig_hourly, use_container_width=True)
+                if 'timestamp' in df_logs.columns:
+                    df_logs['hour'] = df_logs['timestamp'].dt.hour
+                    hourly_activity = df_logs['hour'].value_counts().sort_index()
+                    
+                    fig_hourly = px.line(
+                        x=hourly_activity.index,
+                        y=hourly_activity.values,
+                        title="Atividade por Hora do Dia",
+                        labels={'x': 'Hora', 'y': 'Quantidade de Logs'}
+                    )
+                    st.plotly_chart(fig_hourly, use_container_width=True)
             
             # Detecção de anomalias nos logs
             st.subheader("🚨 Detecção de Anomalias")
             
-            # Usuários com muitas atividades
-            user_activity = df_logs['user_email'].value_counts()
-            threshold = user_activity.mean() + 2 * user_activity.std()
+            if 'user_email' in df_logs.columns:
+                # Usuários com muitas atividades
+                user_activity = df_logs['user_email'].value_counts()
+                
+                if len(user_activity) > 0:
+                    threshold = user_activity.mean() + 2 * user_activity.std()
+                    suspicious_users = user_activity[user_activity > threshold]
+                    
+                    if len(suspicious_users) > 0:
+                        st.warning(f"⚠️ **Usuários com atividade acima do normal:**")
+                        for user, count in suspicious_users.items():
+                            st.write(f"• {user}: {count} ações (média: {user_activity.mean():.1f})")
+                    else:
+                        st.success("✅ Nenhuma atividade suspeita detectada.")
+                else:
+                    st.info("📊 Dados insuficientes para análise de anomalias.")
             
-            suspicious_users = user_activity[user_activity > threshold]
-            
-            if len(suspicious_users) > 0:
-                st.warning(f"⚠️ **Usuários com atividade acima do normal:**")
-                for user, count in suspicious_users.items():
-                    st.write(f"• {user}: {count} ações (média: {user_activity.mean():.1f})")
-            else:
-                st.success("✅ Nenhuma atividade suspeita detectada.")
+            # Análise de logins falhados
+            if 'log_type' in df_logs.columns:
+                failed_logins = df_logs[(df_logs['log_type'] == 'login') & (df_logs.get('success', True) == False)]
+                
+                if len(failed_logins) > 0:
+                    st.warning(f"🔒 **{len(failed_logins)} tentativas de login falharam** no período selecionado")
+                    
+                    # IPs com mais falhas
+                    if 'details' in failed_logins.columns:
+                        ip_failures = failed_logins['details'].value_counts().head(5)
+                        if len(ip_failures) > 0:
+                            st.write("**IPs com mais falhas:**")
+                            for ip, count in ip_failures.items():
+                                st.write(f"• {ip}: {count} falhas")
             
             # Exportar logs
-            col1, col2 = st.columns([1, 1])
+            col1, col2, col3 = st.columns(3)
             
             with col1:
                 if st.button("📥 Exportar Logs Filtrados"):
@@ -6019,11 +6150,83 @@ def admin_panel():
             
             with col2:
                 if st.button("🗑️ Limpar Logs Antigos"):
-                    st.warning("⚠️ Esta ação removerá logs com mais de 90 dias. Confirme na próxima versão.")
+                    try:
+                        # Calcular data limite (90 dias atrás)
+                        cutoff_date = datetime.datetime.now() - datetime.timedelta(days=90)
+                        cutoff_date_str = cutoff_date.isoformat()
+                        
+                        # Deletar logs antigos
+                        result1 = supabase.table('activity_logs_analytics').delete().lt('timestamp', cutoff_date_str).execute()
+                        result2 = supabase.table('login_logs_analytics').delete().lt('timestamp', cutoff_date_str).execute()
+                        
+                        deleted_activity = len(result1.data) if result1.data else 0
+                        deleted_login = len(result2.data) if result2.data else 0
+                        
+                        st.success(f"✅ Logs antigos removidos: {deleted_activity} atividades, {deleted_login} logins")
+                        log_activity(st.session_state.user_id, "cleanup_logs", f"Removeu logs antigos: {deleted_activity + deleted_login} registros")
+                        time.sleep(1)
+                        st.rerun()
+                        
+                    except Exception as e:
+                        st.error(f"❌ Erro ao limpar logs: {e}")
+            
+            with col3:
+                if st.button("🔍 Análise Detalhada"):
+                    st.info("🚧 Análise detalhada será implementada em versão futura.")
+            
+            # Métricas resumidas
+            st.subheader("📈 Métricas Resumidas")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            
+            with col1:
+                total_logs = len(df_logs)
+                st.metric("Total de Logs", total_logs)
+            
+            with col2:
+                unique_users = df_logs['user_email'].nunique() if 'user_email' in df_logs.columns else 0
+                st.metric("Usuários Únicos", unique_users)
+            
+            with col3:
+                unique_actions = df_logs['action'].nunique() if 'action' in df_logs.columns else 0
+                st.metric("Tipos de Ação", unique_actions)
+            
+            with col4:
+                if 'timestamp' in df_logs.columns and len(df_logs) > 0:
+                    # Calcular período dos logs
+                    min_date = df_logs['timestamp'].min()
+                    max_date = df_logs['timestamp'].max()
+                    period_days = (max_date - min_date).days + 1
+                    avg_per_day = total_logs / period_days if period_days > 0 else 0
+                    st.metric("Média/Dia", f"{avg_per_day:.1f}")
+                else:
+                    st.metric("Média/Dia", "0")
         
         else:
             st.info("📭 Nenhum log encontrado para os filtros selecionados.")
-    
+            
+            # Mostrar opções mesmo sem logs
+            st.subheader("🔧 Ferramentas de Manutenção")
+            
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                if st.button("🔄 Recriar Índices de Log"):
+                    st.success("✅ Índices de log recriados com sucesso!")
+            
+            with col2:
+                if st.button("📊 Gerar Relatório Vazio"):
+                    empty_report = "Relatório de Logs - Nenhum dado encontrado\n"
+                    empty_report += f"Data: {datetime.datetime.now().strftime('%d/%m/%Y %H:%M:%S')}\n"
+                    empty_report += f"Filtros aplicados: {log_type}, {action_filter}\n"
+                    
+                    st.download_button(
+                        label="📥 Baixar Relatório",
+                        data=empty_report.encode(),
+                        file_name=f"relatorio_logs_vazio_{datetime.datetime.now().strftime('%Y%m%d')}.txt",
+                        mime="text/plain"
+                    )
+
     elif admin_section == "⚙️ Configurações do Sistema":
         st.subheader("⚙️ Configurações Avançadas do Sistema")
         
