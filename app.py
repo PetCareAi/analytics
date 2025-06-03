@@ -9,7 +9,7 @@ import plotly.figure_factory as ff
 from plotly.subplots import make_subplots
 import io
 import os
-import sqlite3
+# import sqlite3
 import hashlib
 import datetime
 import time
@@ -50,6 +50,10 @@ from scipy.cluster.hierarchy import dendrogram, linkage
 from scipy.spatial.distance import pdist
 import networkx as nx
 from textblob import TextBlob  # Para análise de sentimento (simulada)
+# import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+from config.database import supabase
 
 # Configurar diretórios necessários
 os.makedirs("assets", exist_ok=True)
@@ -58,154 +62,50 @@ os.makedirs("models", exist_ok=True)
 os.makedirs("exports", exist_ok=True)
 
 # Constantes
-DATABASE_PATH = "data/petcare.db"
+# DATABASE_PATH = "data/petcare.db"
 DEFAULT_ADMIN_EMAIL = "admin@petcare.com"
 DEFAULT_ADMIN_PASSWORD = "admin123"
 
 def init_database():
-    """Inicializar banco de dados SQLite com tabelas necessárias."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
-    # Tabela de usuários
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT NOT NULL UNIQUE,
-        password_hash TEXT NOT NULL,
-        full_name TEXT,
-        role TEXT DEFAULT 'user',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        last_login TIMESTAMP
-    )
-    ''')
-    
-    # Tabela de pets
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS pets (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT NOT NULL,
-        tipo_pet TEXT NOT NULL,
-        idade INTEGER,
-        genero TEXT,
-        status TEXT DEFAULT 'Disponível',
-        data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        adotado BOOLEAN DEFAULT 0
-    )
-    ''')
-    
-    # Tabela de logs de atividade
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS activity_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        action TEXT NOT NULL,
-        details TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-    ''')
-    
-    # Tabela de logs de login
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS login_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER,
-        success BOOLEAN,
-        ip_address TEXT,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users (id)
-    )
-    ''')
-    
-    # CORREÇÕES: Verificar e adicionar colunas faltantes
+    """Inicializar dados padrão no Supabase."""
     try:
-        # Corrigir tabela pets
-        c.execute("PRAGMA table_info(pets)")
-        pets_columns = [column[1] for column in c.fetchall()]
+        # Verificar se já existe usuário admin
+        result = supabase.table('users_analytics').select('id').eq('role', 'admin').execute()
         
-        pets_new_columns = {
-            'observacoes': 'TEXT',
-            'peso': 'REAL',
-            'comportamento': 'TEXT',
-            'vacinas': 'TEXT',
-            'castrado': 'BOOLEAN DEFAULT 0',
-            'cor': 'TEXT',
-            'contato': 'TEXT',
-            'endereco': 'TEXT',
-            'created_by': 'INTEGER',
-            'foto_url': 'TEXT',
-            'adaptabilidade': 'TEXT',
-            'nivel_energia': 'TEXT',
-            'sociabilidade': 'INTEGER',
-            'energia': 'INTEGER',
-            'nivel_atividade': 'INTEGER',
-            'cuidados_especiais': 'TEXT',
-            'historico_medico': 'TEXT',
-            'microchip': 'BOOLEAN DEFAULT 0',  # ADICIONADO
-            'bairro': 'TEXT',
-            'raca': 'TEXT',
-            'sexo': 'TEXT',
-            'tipo_comida': 'TEXT',
-            'humor_diario': 'TEXT',
-            'telefone': 'TEXT',
-            'status_vacinacao': 'TEXT',
-            'estado_saude': 'TEXT',
-            'data_registro': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
-            'regiao': 'TEXT',
-            'cor_pelagem': 'TEXT',
-            'necessidades_especiais': 'TEXT',
-            'temperamento': 'TEXT',
-            'custo_mensal': 'REAL',
-            'score_adocao': 'REAL',
-            'risco_abandono': 'REAL'
-        }
-        
-        for col_name, col_type in pets_new_columns.items():
-            if col_name not in pets_columns:
-                c.execute(f"ALTER TABLE pets ADD COLUMN {col_name} {col_type}")
-                print(f"✅ Coluna '{col_name}' adicionada à tabela pets")
+        if not result.data:
+            # Criar usuário admin padrão
+            admin_password = generate_password_hash("admin123")
             
+            admin_data = {
+                "email": "admin@petcare.com",
+                "password_hash": admin_password,
+                "full_name": "Administrador",
+                "role": "admin"
+            }
+            
+            result = supabase.table('users_analytics').insert(admin_data).execute()
+            
+            if result.data:
+                print("✅ Usuário admin padrão criado (admin@petcare.com / admin123)")
+            else:
+                print("❌ Erro ao criar usuário admin")
+        
+        print("✅ Banco de dados inicializado com sucesso!")
+        
     except Exception as e:
-        print(f"❌ Erro ao atualizar tabelas: {e}")
-    
-    # Criar usuário admin padrão se não existir
-    c.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'")
-    admin_count = c.fetchone()[0]
-    
-    if admin_count == 0:
-        admin_password = generate_password_hash("admin123")
-        c.execute('''
-        INSERT INTO users (email, password_hash, full_name, role)
-        VALUES (?, ?, ?, ?)
-        ''', ("admin@petcare.com", admin_password, "Administrador", "admin"))
-        print("✅ Usuário admin padrão criado (admin@petcare.com / admin123)")
-    
-    conn.commit()
-    conn.close()
-    print("✅ Banco de dados inicializado com sucesso!")
+        print(f"❌ Erro ao inicializar banco de dados: {e}")
 
 def add_pet(nome, tipo_pet, idade, genero, status="Disponível", cor="", contato="", endereco="", observacoes="", peso=None, comportamento="", vacinas="", castrado=False, created_by=None, foto_url="", adaptabilidade="", nivel_energia="", sociabilidade="", **kwargs):
-    """Adiciona um novo pet ao banco de dados."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
+    """Adiciona um novo pet ao Supabase."""
     try:
-        # Verificar quais colunas existem na tabela
-        c.execute("PRAGMA table_info(pets)")
-        existing_columns = [column[1] for column in c.fetchall()]
-        
         # Dados obrigatórios
         pet_data = {
             'nome': nome,
             'tipo_pet': tipo_pet,
-            'idade': int(idade) if idade else None,
+            'idade': float(idade) if idade else None,
             'genero': genero,
-            'status': status
-        }
-        
-        # Dados opcionais - adicionar apenas se as colunas existirem
-        optional_fields = {
+            'sexo': genero,  # Mapeamento para compatibilidade
+            'status': status,
             'cor': cor,
             'contato': contato,
             'endereco': endereco,
@@ -213,44 +113,31 @@ def add_pet(nome, tipo_pet, idade, genero, status="Disponível", cor="", contato
             'peso': float(peso) if peso else None,
             'comportamento': comportamento,
             'vacinas': vacinas,
-            'castrado': 1 if castrado else 0,
+            'castrado': castrado,
             'created_by': created_by,
             'foto_url': foto_url,
             'adaptabilidade': adaptabilidade,
             'nivel_energia': nivel_energia,
             'sociabilidade': int(sociabilidade) if sociabilidade else None,
-            'data_registro': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-            'adotado': 0  # Por padrão, não adotado
+            'adotado': False
         }
         
         # Adicionar campos extras do kwargs
         for key, value in kwargs.items():
-            if key in existing_columns and key not in pet_data:
-                optional_fields[key] = value
+            if key not in pet_data:
+                pet_data[key] = value
         
-        # Filtrar apenas colunas que existem
-        for field, value in optional_fields.items():
-            if field in existing_columns:
-                pet_data[field] = value
+        # Inserir no Supabase
+        result = supabase.table('pets_analytics').insert(pet_data).execute()
         
-        # Construir query dinamicamente
-        columns = ', '.join(pet_data.keys())
-        placeholders = ', '.join(['?' for _ in pet_data])
-        values = list(pet_data.values())
-        
-        query = f"INSERT INTO pets ({columns}) VALUES ({placeholders})"
-        c.execute(query, values)
-        
-        pet_id = c.lastrowid
-        conn.commit()
-        
-        return True, pet_id
+        if result.data:
+            return True, result.data[0]['id']
+        else:
+            return False, "Erro ao inserir dados"
         
     except Exception as e:
         print(f"Erro ao adicionar pet: {e}")
         return False, str(e)
-    finally:
-        conn.close()
 
 def display_add_pet_simple():
     """Versão simples do formulário de adicionar pet."""
@@ -312,164 +199,111 @@ def display_add_pet_simple():
             st.rerun()
 
 def get_pets_data():
-    """Obtém todos os dados dos pets do banco."""
-    conn = sqlite3.connect(DATABASE_PATH)
+    """Obtém todos os dados dos pets do Supabase."""
     try:
-        # Verificar se a tabela existe e tem dados
-        cursor = conn.cursor()
-        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='pets'")
-        if not cursor.fetchone():
-            return pd.DataFrame()
+        result = supabase.table('pets_analytics').select('*').execute()
         
-        # Obter dados dos pets
-        df = pd.read_sql_query("SELECT * FROM pets", conn)
-        return df
+        if result.data:
+            df = pd.DataFrame(result.data)
+            return df
+        else:
+            return pd.DataFrame()
+    
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
         return pd.DataFrame()
-    finally:
-        conn.close()
 
 def import_csv_data(df):
-    """Importa dados do CSV para o banco de dados com tratamento completo de erros."""
+    """Importa dados do CSV para o Supabase."""
     
     if df.empty:
         return 0, 0, "DataFrame está vazio"
 
-    def prepare_dataframe_for_sqlite(df):
-        """Prepara DataFrame para importação no SQLite."""
-        df_copy = df.copy()
-        
-        # Converter colunas de data/hora para string
-        datetime_columns = ['data_registro', 'data_nascimento']
-        
-        for col in datetime_columns:
-            if col in df_copy.columns:
-                try:
-                    # Converter para datetime e depois para string
-                    df_copy[col] = pd.to_datetime(df_copy[col], errors='coerce')
-                    df_copy[col] = df_copy[col].dt.strftime('%Y-%m-%d %H:%M:%S')
-                except Exception as e:
-                    st.warning(f"Erro ao converter coluna {col}: {e}")
-                    # Se falhar, converter diretamente para string
-                    df_copy[col] = df_copy[col].astype(str)
-        
-        # Substituir NaN por None para compatibilidade com SQLite
-        df_copy = df_copy.where(pd.notna(df_copy), None)
-        
-        return df_copy
-    
-    # Preparar DataFrame
-    try:
-        df_prepared = prepare_dataframe_for_sqlite(df)
-    except Exception as e:
-        return 0, 0, f"Erro ao preparar dados: {str(e)}"
-    
-    # Conectar ao banco
-    try:
-        conn = sqlite3.connect(DATABASE_PATH)
-        c = conn.cursor()
-    except Exception as e:
-        return 0, 0, f"Erro ao conectar ao banco: {str(e)}"
-    
     success_count = 0
     error_count = 0
     errors = []
     
-    # Definir colunas esperadas (sem ID que é auto-increment)
+    # Colunas esperadas
     expected_columns = [
         'nome', 'bairro', 'tipo_pet', 'raca', 'idade', 'peso', 'sexo', 
-        'tipo_comida', 'humor_diario', 'adotado', 'telefone', 'status_vacinacao', 
-        'estado_saude', 'comportamento', 'nivel_atividade', 'data_registro', 
-        'regiao', 'created_by', 'microchip', 'castrado', 'historico_medico', 
-        'data_nascimento', 'cor_pelagem', 'necessidades_especiais', 'temperamento', 
-        'sociabilidade', 'energia', 'cuidados_veterinarios', 'custo_mensal', 
-        'tempo_disponivel', 'experiencia_tutor', 'ambiente_ideal', 
+        'telefone', 'status_vacinacao', 'estado_saude', 'comportamento', 
+        'nivel_atividade', 'regiao', 'created_by', 'microchip', 'castrado', 
+        'historico_medico', 'cor_pelagem', 'necessidades_especiais', 
+        'temperamento', 'sociabilidade', 'energia', 'custo_mensal', 
         'compatibilidade_criancas', 'compatibilidade_pets', 'score_adocao', 
         'cluster_comportamental', 'risco_abandono'
     ]
     
-    # Verificar se todas as colunas necessárias existem
-    missing_columns = [col for col in expected_columns if col not in df_prepared.columns]
-    if missing_columns:
-        conn.close()
-        return 0, 0, f"Colunas faltando no CSV: {', '.join(missing_columns)}"
+    # Preparar dados para inserção em lote
+    batch_data = []
     
-    # Importar dados linha por linha
-    for index, row in df_prepared.iterrows():
+    for index, row in df.iterrows():
         try:
-            # Preparar dados da linha, excluindo a coluna 'id' se existir
-            row_data = []
+            # Preparar dados da linha
+            row_data = {}
+            
             for col in expected_columns:
-                value = row.get(col)
-                
-                # Tratamentos específicos por tipo de dado
-                if col in ['idade', 'created_by'] and value is not None:
-                    try:
-                        value = int(float(value)) if value != '' else None
-                    except (ValueError, TypeError):
+                if col in df.columns:
+                    value = row.get(col)
+                    
+                    # Tratamentos específicos por tipo de dado
+                    if col in ['idade', 'created_by'] and value is not None:
+                        try:
+                            value = int(float(value)) if value != '' else None
+                        except (ValueError, TypeError):
+                            value = None
+                    
+                    elif col in ['peso', 'custo_mensal', 'score_adocao', 'risco_abandono'] and value is not None:
+                        try:
+                            value = float(value) if value != '' else None
+                        except (ValueError, TypeError):
+                            value = None
+                    
+                    elif col == 'adotado' and value is not None:
+                        if isinstance(value, str):
+                            value = value.lower() in ['true', '1', 'sim', 'yes']
+                        elif isinstance(value, bool):
+                            value = value
+                        else:
+                            value = bool(value) if value else False
+                    
+                    elif col in ['castrado', 'microchip', 'compatibilidade_criancas', 'compatibilidade_pets'] and value is not None:
+                        if isinstance(value, str):
+                            value = value.lower() in ['true', '1', 'sim', 'yes']
+                        else:
+                            value = bool(value) if value else False
+                    
+                    # Converter strings vazias para None
+                    if value == '' or value == 'nan':
                         value = None
-                
-                elif col in ['peso', 'custo_mensal', 'score_adocao'] and value is not None:
-                    try:
-                        value = float(value) if value != '' else None
-                    except (ValueError, TypeError):
-                        value = None
-                
-                elif col == 'adotado' and value is not None:
-                    # Converter para boolean/integer
-                    if isinstance(value, str):
-                        value = 1 if value.lower() in ['true', '1', 'sim', 'yes'] else 0
-                    elif isinstance(value, bool):
-                        value = 1 if value else 0
-                    else:
-                        value = int(value) if value else 0
-                
-                elif col in ['castrado'] and value is not None:
-                    # Tratar campos Sim/Não
-                    if isinstance(value, str):
-                        value = 'Sim' if value.lower() in ['true', '1', 'sim', 'yes'] else 'Não'
-                
-                # Converter strings vazias para None
-                if value == '' or value == 'nan':
-                    value = None
-                
-                row_data.append(value)
+                    
+                    row_data[col] = value
             
-            # Criar query de inserção
-            placeholders = ', '.join(['?' for _ in expected_columns])
-            query = f"""
-                INSERT INTO pets ({', '.join(expected_columns)}) 
-                VALUES ({placeholders})
-            """
-            
-            # Executar inserção
-            c.execute(query, row_data)
-            success_count += 1
-            
-        except sqlite3.IntegrityError as e:
-            error_msg = f"Linha {index + 1}: Erro de integridade - {str(e)}"
-            errors.append(error_msg)
-            error_count += 1
-            
-        except sqlite3.OperationalError as e:
-            error_msg = f"Linha {index + 1}: Erro operacional - {str(e)}"
-            errors.append(error_msg)
-            error_count += 1
+            batch_data.append(row_data)
             
         except Exception as e:
             error_msg = f"Linha {index + 1}: {str(e)}"
             errors.append(error_msg)
             error_count += 1
     
-    # Finalizar transação
+    # Inserir em lotes de 100 registros
+    batch_size = 100
+    
     try:
-        conn.commit()
-        conn.close()
+        for i in range(0, len(batch_data), batch_size):
+            batch = batch_data[i:i+batch_size]
+            
+            result = supabase.table('pets_analytics').insert(batch).execute()
+            
+            if result.data:
+                success_count += len(result.data)
+            else:
+                error_count += len(batch)
+                errors.append(f"Erro ao inserir lote {i//batch_size + 1}")
+    
     except Exception as e:
-        conn.rollback()
-        conn.close()
-        return 0, len(df_prepared), f"Erro ao salvar no banco: {str(e)}"
+        error_count += len(batch_data) - success_count
+        errors.append(f"Erro geral na inserção: {str(e)}")
     
     # Preparar mensagem de resultado
     if errors:
@@ -480,7 +314,6 @@ def import_csv_data(df):
         error_summary = "Importação concluída sem erros!"
     
     return success_count, error_count, error_summary
-
 
 def display_import_results(success_count, error_count, error_summary):
     """Exibe os resultados da importação de forma organizada."""
@@ -681,141 +514,134 @@ def verify_password(stored_hash, provided_password):
 
 def authenticate_user(email, password):
     """Autentica um usuário com email e senha."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
-    c.execute("SELECT id, password_hash, role, full_name FROM users WHERE email = ?", (email,))
-    result = c.fetchone()
-    
-    if result and verify_password(result[1], password):
-        user_id, _, role, full_name = result
-        # Atualizar último login
-        c.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user_id,))
+    try:
+        # Buscar usuário por email
+        result = supabase.table('users_analytics').select('*').eq('email', email).execute()
         
-        # Registrar login bem-sucedido
-        c.execute(
-            "INSERT INTO login_logs (user_id, success) VALUES (?, ?)",
-            (user_id, True)
-        )
+        if result.data and len(result.data) > 0:
+            user = result.data[0]
+            
+            if verify_password(user['password_hash'], password):
+                user_id = user['id']
+                role = user['role']
+                full_name = user['full_name']
+                
+                # Atualizar último login
+                supabase.table('users_analytics').update({
+                    'last_login': datetime.datetime.now().isoformat()
+                }).eq('id', user_id).execute()
+                
+                # Registrar login bem-sucedido
+                log_data = {
+                    'user_id': user_id,
+                    'success': True,
+                    'ip_address': '127.0.0.1'  # Em produção, obter IP real
+                }
+                supabase.table('login_logs_analytics').insert(log_data).execute()
+                
+                return True, user_id, role
+            else:
+                # Registrar tentativa de login mal-sucedida
+                log_data = {
+                    'user_id': user['id'],
+                    'success': False,
+                    'failure_reason': 'Wrong password',
+                    'ip_address': '127.0.0.1'
+                }
+                supabase.table('login_logs_analytics').insert(log_data).execute()
         
-        conn.commit()
-        conn.close()
+        return False, None, None
         
-        # Salvar para persistência
-        if st.session_state.get("remember_login", False):
-            st.session_state.last_user_id = user_id
-        
-        return True, user_id, role
-    
-    # Registrar tentativa de login mal-sucedida se o email existir
-    if result:
-        c.execute(
-            "INSERT INTO login_logs (user_id, success) VALUES (?, ?)",
-            (result[0], False)
-        )
-        conn.commit()
-    
-    conn.close()
-    return False, None, None
+    except Exception as e:
+        print(f"Erro na autenticação: {e}")
+        return False, None, None
 
 def log_activity(user_id, action, details="", execution_time=None):
-    """Registra uma atividade de usuário no sistema."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
-    session_id = st.session_state.get("session_id", str(uuid.uuid4()))
-    
+    """Registra uma atividade de usuário no Supabase."""
     try:
-        # Tentar inserir com todas as colunas
-        c.execute(
-            "INSERT INTO activity_logs (user_id, action, details, session_id, execution_time) VALUES (?, ?, ?, ?, ?)",
-            (user_id, action, details, session_id, execution_time)
-        )
-    except sqlite3.OperationalError:
-        # Se falhar, inserir apenas as colunas básicas
-        c.execute(
-            "INSERT INTO activity_logs (user_id, action, details, timestamp) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
-            (user_id, action, details)
-        )
-    
-    conn.commit()
-    conn.close()
+        session_id = st.session_state.get("session_id", str(uuid.uuid4()))
+        
+        log_data = {
+            'user_id': user_id,
+            'action': action,
+            'details': details,
+            'session_id': session_id,
+            'execution_time': execution_time,
+            'ip_address': '127.0.0.1'  # Em produção, obter IP real
+        }
+        
+        supabase.table('activity_logs_analytics').insert(log_data).execute()
+        
+    except Exception as e:
+        print(f"Erro ao registrar atividade: {e}")
 
 def get_user_info(user_id):
     """Obtém informações do usuário pelo ID."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
     try:
-        # Tentar buscar com as novas colunas
-        c.execute("SELECT email, full_name, role, preferences, profile_data FROM users WHERE id = ?", (user_id,))
-        result = c.fetchone()
-    except sqlite3.OperationalError:
-        # Se falhar, buscar apenas as colunas básicas
-        c.execute("SELECT email, full_name, role FROM users WHERE id = ?", (user_id,))
-        result = c.fetchone()
+        result = supabase.table('users_analytics').select('*').eq('id', user_id).execute()
         
-        if result:
-            conn.close()
+        if result.data and len(result.data) > 0:
+            user = result.data[0]
             return {
-                "email": result[0],
-                "full_name": result[1],
-                "role": result[2],
-                "preferences": {},  # Valores padrão
-                "profile_data": {}
+                "email": user['email'],
+                "full_name": user['full_name'],
+                "role": user['role'],
+                "preferences": user.get('preferences', {}),
+                "profile_data": user.get('profile_data', {})
             }
-        conn.close()
+        
         return None
-    
-    conn.close()
-    
-    if result:
-        return {
-            "email": result[0],
-            "full_name": result[1],
-            "role": result[2],
-            "preferences": json.loads(result[3]) if result[3] else {},
-            "profile_data": json.loads(result[4]) if result[4] else {}
-        }
-    return None
+        
+    except Exception as e:
+        print(f"Erro ao obter informações do usuário: {e}")
+        return None
 
 def register_new_user(email, password, full_name, role="user"):
-    """Registra um novo usuário no sistema."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
+    """Registra um novo usuário no Supabase."""
     try:
         password_hash = hash_password(password)
-        c.execute(
-            "INSERT INTO users (email, password_hash, full_name, role) VALUES (?, ?, ?, ?)",
-            (email, password_hash, full_name, role)
-        )
-        conn.commit()
-        user_id = c.lastrowid
         
-        conn.close()
-        return True, user_id
-    except sqlite3.IntegrityError:
-        conn.close()
+        user_data = {
+            "email": email,
+            "password_hash": password_hash,
+            "full_name": full_name,
+            "role": role
+        }
+        
+        result = supabase.table('users_analytics').insert(user_data).execute()
+        
+        if result.data:
+            return True, result.data[0]['id']
+        else:
+            return False, None
+            
+    except Exception as e:
+        print(f"Erro ao registrar usuário: {e}")
         return False, None
 
 def change_password(user_id, current_password, new_password):
     """Altera a senha de um usuário após verificar a senha atual."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    c = conn.cursor()
-    
-    c.execute("SELECT password_hash FROM users WHERE id = ?", (user_id,))
-    result = c.fetchone()
-    
-    if result and verify_password(result[0], current_password):
-        new_password_hash = hash_password(new_password)
-        c.execute("UPDATE users SET password_hash = ? WHERE id = ?", (new_password_hash, user_id))
-        conn.commit()
-        conn.close()
-        return True
-    
-    conn.close()
-    return False
+    try:
+        # Buscar usuário
+        result = supabase.table('users_analytics').select('password_hash').eq('id', user_id).execute()
+        
+        if result.data and len(result.data) > 0:
+            current_hash = result.data[0]['password_hash']
+            
+            if verify_password(current_hash, current_password):
+                new_password_hash = hash_password(new_password)
+                
+                update_result = supabase.table('users_analytics').update({
+                    'password_hash': new_password_hash
+                }).eq('id', user_id).execute()
+                
+                return update_result.data is not None
+        
+        return False
+        
+    except Exception as e:
+        print(f"Erro ao alterar senha: {e}")
+        return False
 
 def require_login(func):
     """Decorador para exigir login antes de acessar uma função."""
@@ -1191,21 +1017,22 @@ class PetMLAnalyzer:
         return df_engineered
 
 def load_data_from_db():
-    """Carrega os dados do banco de dados com campos expandidos."""
-    conn = sqlite3.connect(DATABASE_PATH)
-    
+    """Carrega os dados do Supabase."""
     try:
-        query = "SELECT * FROM pets"
-        df = pd.read_sql_query(query, conn)
+        result = supabase.table('pets_analytics').select('*').execute()
         
-        # Se não houver dados, criar um DataFrame com dados simulados para demonstração
-        if len(df) == 0:
+        if result.data and len(result.data) > 0:
+            df = pd.DataFrame(result.data)
+            return df
+        else:
+            # Se não houver dados, gerar dados de exemplo
             df = generate_sample_data()
-    except:
-        df = generate_sample_data()
+            return df
     
-    conn.close()
-    return df
+    except Exception as e:
+        print(f"Erro ao carregar dados: {e}")
+        df = generate_sample_data()
+        return df
 
 def generate_sample_data(n_samples=200):
     """Gera dados de exemplo para demonstração do sistema."""
