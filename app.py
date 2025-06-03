@@ -1302,58 +1302,60 @@ def display_login_page():
         st.markdown('<div class="login-title">🐾 PetCareAi</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-subtitle">Sistema Avançado de Análise com IA</div>', unsafe_allow_html=True)
         
-        tab1, tab2 = st.tabs(["Login", "Registro"])
+        # Apenas tab de login (removida tab de registro)
+        st.markdown("### 🔐 Acesso ao Sistema")
         
-        with tab1:
-            with st.form("login_form"):
-                email = st.text_input("Email", key="login_email")
-                password = st.text_input("Senha", type="password", key="login_password")
-                remember = st.checkbox("Lembrar-me", key="login_remember")
-                
-                col1, col2 = st.columns([1, 1])
-                with col1:
-                    submit = st.form_submit_button("Entrar", use_container_width=True)
-                with col2:
-                    forgot_password = st.form_submit_button("Esqueci minha senha", use_container_width=True)
-                
-                if submit:
-                    if not email or not password:
-                        st.error("Por favor, preencha todos os campos.")
-                    else:
-                        with st.spinner("Autenticando..."):
-                            time.sleep(0.5)
-                            is_authenticated, user_id, role = authenticate_user(email, password)
+        with st.form("login_form"):
+            email = st.text_input("Email", key="login_email")
+            password = st.text_input("Senha", type="password", key="login_password")
+            remember = st.checkbox("Lembrar-me", key="login_remember")
+            
+            col1, col2 = st.columns([1, 1])
+            with col1:
+                submit = st.form_submit_button("Entrar", use_container_width=True)
+            with col2:
+                forgot_password = st.form_submit_button("Esqueci minha senha", use_container_width=True)
+            
+            if submit:
+                if not email or not password:
+                    st.error("Por favor, preencha todos os campos.")
+                else:
+                    with st.spinner("Autenticando..."):
+                        time.sleep(0.5)
+                        is_authenticated, user_id, role = authenticate_user(email, password)
+                        
+                        if is_authenticated:
+                            st.session_state.user_id = user_id
+                            st.session_state.user_role = role
+                            st.session_state.user_info = get_user_info(user_id)
+                            st.session_state.session_id = str(uuid.uuid4())
                             
-                            if is_authenticated:
-                                st.session_state.user_id = user_id
-                                st.session_state.user_role = role
-                                st.session_state.user_info = get_user_info(user_id)
-                                st.session_state.session_id = str(uuid.uuid4())
-                                
-                                if remember:
-                                    st.session_state.remember_login = True
-                                    st.session_state.last_user_id = user_id
-                                    # Adicionar token na URL para persistir sessão
-                                    # st.experimental_set_query_params(session_token="demo_session")
-                                
-                                log_activity(user_id, "login", "Login bem-sucedido")
-                                
-                                st.success("Login realizado com sucesso!")
-                                st.rerun()
-                            else:
-                                st.error("Email ou senha incorretos.")
-                
-                if forgot_password:
-                    st.info("Entre em contato com o administrador para redefinir sua senha.")
+                            if remember:
+                                st.session_state.remember_login = True
+                                st.session_state.last_user_id = user_id
+                            
+                            log_activity(user_id, "login", "Login bem-sucedido")
+                            
+                            st.success("Login realizado com sucesso!")
+                            st.rerun()
+                        else:
+                            st.error("Email ou senha incorretos.")
             
-            st.markdown('<div style="text-align: center; margin: 1rem 0;">ou</div>', unsafe_allow_html=True)
-            
-            if st.button("Continuar como Convidado", use_container_width=True):
-                st.session_state.user_id = None
-                st.session_state.user_role = "guest"
-                st.session_state.user_info = {"email": "guest", "full_name": "Convidado", "role": "guest"}
-                st.session_state.session_id = str(uuid.uuid4())
-                st.rerun()
+            if forgot_password:
+                st.info("Entre em contato com o administrador para redefinir sua senha.")
+        
+        st.markdown('<div style="text-align: center; margin: 1rem 0;">ou</div>', unsafe_allow_html=True)
+        
+        if st.button("Continuar como Convidado", use_container_width=True):
+            st.session_state.user_id = None
+            st.session_state.user_role = "guest"
+            st.session_state.user_info = {"email": "guest", "full_name": "Convidado", "role": "guest"}
+            st.session_state.session_id = str(uuid.uuid4())
+            st.rerun()
+        
+        # Seção de registro comentada
+        """
+        # SEÇÃO DE REGISTRO COMENTADA - Para reativar, descomente este bloco
         
         with tab2:
             with st.form("register_form"):
@@ -1397,6 +1399,7 @@ def display_login_page():
                                 st.rerun()
                             else:
                                 st.error("Este email já está em uso.")
+        """
         
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -1497,6 +1500,19 @@ def apply_filters(df):
     """Aplica filtros avançados ao DataFrame."""
     if df.empty:
         return df
+    
+    # Adicionar logo no topo da sidebar
+    st.sidebar.markdown(
+        f'''
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <img src="data:image/jpeg;base64,{get_logo_base64()}" 
+                 style="width: 120px; height: 120px; border-radius: 50%; 
+                        border: 3px solid #4CAF50; box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);" 
+                 alt="PetCareAi Logo"/>
+        </div>
+        ''',
+        unsafe_allow_html=True
+    )
     
     st.sidebar.markdown("## 🔍 Filtros Avançados")
     
