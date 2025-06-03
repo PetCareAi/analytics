@@ -135,11 +135,30 @@ def init_database():
             'endereco': 'TEXT',
             'created_by': 'INTEGER',
             'foto_url': 'TEXT',
-            'adaptabilidade': 'TEXT',  # ADICIONADO
-            'nivel_energia': 'TEXT',   # ADICIONADO (pode ser necessário)
-            'sociabilidade': 'TEXT',   # ADICIONADO (pode ser necessário)
-            'cuidados_especiais': 'TEXT',  # ADICIONADO (pode ser necessário)
-            'historico_medico': 'TEXT'     # ADICIONADO (pode ser necessário)
+            'adaptabilidade': 'TEXT',
+            'nivel_energia': 'TEXT',
+            'sociabilidade': 'INTEGER',
+            'energia': 'INTEGER',
+            'nivel_atividade': 'INTEGER',
+            'cuidados_especiais': 'TEXT',
+            'historico_medico': 'TEXT',
+            'microchip': 'BOOLEAN DEFAULT 0',  # ADICIONADO
+            'bairro': 'TEXT',
+            'raca': 'TEXT',
+            'sexo': 'TEXT',
+            'tipo_comida': 'TEXT',
+            'humor_diario': 'TEXT',
+            'telefone': 'TEXT',
+            'status_vacinacao': 'TEXT',
+            'estado_saude': 'TEXT',
+            'data_registro': 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP',
+            'regiao': 'TEXT',
+            'cor_pelagem': 'TEXT',
+            'necessidades_especiais': 'TEXT',
+            'temperamento': 'TEXT',
+            'custo_mensal': 'REAL',
+            'score_adocao': 'REAL',
+            'risco_abandono': 'REAL'
         }
         
         for col_name, col_type in pets_new_columns.items():
@@ -166,7 +185,7 @@ def init_database():
     conn.close()
     print("✅ Banco de dados inicializado com sucesso!")
 
-def add_pet(nome, tipo_pet, idade, genero, status="Disponível", cor="", contato="", endereco="", observacoes="", peso=None, comportamento="", vacinas="", castrado=False, created_by=None, foto_url="", adaptabilidade="", nivel_energia="", sociabilidade=""):
+def add_pet(nome, tipo_pet, idade, genero, status="Disponível", cor="", contato="", endereco="", observacoes="", peso=None, comportamento="", vacinas="", castrado=False, created_by=None, foto_url="", adaptabilidade="", nivel_energia="", sociabilidade="", **kwargs):
     """Adiciona um novo pet ao banco de dados."""
     conn = sqlite3.connect(DATABASE_PATH)
     c = conn.cursor()
@@ -197,10 +216,17 @@ def add_pet(nome, tipo_pet, idade, genero, status="Disponível", cor="", contato
             'castrado': 1 if castrado else 0,
             'created_by': created_by,
             'foto_url': foto_url,
-            'adaptabilidade': adaptabilidade,      # ADICIONADO
-            'nivel_energia': nivel_energia,        # ADICIONADO
-            'sociabilidade': sociabilidade         # ADICIONADO
+            'adaptabilidade': adaptabilidade,
+            'nivel_energia': nivel_energia,
+            'sociabilidade': int(sociabilidade) if sociabilidade else None,
+            'data_registro': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'adotado': 0  # Por padrão, não adotado
         }
+        
+        # Adicionar campos extras do kwargs
+        for key, value in kwargs.items():
+            if key in existing_columns and key not in pet_data:
+                optional_fields[key] = value
         
         # Filtrar apenas colunas que existem
         for field, value in optional_fields.items():
@@ -221,10 +247,11 @@ def add_pet(nome, tipo_pet, idade, genero, status="Disponível", cor="", contato
         return True, pet_id
         
     except Exception as e:
+        print(f"Erro ao adicionar pet: {e}")
         return False, str(e)
     finally:
         conn.close()
-        
+
 def display_add_pet_simple():
     """Versão simples do formulário de adicionar pet."""
     st.subheader("➕ Adicionar Novo Pet")
@@ -657,11 +684,11 @@ def authenticate_user(email, password):
     conn = sqlite3.connect(DATABASE_PATH)
     c = conn.cursor()
     
-    c.execute("SELECT id, password_hash, role FROM users WHERE email = ?", (email,))
+    c.execute("SELECT id, password_hash, role, full_name FROM users WHERE email = ?", (email,))
     result = c.fetchone()
     
     if result and verify_password(result[1], password):
-        user_id, _, role = result
+        user_id, _, role, full_name = result
         # Atualizar último login
         c.execute("UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?", (user_id,))
         
@@ -673,6 +700,11 @@ def authenticate_user(email, password):
         
         conn.commit()
         conn.close()
+        
+        # Salvar para persistência
+        if st.session_state.get("remember_login", False):
+            st.session_state.last_user_id = user_id
+        
         return True, user_id, role
     
     # Registrar tentativa de login mal-sucedida se o email existir
@@ -1217,8 +1249,7 @@ def generate_sample_data(n_samples=200):
             peso_base = np.random.normal(0.5, 0.3)  # Média 0.5kg
             idade_max = 10
         
-        idade = np.random.exponential(3)
-        idade = min(idade, idade_max)
+        idade = max(0.1, min(idade_max, np.random.exponential(3)))
         peso = max(0.1, peso_base + np.random.normal(0, peso_base * 0.2))
         
         # Dados expandidos
@@ -1227,30 +1258,30 @@ def generate_sample_data(n_samples=200):
         nivel_atividade = np.random.randint(1, 6)
         
         # Score de adocao baseado em múltiplos fatores
-        score_adocao = (
+        score_adocao = min(5.0, max(0.1, (
             sociabilidade * 0.3 + 
             energia * 0.2 + 
             nivel_atividade * 0.2 + 
-            (5 - idade/idade_max * 5) * 0.2 +  # Pets mais jovens têm score maior
-            np.random.uniform(0, 1) * 0.1  # Fator aleatório
-        )
+            (5 - idade/idade_max * 5) * 0.2 +
+            np.random.uniform(1, 5) * 0.1
+        )))
         
         # Probabilidade de adocao baseada no score
         prob_adocao = score_adocao / 5.0
         adotado = np.random.random() < prob_adocao
         
         # Risco de abandono (inverso do score de adocao)
-        risco_abandono = 1 - (score_adocao / 5.0) + np.random.uniform(-0.2, 0.2)
-        risco_abandono = max(0, min(1, risco_abandono))
+        risco_abandono = max(0.0, min(1.0, 1 - (score_adocao / 5.0) + np.random.uniform(-0.2, 0.2)))
         
         record = {
             'id': i + 1,
-            'nome': nome + f"_{i+1}" if i > len(nomes_cachorros) else nome,
+            'nome': f"{nome}_{i+1}" if i > len(nomes_cachorros) else nome,
             'tipo_pet': tipo_pet,
             'raca': raca,
             'idade': round(idade, 1),
             'peso': round(peso, 1),
             'sexo': np.random.choice(['Macho', 'Fêmea']),
+            'genero': np.random.choice(['Macho', 'Fêmea']),  # Compatibilidade
             'bairro': np.random.choice(bairros),
             'comportamento': np.random.choice(comportamentos),
             'estado_saude': np.random.choice(estados_saude),
@@ -1266,11 +1297,13 @@ def generate_sample_data(n_samples=200):
             'nivel_atividade': nivel_atividade,
             'score_adocao': round(score_adocao, 2),
             'risco_abandono': round(risco_abandono, 2),
-            'custo_mensal': round(np.random.normal(200, 100), 2),
-            'tempo_disponivel': np.random.randint(1, 8),  # horas por dia
+            'custo_mensal': round(max(50, np.random.normal(200, 100)), 2),
+            'tempo_disponivel': np.random.randint(1, 8),
             'compatibilidade_criancas': np.random.choice([True, False], p=[0.8, 0.2]),
             'compatibilidade_pets': np.random.choice([True, False], p=[0.7, 0.3]),
-            'created_by': 1
+            'created_by': 1,
+            'status': 'Adotado' if adotado else 'Disponível',
+            'regiao': np.random.choice(['Centro', 'Norte', 'Sul', 'Leste', 'Oeste'])
         }
         
         data.append(record)
@@ -1282,21 +1315,47 @@ def save_pet_to_db(pet_data):
     conn = sqlite3.connect(DATABASE_PATH)
     c = conn.cursor()
     
-    columns = ', '.join(pet_data.keys())
-    placeholders = ', '.join(['?' for _ in pet_data])
-    values = tuple(pet_data.values())
-    
-    query = f"INSERT INTO pets ({columns}) VALUES ({placeholders})"
-    
     try:
+        # Verificar quais colunas existem na tabela
+        c.execute("PRAGMA table_info(pets)")
+        existing_columns = [column[1] for column in c.fetchall()]
+        
+        # Filtrar apenas dados que correspondem a colunas existentes
+        filtered_data = {}
+        for key, value in pet_data.items():
+            if key in existing_columns:
+                # Converter valores booleanos para inteiros se necessário
+                if isinstance(value, bool):
+                    filtered_data[key] = 1 if value else 0
+                elif value == '' or value is None:
+                    filtered_data[key] = None
+                else:
+                    filtered_data[key] = value
+        
+        # Garantir que temos pelo menos os campos obrigatórios
+        required_fields = ['nome', 'tipo_pet']
+        for field in required_fields:
+            if field not in filtered_data or not filtered_data[field]:
+                return False, f"Campo obrigatório '{field}' está vazio"
+        
+        # Construir query dinamicamente
+        columns = ', '.join(filtered_data.keys())
+        placeholders = ', '.join(['?' for _ in filtered_data])
+        values = tuple(filtered_data.values())
+        
+        query = f"INSERT INTO pets ({columns}) VALUES ({placeholders})"
         c.execute(query, values)
-        conn.commit()
+        
         pet_id = c.lastrowid
-        conn.close()
+        conn.commit()
+        
         return True, pet_id
+        
     except Exception as e:
-        conn.close()
+        print(f"Erro ao salvar pet: {e}")
         return False, str(e)
+    finally:
+        conn.close()
 
 def custom_card(title, content, icon=None, color="#4527A0"):
     """Renderiza um card personalizado."""
@@ -1360,22 +1419,34 @@ def display_login_page():
         max-width: 400px;
         margin: 0 auto;
         padding: 2rem;
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+        border-radius: 15px;
+        box-shadow: 0 8px 25px rgba(76, 175, 80, 0.3);
+        border: 2px solid #4CAF50;
     }
     .login-title {
         font-size: 1.8rem;
         font-weight: bold;
-        color: #4527A0;
+        color: #2E7D32;
         margin-bottom: 0.5rem;
         text-align: center;
     }
     .login-subtitle {
-        color: #666;
+        color: #388E3C;
         font-size: 1rem;
         text-align: center;
         margin-bottom: 2rem;
+    }
+    .logo-container {
+        text-align: center;
+        margin-bottom: 1.5rem;
+    }
+    .logo-container img {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 3px solid #4CAF50;
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
     }
     @keyframes fadeIn {
         from { opacity: 0; transform: translateY(-20px); }
@@ -1383,6 +1454,19 @@ def display_login_page():
     }
     .animated {
         animation: fadeIn 0.6s ease-out;
+    }
+    .stButton > button {
+        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    .stButton > button:hover {
+        background: linear-gradient(135deg, #388E3C 0%, #4CAF50 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
     }
     </style>
     """
@@ -1394,7 +1478,17 @@ def display_login_page():
     with col2:
         st.markdown('<div class="login-container animated">', unsafe_allow_html=True)
         
-        st.markdown('<div class="login-title">🐾 PetCare Analytics</div>', unsafe_allow_html=True)
+        # Logo da empresa
+        st.markdown(
+            '''
+            <div class="logo-container">
+                <img src="data:image/jpeg;base64,{}" alt="PetCareAi Logo"/>
+            </div>
+            '''.format(get_logo_base64()),
+            unsafe_allow_html=True
+        )
+        
+        st.markdown('<div class="login-title">🐾 PetCareAi</div>', unsafe_allow_html=True)
         st.markdown('<div class="login-subtitle">Sistema Avançado de Análise com IA</div>', unsafe_allow_html=True)
         
         tab1, tab2 = st.tabs(["Login", "Registro"])
@@ -1427,6 +1521,9 @@ def display_login_page():
                                 
                                 if remember:
                                     st.session_state.remember_login = True
+                                    st.session_state.last_user_id = user_id
+                                    # Adicionar token na URL para persistir sessão
+                                    st.experimental_set_query_params(session_token="demo_session")
                                 
                                 log_activity(user_id, "login", "Login bem-sucedido")
                                 
@@ -1492,6 +1589,17 @@ def display_login_page():
         
         st.markdown('</div>', unsafe_allow_html=True)
 
+def get_logo_base64():
+    """Carrega o logo e converte para base64."""
+    try:
+        import base64
+        with open("public/logo.jpeg", "rb") as f:
+            logo_data = f.read()
+        return base64.b64encode(logo_data).decode()
+    except FileNotFoundError:
+        # Retorna um placeholder se o logo não for encontrado
+        return ""
+
 def display_header():
     """Exibe o cabeçalho da aplicação."""
     user_info = st.session_state.get("user_info", {"full_name": "Convidado", "role": "guest"})
@@ -1508,27 +1616,71 @@ def display_header():
     if not initials:
         initials = "?"
     
-    col1, col2 = st.columns([4, 1])
+    # CSS para o cabeçalho com tema verde
+    header_css = """
+    <style>
+    .main-header {
+        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
+        color: white;
+        padding: 1rem;
+        border-radius: 15px;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+    }
+    .header-logo {
+        width: 50px;
+        height: 50px;
+        border-radius: 50%;
+        border: 2px solid white;
+        margin-right: 15px;
+    }
+    .header-title {
+        flex-grow: 1;
+        font-size: 1.5rem;
+        font-weight: bold;
+    }
+    .user-info {
+        display: flex;
+        align-items: center;
+    }
+    .user-avatar {
+        width: 35px;
+        height: 35px;
+        border-radius: 50%;
+        background: rgba(255, 255, 255, 0.2);
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-right: 10px;
+        font-weight: bold;
+        border: 2px solid white;
+    }
+    </style>
+    """
     
-    with col1:
-        st.markdown('<h1>🐾 PetCare Analytics - Sistema Avançado com IA</h1>', unsafe_allow_html=True)
+    st.markdown(header_css, unsafe_allow_html=True)
     
-    with col2:
-        user_html = f"""
-        <div style="display: flex; align-items: center; justify-content: flex-end;">
-            <div style="width: 35px; height: 35px; border-radius: 50%; background: #4527A0; color: white; 
-                        display: flex; align-items: center; justify-content: center; margin-right: 10px; font-weight: bold;">
-                {initials}
-            </div>
+    header_html = f"""
+    <div class="main-header">
+        <div style="display: flex; align-items: center;">
+            <img src="data:image/jpeg;base64,{get_logo_base64()}" class="header-logo" alt="Logo"/>
+            <div class="header-title">🐾 PetCareAi - Sistema Avançado com IA</div>
+        </div>
+        <div class="user-info">
+            <div class="user-avatar">{initials}</div>
             <div>
                 <div style="font-weight: bold; font-size: 0.9rem;">{user_name}</div>
-                <div style="color: #666; font-size: 0.8rem;">{role_text}</div>
+                <div style="opacity: 0.8; font-size: 0.8rem;">{role_text}</div>
             </div>
         </div>
-        """
-        st.markdown(user_html, unsafe_allow_html=True)
+    </div>
+    """
     
-    st.markdown('<hr style="margin: 0.5rem 0; opacity: 0.2;">', unsafe_allow_html=True)
+    st.markdown(header_html, unsafe_allow_html=True)
 
 def apply_filters(df):
     """Aplica filtros avançados ao DataFrame."""
@@ -1539,15 +1691,15 @@ def apply_filters(df):
     
     with st.sidebar.expander("Filtros Básicos", expanded=True):
         # Filtro por bairro
-        if 'bairro' in df.columns:
-            bairros = ["Todos"] + sorted(df['bairro'].unique().tolist())
+        if 'bairro' in df.columns and not df['bairro'].empty:
+            bairros = ["Todos"] + sorted(df['bairro'].dropna().unique().tolist())
             bairro_filtro = st.selectbox("🏘️ Bairro:", bairros)
             if bairro_filtro != "Todos":
                 df = df[df['bairro'] == bairro_filtro]
         
         # Filtro por tipo de pet
-        if 'tipo_pet' in df.columns:
-            tipos_pet = ["Todos"] + sorted(df['tipo_pet'].unique().tolist())
+        if 'tipo_pet' in df.columns and not df['tipo_pet'].empty:
+            tipos_pet = ["Todos"] + sorted(df['tipo_pet'].dropna().unique().tolist())
             tipo_pet_filtro = st.selectbox("🐕 Tipo de Pet:", tipos_pet)
             if tipo_pet_filtro != "Todos":
                 df = df[df['tipo_pet'] == tipo_pet_filtro]
@@ -1563,48 +1715,67 @@ def apply_filters(df):
     
     with st.sidebar.expander("Filtros Avançados"):
         # Filtro por intervalo de idade
-        if 'idade' in df.columns:
-            min_idade, max_idade = st.slider(
-                "📅 Faixa de Idade:",
-                min_value=float(df['idade'].min() if not df['idade'].isna().all() else 0),
-                max_value=float(df['idade'].max() if not df['idade'].isna().all() else 20),
-                value=(float(df['idade'].min() if not df['idade'].isna().all() else 0),
-                       float(df['idade'].max() if not df['idade'].isna().all() else 20))
-            )
-            df = df[(df['idade'] >= min_idade) & (df['idade'] <= max_idade)]
+        if 'idade' in df.columns and not df['idade'].isna().all() and len(df['idade'].dropna()) > 0:
+            idade_values = df['idade'].dropna()
+            if len(idade_values) > 0:
+                min_idade = float(idade_values.min())
+                max_idade = float(idade_values.max())
+                
+                # Verificar se min e max são diferentes
+                if min_idade < max_idade:
+                    selected_range = st.slider(
+                        "📅 Faixa de Idade:",
+                        min_value=min_idade,
+                        max_value=max_idade,
+                        value=(min_idade, max_idade)
+                    )
+                    df = df[(df['idade'] >= selected_range[0]) & (df['idade'] <= selected_range[1])]
+                else:
+                    st.info(f"📅 Idade única: {min_idade} anos")
         
         # Filtro por score de adoção
-        if 'score_adocao' in df.columns:
-            min_score, max_score = st.slider(
-                "⭐ Score de Adoção:",
-                min_value=float(df['score_adocao'].min() if not df['score_adocao'].isna().all() else 0),
-                max_value=float(df['score_adocao'].max() if not df['score_adocao'].isna().all() else 5),
-                value=(float(df['score_adocao'].min() if not df['score_adocao'].isna().all() else 0),
-                       float(df['score_adocao'].max() if not df['score_adocao'].isna().all() else 5))
-            )
-            df = df[(df['score_adocao'] >= min_score) & (df['score_adocao'] <= max_score)]
+        if 'score_adocao' in df.columns and not df['score_adocao'].isna().all() and len(df['score_adocao'].dropna()) > 0:
+            score_values = df['score_adocao'].dropna()
+            if len(score_values) > 0:
+                min_score = float(score_values.min())
+                max_score = float(score_values.max())
+                
+                # Verificar se min e max são diferentes
+                if min_score < max_score:
+                    selected_score_range = st.slider(
+                        "⭐ Score de Adoção:",
+                        min_value=min_score,
+                        max_value=max_score,
+                        value=(min_score, max_score)
+                    )
+                    df = df[(df['score_adocao'] >= selected_score_range[0]) & (df['score_adocao'] <= selected_score_range[1])]
+                else:
+                    st.info(f"⭐ Score único: {min_score}")
         
         # Filtro por características comportamentais
-        if 'sociabilidade' in df.columns:
+        if 'sociabilidade' in df.columns and not df['sociabilidade'].isna().all():
             min_soc = st.slider("🤝 Sociabilidade mínima:", 1, 5, 1)
             df = df[df['sociabilidade'] >= min_soc]
         
-        if 'energia' in df.columns:
+        if 'energia' in df.columns and not df['energia'].isna().all():
             min_energia = st.slider("⚡ Energia mínima:", 1, 5, 1)
             df = df[df['energia'] >= min_energia]
     
     with st.sidebar.expander("Filtros ML"):
         # Filtro por cluster (se existir)
-        if 'cluster_comportamental' in df.columns:
-            clusters = ["Todos"] + sorted([str(x) for x in df['cluster_comportamental'].unique() if pd.notna(x)])
+        if 'cluster_comportamental' in df.columns and not df['cluster_comportamental'].isna().all():
+            clusters = ["Todos"] + sorted([str(x) for x in df['cluster_comportamental'].dropna().unique() if pd.notna(x)])
             cluster_filtro = st.selectbox("🎯 Cluster Comportamental:", clusters)
             if cluster_filtro != "Todos":
                 df = df[df['cluster_comportamental'] == int(cluster_filtro)]
         
         # Filtro por risco de abandono
-        if 'risco_abandono' in df.columns:
-            risco_max = st.slider("⚠️ Risco máximo de abandono:", 0.0, 1.0, 1.0, 0.1)
-            df = df[df['risco_abandono'] <= risco_max]
+        if 'risco_abandono' in df.columns and not df['risco_abandono'].isna().all() and len(df['risco_abandono'].dropna()) > 0:
+            risco_values = df['risco_abandono'].dropna()
+            if len(risco_values) > 0:
+                max_risco = float(risco_values.max())
+                risco_max = st.slider("⚠️ Risco máximo de abandono:", 0.0, max_risco, max_risco, 0.1)
+                df = df[df['risco_abandono'] <= risco_max]
     
     # Exibir contagem de resultados
     st.sidebar.markdown(f"**📊 {len(df)} pets** correspondem aos filtros.")
@@ -1705,20 +1876,42 @@ def display_dashboard(df, df_filtrado):
                     'score_adocao': 'mean' if 'score_adocao' in df_filtrado.columns else 'count'
                 }).round(2)
                 
-                bairro_stats.columns = ['Total', 'Adotados', 'Taxa_Adocao', 'Score_Medio']
+                # Corrigir estrutura das colunas
+                if 'score_adocao' in df_filtrado.columns:
+                    bairro_stats.columns = ['Total', 'Adotados', 'Taxa_Adocao', 'Score_Medio']
+                else:
+                    bairro_stats.columns = ['Total', 'Adotados', 'Taxa_Adocao']
+                    bairro_stats['Score_Medio'] = 3.0  # Valor padrão
+                
                 bairro_stats = bairro_stats.reset_index()
                 
-                fig = px.scatter(
-                    bairro_stats, 
-                    x='Total', 
-                    y='Taxa_Adocao', 
-                    size='Score_Medio' if 'score_adocao' in df_filtrado.columns else 'Total',
-                    color='Score_Medio' if 'score_adocao' in df_filtrado.columns else 'Taxa_Adocao',
-                    hover_name='bairro',
-                    title="Análise por Bairro: Total vs Taxa de Adoção",
-                    labels={'Taxa_Adocao': 'Taxa de Adoção (%)', 'Total': 'Total de Pets'}
-                )
-                st.plotly_chart(fig, use_container_width=True)
+                # Verificar se há dados válidos antes de criar o gráfico
+                if len(bairro_stats) > 0 and not bairro_stats['Score_Medio'].isna().all():
+                    # Limpar valores NaN
+                    bairro_stats = bairro_stats.dropna(subset=['Score_Medio', 'Taxa_Adocao', 'Total'])
+                    
+                    if len(bairro_stats) > 0:
+                        # Garantir que os valores são numéricos
+                        bairro_stats['Score_Medio'] = pd.to_numeric(bairro_stats['Score_Medio'], errors='coerce').fillna(3.0)
+                        bairro_stats['Taxa_Adocao'] = pd.to_numeric(bairro_stats['Taxa_Adocao'], errors='coerce').fillna(0.0)
+                        bairro_stats['Total'] = pd.to_numeric(bairro_stats['Total'], errors='coerce').fillna(1)
+                        
+                        fig = px.scatter(
+                            bairro_stats, 
+                            x='Total', 
+                            y='Taxa_Adocao', 
+                            size='Score_Medio',
+                            color='Score_Medio',
+                            hover_name='bairro',
+                            title="Análise por Bairro: Total vs Taxa de Adoção",
+                            labels={'Taxa_Adocao': 'Taxa de Adoção (%)', 'Total': 'Total de Pets'},
+                            size_max=50
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info("📊 Dados insuficientes para análise por bairro")
+                else:
+                    st.info("📊 Dados insuficientes para análise por bairro")
         
         with tab2:
             # Matriz de correlação avançada
@@ -1867,40 +2060,53 @@ def display_dashboard(df, df_filtrado):
     
     insights = []
     
-    # Insight 1: Taxa de adoção por tipo
-    if 'tipo_pet' in df_filtrado.columns and 'adotado' in df_filtrado.columns:
-        adocao_por_tipo = df_filtrado.groupby('tipo_pet')['adotado'].mean().sort_values(ascending=False)
-        if len(adocao_por_tipo) > 1:
-            melhor_tipo = adocao_por_tipo.index[0]
-            taxa_melhor = adocao_por_tipo.iloc[0] * 100
-            insights.append(f"🏆 **{melhor_tipo}s** têm a maior taxa de adoção ({taxa_melhor:.1f}%)")
-    
-    # Insight 2: Bairro com maior atividade
-    if 'bairro' in df_filtrado.columns:
-        atividade_bairro = df_filtrado['bairro'].value_counts()
-        bairro_ativo = atividade_bairro.index[0]
-        insights.append(f"📍 **{bairro_ativo}** é o bairro com mais pets cadastrados ({atividade_bairro.iloc[0]} pets)")
-    
-    # Insight 3: Análise de idade
-    if 'idade' in df_filtrado.columns:
-        idade_media = df_filtrado['idade'].mean()
-        if idade_media < 3:
-            insights.append("👶 A maioria dos pets são jovens, ideal para famílias que querem pets mais ativos")
-        elif idade_media > 7:
-            insights.append("👴 A maioria dos pets são mais velhos, ideais para famílias que preferem pets mais calmos")
-    
-    # Insight 4: Score de adoção
-    if 'score_adocao' in df_filtrado.columns:
-        score_alto = (df_filtrado['score_adocao'] > 4).sum()
-        perc_score_alto = (score_alto / len(df_filtrado)) * 100
-        insights.append(f"⭐ {perc_score_alto:.1f}% dos pets têm score de adoção alto (>4.0)")
-    
-    # Exibir insights
-    if insights:
-        for i, insight in enumerate(insights):
-            st.info(insight)
-    else:
-        st.info("Adicione mais dados para gerar insights automatizados.")
+    try:
+        # Insight 1: Taxa de adoção por tipo
+        if 'tipo_pet' in df_filtrado.columns and 'adotado' in df_filtrado.columns and len(df_filtrado) > 0:
+            adocao_por_tipo = df_filtrado.groupby('tipo_pet')['adotado'].mean()
+            adocao_por_tipo = adocao_por_tipo.dropna()
+            
+            if len(adocao_por_tipo) > 0:
+                adocao_por_tipo = adocao_por_tipo.sort_values(ascending=False)
+                melhor_tipo = adocao_por_tipo.index[0]
+                taxa_melhor = adocao_por_tipo.iloc[0] * 100
+                insights.append(f"🏆 **{melhor_tipo}s** têm a maior taxa de adoção ({taxa_melhor:.1f}%)")
+        
+        # Insight 2: Bairro com maior atividade
+        if 'bairro' in df_filtrado.columns and len(df_filtrado) > 0:
+            atividade_bairro = df_filtrado['bairro'].value_counts()
+            if len(atividade_bairro) > 0:
+                bairro_ativo = atividade_bairro.index[0]
+                insights.append(f"📍 **{bairro_ativo}** é o bairro com mais pets cadastrados ({atividade_bairro.iloc[0]} pets)")
+        
+        # Insight 3: Análise de idade
+        if 'idade' in df_filtrado.columns and len(df_filtrado) > 0:
+            idade_values = df_filtrado['idade'].dropna()
+            if len(idade_values) > 0:
+                idade_media = idade_values.mean()
+                if idade_media < 3:
+                    insights.append("👶 A maioria dos pets são jovens, ideal para famílias que querem pets mais ativos")
+                elif idade_media > 7:
+                    insights.append("👴 A maioria dos pets são mais velhos, ideais para famílias que preferem pets mais calmos")
+        
+        # Insight 4: Score de adoção
+        if 'score_adocao' in df_filtrado.columns and len(df_filtrado) > 0:
+            score_values = df_filtrado['score_adocao'].dropna()
+            if len(score_values) > 0:
+                score_alto = (score_values > 4).sum()
+                perc_score_alto = (score_alto / len(score_values)) * 100
+                insights.append(f"⭐ {perc_score_alto:.1f}% dos pets têm score de adoção alto (>4.0)")
+        
+        # Exibir insights
+        if insights:
+            for insight in insights:
+                st.info(insight)
+        else:
+            st.info("Adicione mais dados para gerar insights automatizados.")
+            
+    except Exception as e:
+        st.warning("⚠️ Não foi possível gerar alguns insights automatizados. Verifique se há dados suficientes.")
+        st.info("💡 Dica: Adicione mais pets para ter análises mais precisas.")
 
 # Funções auxiliares de segurança
 def safe_get_first(series_or_df, default="Não disponível"):
@@ -3536,12 +3742,14 @@ def adicionar_pet():
                         'energia': energia,
                         'nivel_atividade': nivel_atividade,
                         'adaptabilidade': adaptabilidade,
-                        'adotado': adotado,
+                        'adotado': 1 if adotado else 0,
                         'score_adocao': score_adocao,
                         'risco_abandono': risco_abandono,
                         'observacoes': observacoes,
                         'data_registro': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
-                        'created_by': st.session_state.user_id
+                        'created_by': st.session_state.user_id,
+                        'genero': sexo,  # Mapeamento para compatibilidade
+                        'status': 'Disponível' if not adotado else 'Adotado'
                     }
                     
                     # Salvar no banco de dados
@@ -4246,11 +4454,45 @@ def main():
         initial_sidebar_state="expanded"
     )
     
+    # Verificar se há sessão persistente
+    if "user_id" not in st.session_state:
+        # Tentar recuperar sessão do query params ou cookies simulados
+        query_params = st.experimental_get_query_params()
+        
+        # Verificar se há um token de sessão nos query params
+        if "session_token" in query_params:
+            try:
+                # Simular validação de token (em produção, validar no banco)
+                session_token = query_params["session_token"][0]
+                if session_token == "demo_session":  # Token demo
+                    st.session_state.user_id = 1
+                    st.session_state.user_role = "admin"
+                    st.session_state.user_info = {
+                        "email": "admin@petcare.com",
+                        "full_name": "Administrador",
+                        "role": "admin"
+                    }
+                    st.session_state.session_id = str(uuid.uuid4())
+            except:
+                pass
+        
+        # Verificar se há lembrete de login
+        if st.session_state.get("remember_login", False):
+            # Restaurar sessão anterior (simulado)
+            last_user = st.session_state.get("last_user_id")
+            if last_user:
+                user_info = get_user_info(last_user)
+                if user_info:
+                    st.session_state.user_id = last_user
+                    st.session_state.user_role = user_info["role"]
+                    st.session_state.user_info = user_info
+                    st.session_state.session_id = str(uuid.uuid4())
+    
     # CSS personalizado global
     st.markdown("""
     <style>
     .main-header {
-        background: linear-gradient(90deg, #4527A0 0%, #7B1FA2 100%);
+        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
         color: white;
         padding: 1rem;
         border-radius: 10px;
@@ -4262,21 +4504,22 @@ def main():
         padding: 1rem;
         border-radius: 8px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        border-left: 4px solid #4527A0;
+        border-left: 4px solid #4CAF50;
     }
     .sidebar .stSelectbox > div > div {
         background-color: #f8f9fa;
     }
     .stButton > button {
-        background: linear-gradient(90deg, #4527A0 0%, #7B1FA2 100%);
+        background: linear-gradient(135deg, #4CAF50 0%, #66BB6A 100%);
         color: white;
         border: none;
         border-radius: 5px;
         transition: all 0.3s ease;
     }
     .stButton > button:hover {
+        background: linear-gradient(135deg, #388E3C 0%, #4CAF50 100%);
         transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
     }
     .alert-success {
         background-color: #d4edda;
@@ -4287,9 +4530,21 @@ def main():
         border: 1px solid transparent;
         border-radius: 0.25rem;
     }
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 2px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        background-color: #e8f5e8;
+        color: #2E7D32;
+        border-radius: 8px 8px 0 0;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: #4CAF50;
+        color: white;
+    }
     </style>
     """, unsafe_allow_html=True)
-    
+
     # Verificar se o usuário está logado
     if "user_id" not in st.session_state or "user_role" not in st.session_state:
         display_login_page()
