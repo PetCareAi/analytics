@@ -1,38 +1,18 @@
 Com base no repoitorio anexado,
 
-Quando tento se conectar ao banco de dados, ocorre o erro:
+Houve um erro:
 
-❌ Erro ao inicializar banco de dados: name 'generate_password_hash' is not defined
-2025-06-02 22:43:26.128 Please replace `st.experimental_get_query_params` with `st.query_params`.
-
-Erro ao registrar usuário: {'message': 'new row violates row-level security policy for table "users_analytics"', 'code': '42501', 'hint': None, 'details': None}
-
-Quando entro como convidado, ocorre o erro:
-
-ValueError: scale < 0
+KeyError: 'type'
 Traceback:
 File "/Users/cliente/Desktop/projetos/PetCareAi/analytics/venv/lib/python3.13/site-packages/streamlit/runtime/scriptrunner/script_runner.py", line 535, in _run_script
     exec(code, module.__dict__)
     ~~~~^^^^^^^^^^^^^^^^^^^^^^^
-File "/Users/cliente/Desktop/projetos/PetCareAi/analytics/app.py", line 6561, in <module>
+File "/Users/cliente/Desktop/projetos/PetCareAi/analytics/app.py", line 6903, in <module>
     main()
     ~~~~^^
-File "/Users/cliente/Desktop/projetos/PetCareAi/analytics/app.py", line 4384, in main
-    df = load_data_from_db()
-File "/Users/cliente/Desktop/projetos/PetCareAi/analytics/app.py", line 1034, in load_data_from_db
-    df = generate_sample_data()
-File "/Users/cliente/Desktop/projetos/PetCareAi/analytics/app.py", line 1080, in generate_sample_data
-    peso = max(0.1, peso_base + np.random.normal(0, peso_base * 0.2))
-                                ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
-File "numpy/random/mtrand.pyx", line 1557, in numpy.random.mtrand.RandomState.normal
-File "_common.pyx", line 616, in numpy.random._common.cont
-File "_common.pyx", line 422, in numpy.random._common.check_constraint
-
-
-Please replace st.experimental_get_query_params with st.query_params.
-st.experimental_get_query_params will be removed after 2024-04-11.
-Refer to our docs page for more information.
-
+File "/Users/cliente/Desktop/projetos/PetCareAi/analytics/app.py", line 4445, in main
+    if notification['type'] == 'warning':
+       ~~~~~~~~~~~~^^^^^^^^
 
 Mostre o caminho completo para cada codigo modificado
 Forneça o código diretamente na conversa, e não em um artefato à direita.

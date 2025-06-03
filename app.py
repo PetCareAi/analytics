@@ -4442,12 +4442,18 @@ def main():
     notifications = generate_smart_notifications(df)
     
     for notification in notifications[:3]:  # Máximo 3 notificações
-        if notification['type'] == 'warning':
-            st.sidebar.warning(f"⚠️ {notification['message']}")
-        elif notification['type'] == 'info':
-            st.sidebar.info(f"ℹ️ {notification['message']}")
+        if notification['tipo'] == 'warning':
+            st.sidebar.warning(f"⚠️ {notification['titulo']}")
+            if 'descricao' in notification:
+                st.sidebar.caption(notification['descricao'])
+        elif notification['tipo'] == 'info':
+            st.sidebar.info(f"ℹ️ {notification['titulo']}")
+            if 'descricao' in notification:
+                st.sidebar.caption(notification['descricao'])
         else:
-            st.sidebar.success(f"✅ {notification['message']}")
+            st.sidebar.success(f"✅ {notification['titulo']}")
+            if 'descricao' in notification:
+                st.sidebar.caption(notification['descricao'])
     
     # Botão de logout
     st.sidebar.markdown("---")
