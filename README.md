@@ -1,7 +1,5 @@
-# PetCare Analytics - Sistema Avançado de Análise de Pets
-
 <div align="center">
-  <img src="public/logo.jpeg" alt="PetCare Analytics Logo" width="300" height="auto" style="border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);"/>
+  <img src="https://github.com/PetCareAi/.github/blob/main/imagens/Analista-dados.png?raw=true" alt="PetCare Analytics Logo" width="120" height="auto" style="border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);"/>
   
   <h3>🐾 Transformando dados em vida: Análise inteligente para adoção responsável</h3>
   
