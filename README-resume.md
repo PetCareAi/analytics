@@ -14,3 +14,5 @@ Sistema Avançado de Análise com Inteligência Artificial para Gestão de Pets
 * **Relatórios personalizáveis** e exportação em múltiplos formatos
 * **Painel administrativo** com logs, auditoria e monitoramento
 * **Integração Supabase** para banco de dados em tempo real
+
+https://github.com/PetCareAi/analytics
