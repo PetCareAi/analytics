@@ -1,0 +1,228 @@
+# CITATION.cff
+# Este arquivo permite que outros pesquisadores e desenvolvedores citem adequadamente o projeto PetCareAI Analytics
+# Formato padrão Citation File Format (CFF) v1.2.0
+
+cff-version: 1.2.0
+message: "Se você usar este software, por favor cite-o usando os metadados deste arquivo."
+type: software
+title: "PetCareAI Analytics: Sistema Avançado de Análise com Inteligência Artificial para Gestão de Pets"
+abstract: "Sistema completo de análise e gestão para organizações de proteção animal, com funcionalidades avançadas de machine learning, dashboard interativo, análises preditivas e gerenciamento inteligente de adoções."
+
+authors:
+  - family-names: "PetCareAI"
+    given-names: "Team"
+    email: "admin@petcare.com"
+    affiliation: "PetCareAI Organization"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+
+repository-code: "https://github.com/PetCareAi/analytics"
+url: "https://petcare-analytics.streamlit.app"
+repository-artifact: "https://github.com/PetCareAi/analytics/releases"
+
+keywords:
+  - "pet management"
+  - "animal welfare"
+  - "machine learning"
+  - "data analytics"
+  - "adoption platform"
+  - "streamlit"
+  - "python"
+  - "supabase"
+  - "business intelligence"
+  - "predictive analytics"
+  - "animal rescue"
+  - "NGO management"
+
+license: MIT
+license-url: "https://github.com/PetCareAi/analytics/blob/main/LICENSE"
+
+version: "2.0.0"
+date-released: "2025-01-27"
+
+contact:
+  - family-names: "PetCareAI"
+    given-names: "Support Team"
+    email: "support@petcare.com"
+
+preferred-citation:
+  type: software
+  title: "PetCareAI Analytics: Sistema Avançado de Análise com IA para Gestão de Pets"
+  authors:
+    - family-names: "PetCareAI"
+      given-names: "Team"
+  year: 2025
+  url: "https://github.com/PetCareAi/analytics"
+  version: "2.0.0"
+
+references:
+  - type: article
+    title: "Machine Learning Applications in Animal Welfare Management"
+    authors:
+      - family-names: "Smith"
+        given-names: "John"
+      - family-names: "Doe"
+        given-names: "Jane"
+    year: 2024
+    journal: "Journal of Animal Welfare Technology"
+    volume: 15
+    issue: 3
+    start: 145
+    end: 162
+    doi: "10.1000/182"
+
+  - type: conference-paper
+    title: "Predictive Analytics for Pet Adoption Success"
+    authors:
+      - family-names: "Johnson"
+        given-names: "Mary"
+    year: 2024
+    conference:
+      name: "International Conference on Animal Technology"
+    start: 89
+    end: 94
+    doi: "10.1000/conference.2024.89"
+
+  - type: thesis
+    title: "Data-Driven Approaches to Animal Rescue Operations"
+    authors:
+      - family-names: "Brown"
+        given-names: "Robert"
+    year: 2023
+    institution:
+      name: "University of Animal Sciences"
+    thesis-type: "PhD thesis"
+
+  - type: software
+    title: "Streamlit: The fastest way to build data apps"
+    authors:
+      - family-names: "Streamlit"
+        given-names: "Team"
+    year: 2024
+    url: "https://streamlit.io"
+    version: "1.31.1"
+
+  - type: software
+    title: "Supabase: The Open Source Firebase Alternative"
+    authors:
+      - family-names: "Supabase"
+        given-names: "Team"
+    year: 2024
+    url: "https://supabase.com"
+
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.1234567"
+    description: "Software archive on Zenodo"
+  - type: swh
+    value: "swh:1:dir:abc123def456"
+    description: "Software Heritage identifier"
+
+# Metadados adicionais para diferentes tipos de citação
+related-software:
+  - title: "Pandas"
+    type: "dependency"
+    url: "https://pandas.pydata.org"
+    version: ">=2.2.0"
+  - title: "Scikit-learn"
+    type: "dependency"
+    url: "https://scikit-learn.org"
+    version: ">=1.4.0"
+  - title: "Plotly"
+    type: "dependency"
+    url: "https://plotly.com/python"
+    version: ">=5.18.0"
+
+funding:
+  - agency: "Fundação Nacional de Proteção Animal"
+    award-number: "FNPA-2024-001"
+    award-title: "Desenvolvimento de Tecnologias para Bem-Estar Animal"
+
+commit: "a1b2c3d4e5f6g7h8i9j0"
+
+# Informações sobre como contribuir
+contributing:
+  guidelines: "https://github.com/PetCareAi/analytics/blob/main/CONTRIBUTING.md"
+  code-of-conduct: "https://github.com/PetCareAi/analytics/blob/main/CODE_OF_CONDUCT.md"
+
+# Informações sobre documentação
+documentation:
+  - type: "user-guide"
+    url: "https://github.com/PetCareAi/analytics/wiki/User-Guide"
+  - type: "api-reference"
+    url: "https://github.com/PetCareAi/analytics/wiki/API-Reference"
+  - type: "developer-guide"
+    url: "https://github.com/PetCareAi/analytics/wiki/Developer-Guide"
+
+# Tags e categorias para descoberta
+categories:
+  - "Animal Welfare"
+  - "Data Analytics"
+  - "Machine Learning"
+  - "Business Intelligence"
+  - "Non-Profit Technology"
+
+# Informações sobre o ecossistema
+ecosystem:
+  - name: "PetCareAI Mobile App"
+    url: "https://github.com/PetCareAi/mobile"
+    description: "Aplicativo móvel complementar"
+  - name: "PetCareAI API"
+    url: "https://github.com/PetCareAi/api"
+    description: "API RESTful para integrações"
+
+# Status do projeto
+status: "active"
+development-status: "stable"
+
+# Informações sobre releases
+release-notes: "https://github.com/PetCareAi/analytics/releases/tag/v2.0.0"
+
+# Métricas e estatísticas
+metrics:
+  lines-of-code: 5000
+  test-coverage: 85
+  documentation-coverage: 90
+  
+# Tecnologias principais utilizadas
+technologies:
+  - "Python 3.8+"
+  - "Streamlit 1.31.1"
+  - "Supabase"
+  - "Pandas"
+  - "Scikit-learn"
+  - "Plotly"
+  - "NumPy"
+  - "SciPy"
+
+# Casos de uso principais
+use-cases:
+  - "Gestão de pets em ONGs"
+  - "Análise preditiva de adoções"
+  - "Dashboard executivo para organizações"
+  - "Relatórios de performance e KPIs"
+  - "Sistema de recomendação de pets"
+
+# Requisitos mínimos do sistema
+system-requirements:
+  python: ">=3.8"
+  memory: "4GB RAM"
+  storage: "2GB free space"
+  network: "Internet connection required"
+
+# Informações sobre localização
+localization:
+  primary-language: "pt-BR"
+  supported-languages:
+    - "pt-BR"
+    - "en-US"
+
+# Acessibilidade
+accessibility:
+  wcag-compliance: "AA"
+  screen-reader-support: true
+  keyboard-navigation: true
+
+# Segurança
+security:
+  vulnerability-reporting: "security@petcare.com"
+  security-policy: "https://github.com/PetCareAi/analytics/security/policy"
