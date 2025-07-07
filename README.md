@@ -916,6 +916,23 @@ Este projeto está licenciado sob a **MIT License** - veja o arquivo [LICENSE](L
 
 ---
 
+## Contributors ✨
+
+Thanks go to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="20%"><a href="http://twitter.com/vivek_jonam"><img src="https://avatars.githubusercontent.com/u/83369803?v=4" width="100px;" alt="Estevam Souza"/><br /><sub><b>Estevam Souza</b></sub></a><br /><a href="https://github.com/responsively-org/responsively-app/commits?author=estevam5s" title="Code">💻</a> <a href="https://github.com/responsively-org/responsively-app/commits?author=estevam5s" title="Tests">⚠️</a> <a href="#projectManagement-estevam5s" title="Project Management">📆</a></td>
+    </tr>
+  </tbody>
+</table>
+
+---
+
 ## Star History
 
 <a href="https://www.star-history.com/#PetCareAi/analytics&Date">
