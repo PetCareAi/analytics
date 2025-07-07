@@ -916,6 +916,18 @@ Este projeto está licenciado sob a **MIT License** - veja o arquivo [LICENSE](L
 
 ---
 
+## Star History
+
+<a href="https://www.star-history.com/#PetCareAi/analytics&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date" />
+ </picture>
+</a>
+
+---
+
 <div align="center">
   
   ![Footer Image](https://via.placeholder.com/800x200/4527A0/ffffff?text=PetCare+Analytics+-+Transformando+Vidas+com+Tecnologia)
