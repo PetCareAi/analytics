@@ -1,0 +1,196 @@
+# Arquivo MANIFEST.in para controlar quais arquivos incluir na distribuição
+
+# Incluir arquivos de documentação essenciais
+include README.md
+include LICENSE
+include CHANGELOG.md
+include CONTRIBUTORS.md
+include CODE_OF_CONDUCT.md
+include CONTRIBUTING.md
+include Roadmap.md
+include architecture.md
+include release.md
+include requisitos-funcionais.md
+
+# Incluir arquivos de configuração principais
+include setup.py
+include setup.cfg
+include pyproject.toml
+include requirements.txt
+include requirements-dev.txt
+include requirements-test.txt
+
+# Incluir metadados do projeto
+include .version
+include MANIFEST.in
+
+# Incluir configurações de desenvolvimento
+include .editorconfig
+include .gitignore
+include .gitattributes
+include .pre-commit-config.yaml
+include commitlint.config.js
+include .flake8
+include .pylintrc
+include mypy.ini
+include pytest.ini
+include setup.cfg
+
+# Incluir arquivos de configuração específicos
+include config/*.py
+include config/*.ini
+include config/*.yaml
+include config/*.yml
+include config/*.json
+
+# Incluir assets e recursos estáticos
+recursive-include assets *
+recursive-include static *
+recursive-include public *
+recursive-include resources *
+
+# Incluir templates e arquivos de interface
+recursive-include templates *.html *.css *.js
+recursive-include components *.py
+
+# Incluir dados de exemplo e configurações iniciais
+recursive-include data *.csv *.json *.yaml *.yml
+recursive-include examples *.py *.csv *.json
+recursive-include sample_data *.csv *.json
+
+# Incluir scripts utilitários
+recursive-include scripts *.py *.sh *.bat
+recursive-include tools *.py
+recursive-include utils *.py
+
+# Incluir documentação
+recursive-include docs *.md *.rst *.txt *.png *.jpg *.svg
+recursive-include docs/source *
+recursive-include docs/build *.html *.css *.js
+include docs/Makefile
+include docs/make.bat
+
+# Incluir testes (opcional para distribuição)
+recursive-include tests *.py
+include conftest.py
+include tox.ini
+
+# Incluir notebooks Jupyter (se relevantes)
+recursive-include notebooks *.ipynb *.md
+
+# Incluir arquivos de tradução/localização
+recursive-include locale *.po *.pot *.mo
+recursive-include i18n *.po *.pot *.mo
+
+# Incluir configurações de CI/CD importantes
+include .travis.yml
+include .github/workflows/*.yml
+include .github/workflows/*.yaml
+
+# Incluir arquivos de Docker para desenvolvimento
+include Dockerfile
+include docker-compose.yml
+include docker-compose.override.yml
+include .dockerignore
+
+# Incluir schemas e definições de dados
+recursive-include schemas *.json *.yaml *.yml
+recursive-include models *.py
+
+# Incluir arquivos de migração de banco de dados
+recursive-include migrations *.py *.sql
+recursive-include alembic *.py *.ini
+
+# Excluir arquivos desnecessários
+exclude .DS_Store
+exclude Thumbs.db
+exclude *.pyc
+exclude *.pyo
+exclude *.pyd
+exclude __pycache__
+exclude .pytest_cache
+exclude .coverage
+exclude .tox
+exclude .mypy_cache
+exclude .git
+exclude .gitmodules
+
+# Excluir dados sensíveis
+exclude .env
+exclude .env.*
+exclude secrets.json
+exclude config/local.py
+exclude config/.env
+
+# Excluir arquivos de desenvolvimento local
+exclude .vscode
+exclude .idea
+exclude *.swp
+exclude *.swo
+exclude *~
+
+# Excluir logs e arquivos temporários
+recursive-exclude * *.log
+recursive-exclude * *.tmp
+recursive-exclude * *.temp
+recursive-exclude * *.bak
+recursive-exclude * *.backup
+
+# Excluir build artifacts
+recursive-exclude * *.egg-info
+recursive-exclude * build
+recursive-exclude * dist
+recursive-exclude * __pycache__
+recursive-exclude * *.pyc
+recursive-exclude * *.pyo
+
+# Excluir arquivos de cache
+recursive-exclude * .cache
+recursive-exclude * *.cache
+
+# Excluir dados de usuário/desenvolvimento
+recursive-exclude uploads *
+recursive-exclude user_data *
+recursive-exclude dev_data *
+
+# Excluir backups de desenvolvimento
+recursive-exclude backups *
+recursive-exclude *.sql
+recursive-exclude *.db
+recursive-exclude *.sqlite
+recursive-exclude *.sqlite3
+
+# Excluir arquivos de profiling
+recursive-exclude * *.prof
+recursive-exclude * *.profile
+
+# Excluir coverage reports
+recursive-exclude htmlcov *
+recursive-exclude coverage *
+
+# Incluir apenas arquivos essenciais de configuração
+prune .git
+prune .github/ISSUE_TEMPLATE
+prune .github/PULL_REQUEST_TEMPLATE
+
+# Configurações globais de inclusão
+global-include *.py
+global-include *.md
+global-include *.rst
+global-include *.txt
+global-include *.yml
+global-include *.yaml
+global-include *.json
+global-include *.ini
+global-include *.cfg
+global-include *.toml
+
+# Excluir padrões globais indesejados
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude *.pyd
+global-exclude __pycache__
+global-exclude .DS_Store
+global-exclude Thumbs.db
+global-exclude *.log
+global-exclude *.tmp
