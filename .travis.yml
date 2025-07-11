@@ -1,0 +1,252 @@
+# Configuração do Travis CI para PetCareAi
+language: python
+
+# Versões do Python para testar
+python:
+  - "3.9"
+  - "3.10"
+  - "3.11"
+
+# Sistema operacional
+os:
+  - linux
+  - osx
+
+# Distribuições específicas do Linux
+dist: focal
+
+# Configurações de ambiente
+env:
+  global:
+    - PYTHONPATH=$PYTHONPATH:$TRAVIS_BUILD_DIR
+    - STREAMLIT_SERVER_HEADLESS=true
+    - STREAMLIT_SERVER_PORT=8501
+    - STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
+  matrix:
+    - TEST_SUITE=unit
+    - TEST_SUITE=integration
+    - TEST_SUITE=e2e
+
+# Cache de dependências
+cache:
+  pip: true
+  directories:
+    - $HOME/.cache/pip
+    - node_modules
+
+# Serviços necessários
+services:
+  - postgresql
+  - redis-server
+
+# Addons para dependências do sistema
+addons:
+  postgresql: "13"
+  apt:
+    packages:
+      - postgresql-13
+      - postgresql-client-13
+      - build-essential
+      - python3-dev
+      - libpq-dev
+      - redis-tools
+
+# Configuração antes da instalação
+before_install:
+  # Atualizar pip
+  - python -m pip install --upgrade pip setuptools wheel
+  
+  # Configurar PostgreSQL
+  - sudo systemctl start postgresql
+  - sudo -u postgres createuser -s $USER
+  - createdb petcare_test
+  
+  # Configurar Redis
+  - sudo systemctl start redis-server
+  
+  # Instalar dependências do sistema
+  - if [[ "$TRAVIS_OS_NAME" == "osx" ]]; then brew install postgresql redis; fi
+
+# Instalação de dependências
+install:
+  # Instalar dependências Python
+  - pip install -r requirements.txt
+  - pip install -r requirements-dev.txt
+  
+  # Instalar dependências de teste
+  - pip install pytest pytest-cov pytest-mock pytest-asyncio
+  - pip install black flake8 mypy isort bandit safety
+  
+  # Instalar streamlit e dependências específicas
+  - pip install streamlit plotly pandas scikit-learn
+  
+  # Verificar instalação
+  - python --version
+  - pip list
+
+# Scripts antes dos testes
+before_script:
+  # Configurar variáveis de ambiente de teste
+  - export DATABASE_URL="postgresql://localhost/petcare_test"
+  - export REDIS_URL="redis://localhost:6379"
+  - export SUPABASE_URL="https://test.supabase.co"
+  - export SUPABASE_KEY="test-key"
+  
+  # Executar migrações de teste
+  - python -c "from config.database import init_test_database; init_test_database()"
+  
+  # Verificar serviços
+  - pg_isready
+  - redis-cli ping
+
+# Scripts de teste
+script:
+  # Linting e formatação
+  - black --check --diff .
+  - isort --check-only --diff .
+  - flake8 --max-line-length=100 --ignore=E203,W503 .
+  - mypy --ignore-missing-imports .
+  
+  # Verificações de segurança
+  - bandit -r . -f json -o bandit-report.json || true
+  - safety check || true
+  
+  # Testes baseados no TEST_SUITE
+  - |
+    case $TEST_SUITE in
+      unit)
+        pytest tests/unit/ -v --cov=. --cov-report=xml --cov-report=html
+        ;;
+      integration)
+        pytest tests/integration/ -v --cov=. --cov-report=xml
+        ;;
+      e2e)
+        pytest tests/e2e/ -v --maxfail=1
+        ;;
+    esac
+
+# Scripts após sucesso
+after_success:
+  # Upload de cobertura para Codecov
+  - bash <(curl -s https://codecov.io/bash)
+  
+  # Upload para Coveralls
+  - pip install coveralls
+  - coveralls
+
+# Scripts após falha
+after_failure:
+  # Coletar logs de erro
+  - cat /var/log/postgresql/postgresql-13-main.log | tail -100
+  - redis-cli info
+  
+  # Mostrar últimos logs do aplicativo
+  - if [ -f app.log ]; then tail -100 app.log; fi
+
+# Scripts após o script principal
+after_script:
+  # Limpeza de recursos
+  - dropdb petcare_test || true
+  - redis-cli flushall || true
+
+# Configuração de deploy
+deploy:
+  # Deploy para staging no branch develop
+  - provider: script
+    script: bash scripts/deploy-staging.sh
+    on:
+      branch: develop
+      python: "3.10"
+      condition: $TEST_SUITE = unit
+    skip_cleanup: true
+  
+  # Deploy para produção no branch main
+  - provider: script
+    script: bash scripts/deploy-production.sh
+    on:
+      branch: main
+      python: "3.10"
+      condition: $TEST_SUITE = unit && $TRAVIS_TAG =~ ^v[0-9]
+    skip_cleanup: true
+
+# Configuração de notificações
+notifications:
+  email:
+    recipients:
+      - devops@petcare.ai
+      - team@petcare.ai
+    on_success: change
+    on_failure: always
+  
+  slack:
+    rooms:
+      - secure: "encrypted-slack-token"
+    on_success: change
+    on_failure: always
+    template:
+      - "Build <%{build_url}|#%{build_number}> (%{branch} - %{commit}) de %{author}: %{message}"
+      - "Status: %{result} em %{duration}"
+
+# Jobs específicos
+jobs:
+  include:
+    # Job de linting rápido
+    - stage: lint
+      python: "3.10"
+      env: QUICK_LINT=true
+      script:
+        - black --check .
+        - flake8 --max-line-length=100 .
+        - isort --check-only .
+      
+    # Job de testes de segurança
+    - stage: security
+      python: "3.10"
+      env: SECURITY_SCAN=true
+      script:
+        - bandit -r . -f json -o bandit-report.json
+        - safety check --json --output safety-report.json
+      after_script:
+        - python scripts/parse-security-reports.py
+    
+    # Job de build de documentação
+    - stage: docs
+      python: "3.10"
+      env: BUILD_DOCS=true
+      script:
+        - pip install sphinx sphinx-rtd-theme
+        - cd docs && make html
+      deploy:
+        provider: pages
+        skip_cleanup: true
+        github_token: $GITHUB_TOKEN
+        local_dir: docs/_build/html
+        on:
+          branch: main
+    
+    # Job de performance testing
+    - stage: performance
+      python: "3.10"
+      env: PERF_TEST=true
+      script:
+        - pip install locust
+        - python scripts/performance-test.py
+      after_script:
+        - python scripts/analyze-performance.py
+
+  # Jobs que podem falhar sem quebrar o build
+  allow_failures:
+    - env: TEST_SUITE=e2e
+    - stage: performance
+  
+  # Jobs que devem terminar rapidamente
+  fast_finish: true
+
+# Estágios de build
+stages:
+  - lint
+  - test
+  - security
+  - performance
+  - docs
+  - deploy
