@@ -1,0 +1,152 @@
+# Configuração do Dependabot para atualizações automáticas
+version: 2
+updates:
+  # Atualizações do pip para Python
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "America/Sao_Paulo"
+    reviewers:
+      - "admin"
+      - "dev-team"
+    assignees:
+      - "maintainer"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+    open-pull-requests-limit: 5
+    rebase-strategy: "auto"
+    target-branch: "develop"
+    versioning-strategy: "increase"
+    allow:
+      # Permitir atualizações de dependências diretas
+      - dependency-type: "direct"
+        update-type: "version-update:semver-patch"
+      - dependency-type: "direct"
+        update-type: "version-update:semver-minor"
+      # Permitir atualizações de segurança
+      - dependency-type: "all"
+        update-type: "security"
+    ignore:
+      # Ignorar atualizações de versão major para dependências críticas
+      - dependency-name: "streamlit"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "pandas"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "scikit-learn"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # Agrupar atualizações de dependências ML
+      machine-learning:
+        patterns:
+          - "scikit-learn"
+          - "pandas"
+          - "numpy"
+          - "scipy"
+          - "matplotlib"
+          - "seaborn"
+        update-types:
+          - "minor"
+          - "patch"
+      # Agrupar dependências de visualização
+      visualization:
+        patterns:
+          - "plotly"
+          - "bokeh"
+          - "altair"
+        update-types:
+          - "minor"
+          - "patch"
+      # Agrupar dependências de desenvolvimento
+      development:
+        patterns:
+          - "pytest"
+          - "black"
+          - "flake8"
+          - "mypy"
+          - "pre-commit"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Atualizações do npm (se houver frontend JS)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+      day: "tuesday"
+      time: "10:00"
+      timezone: "America/Sao_Paulo"
+    reviewers:
+      - "frontend-team"
+    commit-message:
+      prefix: "deps(js)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "javascript"
+    open-pull-requests-limit: 3
+    allow:
+      - dependency-type: "direct"
+        update-type: "version-update:semver-patch"
+      - dependency-type: "direct"
+        update-type: "version-update:semver-minor"
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+
+  # Atualizações do Docker
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "first-monday"
+      time: "11:00"
+      timezone: "America/Sao_Paulo"
+    reviewers:
+      - "devops-team"
+    commit-message:
+      prefix: "deps(docker)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "docker"
+    open-pull-requests-limit: 2
+
+  # Atualizações do GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+      day: "first-wednesday"
+      time: "12:00"
+      timezone: "America/Sao_Paulo"
+    reviewers:
+      - "ci-team"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci/cd"
+      - "github-actions"
+    open-pull-requests-limit: 2
+
+# Configurações globais do repositório
+registries:
+  # Registro privado se necessário
+  private-registry:
+    type: python-index
+    url: https://pypi.private.company.com
+    username: ${{secrets.PRIVATE_PYPI_USERNAME}}
+    password: ${{secrets.PRIVATE_PYPI_PASSWORD}}
+
+# Estratégias de merge
+enable-beta-ecosystems: true
