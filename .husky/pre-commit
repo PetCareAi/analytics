@@ -1,0 +1,215 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Hook pre-commit do Husky para projetos Node.js/JavaScript
+# Este script é executado antes de cada commit
+
+echo "🔍 Executando verificações pre-commit (Husky)..."
+
+# Verificar se há arquivos staged
+if git diff --cached --quiet; then
+  echo "❌ Nenhum arquivo staged para commit"
+  exit 1
+fi
+
+# Executar lint-staged se disponível
+if command -v npx >/dev/null 2>&1 && [ -f "package.json" ]; then
+  echo "🧹 Executando lint-staged..."
+  npx lint-staged
+  
+  if [ $? -ne 0 ]; then
+    echo "❌ lint-staged falhou"
+    exit 1
+  fi
+fi
+
+# Executar prettier se disponível
+if command -v npx >/dev/null 2>&1 && [ -f ".prettierrc" ] || [ -f "prettier.config.js" ]; then
+  echo "🎨 Verificando formatação com Prettier..."
+  npx prettier --check $(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|jsx|ts|tsx|json|css|scss|md)$')
+  
+  if [ $? -ne 0 ]; then
+    echo "❌ Código não está formatado corretamente"
+    echo "💡 Execute: npx prettier --write ."
+    exit 1
+  fi
+fi
+
+# Executar ESLint se disponível
+if command -v npx >/dev/null 2>&1 && [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ] || [ -f "eslint.config.js" ]; then
+  echo "🔍 Executando ESLint..."
+  staged_js_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|jsx|ts|tsx)$')
+  
+  if [ -n "$staged_js_files" ]; then
+    npx eslint $staged_js_files
+    
+    if [ $? -ne 0 ]; then
+      echo "❌ Problemas de linting encontrados"
+      exit 1
+    fi
+  fi
+fi
+
+# Executar verificação de tipos TypeScript
+if command -v npx >/dev/null 2>&1 && [ -f "tsconfig.json" ]; then
+  echo "🔧 Verificando tipos TypeScript..."
+  npx tsc --noEmit
+  
+  if [ $? -ne 0 ]; then
+    echo "❌ Erros de tipo encontrados"
+    exit 1
+  fi
+fi
+
+# Executar testes relacionados aos arquivos modificados
+if command -v npm >/dev/null 2>&1 && [ -f "package.json" ]; then
+  # Verificar se há script de teste
+  if npm run | grep -q "test"; then
+    echo "🧪 Executando testes..."
+    
+    # Executar apenas testes relacionados se usar Jest
+    if [ -f "jest.config.js" ] || [ -f "jest.config.json" ] || grep -q "jest" package.json; then
+      npm run test -- --findRelatedTests $(git diff --cached --name-only --diff-filter=ACM) --passWithNoTests
+    else
+      npm run test
+    fi
+    
+    if [ $? -ne 0 ]; then
+      echo "❌ Testes falharam"
+      exit 1
+    fi
+  fi
+fi
+
+# Verificar se há secrets expostos
+echo "🔒 Verificando secrets..."
+secrets_pattern="(password|secret|key|token|api_key|private_key|auth)"
+
+staged_files=$(git diff --cached --name-only)
+for file in $staged_files; do
+  if [ -f "$file" ]; then
+    # Pular arquivos de configuração e documentação
+    if echo "$file" | grep -E '\.(md|txt|json|example|sample)$' >/dev/null; then
+      continue
+    fi
+    
+    if git show ":$file" | grep -iE "$secrets_pattern.*[:=].*(\"[^\"]{10,}\"|'[^']{10,}'|[a-zA-Z0-9]{20,})" >/dev/null; then
+      echo "⚠️ Possível secret detectado em $file"
+      
+      # Mostrar a linha suspeita (sem revelar o valor)
+      git show ":$file" | grep -iE "$secrets_pattern" | head -1 | sed 's/[=:].*/=***'
+      
+      read -p "Continuar mesmo assim? (y/N): " -n 1 -r
+      echo
+      if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo "❌ Commit cancelado para verificar secrets"
+        exit 1
+      fi
+    fi
+  fi
+done
+
+# Verificar tamanho dos arquivos
+echo "📁 Verificando tamanho dos arquivos..."
+large_files=""
+
+for file in $staged_files; do
+  if [ -f "$file" ]; then
+    # Obter tamanho do arquivo (compatível com macOS e Linux)
+    if command -v stat >/dev/null 2>&1; then
+      size=$(stat -f%z "$file" 2>/dev/null || stat -c%s "$file" 2>/dev/null)
+      
+      # 2MB = 2097152 bytes
+      if [ "$size" -gt 2097152 ]; then
+        large_files="$large_files\n  $file ($(echo $size | awk '{print int($1/1024/1024)"MB"}'))"
+      fi
+    fi
+  fi
+done
+
+if [ -n "$large_files" ]; then
+  echo "⚠️ Arquivos grandes detectados:$large_files"
+  echo "💡 Considere usar Git LFS para arquivos grandes"
+  
+  read -p "Continuar mesmo assim? (y/N): " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "❌ Commit cancelado devido a arquivos grandes"
+    exit 1
+  fi
+fi
+
+# Verificar se package-lock.json e yarn.lock estão sincronizados
+if [ -f "package-lock.json" ] && [ -f "yarn.lock" ]; then
+  echo "⚠️ Ambos package-lock.json e yarn.lock estão presentes"
+  echo "💡 Recomenda-se usar apenas um gerenciador de pacotes"
+fi
+
+# Verificar se package.json foi modificado mas lock files não
+package_json_modified=$(git diff --cached --name-only | grep "package.json")
+package_lock_modified=$(git diff --cached --name-only | grep -E "(package-lock.json|yarn.lock)")
+
+if [ -n "$package_json_modified" ] && [ -z "$package_lock_modified" ]; then
+  echo "⚠️ package.json foi modificado mas lock files não foram atualizados"
+  echo "💡 Execute npm install ou yarn install para atualizar"
+  
+  read -p "Continuar mesmo assim? (y/N): " -n 1 -r
+  echo
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "❌ Commit cancelado - atualize os lock files"
+    exit 1
+  fi
+fi
+
+# Verificar se há conflitos de merge não resolvidos
+echo "🔀 Verificando conflitos de merge..."
+for file in $staged_files; do
+  if [ -f "$file" ]; then
+    if git show ":$file" | grep -E '^(<{7}|={7}|>{7})' >/dev/null; then
+      echo "❌ Marcadores de conflito de merge encontrados em $file"
+      exit 1
+    fi
+  fi
+done
+
+# Verificar imports/requires não utilizados (JavaScript/TypeScript)
+if command -v npx >/dev/null 2>&1; then
+  js_ts_files=$(git diff --cached --name-only --diff-filter=ACM | grep -E '\.(js|jsx|ts|tsx)$')
+  
+  if [ -n "$js_ts_files" ]; then
+    echo "📦 Verificando imports não utilizados..."
+    
+    # Usar unimported se disponível
+    if npm list unimported >/dev/null 2>&1; then
+      npx unimported --silent
+      
+      if [ $? -ne 0 ]; then
+        echo "⚠️ Possíveis imports não utilizados detectados"
+        echo "💡 Execute: npx unimported para mais detalhes"
+      fi
+    fi
+  fi
+fi
+
+# Executar audit de segurança se disponível
+if command -v npm >/dev/null 2>&1 && [ -f "package.json" ]; then
+  echo "🛡️ Executando audit de segurança..."
+  
+  npm audit --audit-level=high --silent
+  audit_exit_code=$?
+  
+  if [ $audit_exit_code -ne 0 ]; then
+    echo "⚠️ Vulnerabilidades de segurança encontradas"
+    echo "💡 Execute: npm audit para mais detalhes"
+    
+    read -p "Continuar mesmo assim? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+      echo "❌ Commit cancelado devido a vulnerabilidades"
+      exit 1
+    fi
+  fi
+fi
+
+echo "✅ Todas as verificações pre-commit passaram!"
+exit 0
