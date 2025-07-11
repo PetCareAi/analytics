@@ -1,0 +1,177 @@
+# Configurações globais de atributos do Git
+
+# Configuração padrão para todos os arquivos
+* text=auto eol=lf
+
+# Arquivos de texto específicos
+*.py text diff=python
+*.md text diff=markdown
+*.txt text
+*.csv text
+*.json text
+*.yml text
+*.yaml text
+*.xml text
+*.html text
+*.css text
+*.js text
+*.ts text
+*.jsx text
+*.tsx text
+*.sql text
+*.ini text
+*.cfg text
+*.conf text
+*.toml text
+
+# Arquivos de configuração
+.gitignore text
+.gitattributes text
+.editorconfig text
+requirements*.txt text
+Dockerfile text
+docker-compose*.yml text
+Makefile text
+*.mk text
+
+# Documentação
+*.rst text
+README* text
+CHANGELOG* text
+LICENSE* text
+CONTRIBUTING* text
+AUTHORS* text
+CONTRIBUTORS* text
+
+# Scripts
+*.sh text eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Arquivos Python específicos
+*.py text diff=python
+*.pyx text diff=python
+*.pyi text diff=python
+*.pyw text diff=python
+
+# Jupyter Notebooks - tratar como binário para evitar conflitos
+*.ipynb -text -diff
+
+# Dados e arquivos de modelo
+*.pkl binary
+*.joblib binary
+*.h5 binary
+*.hdf5 binary
+*.npz binary
+*.npy binary
+*.mat binary
+
+# Imagens
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg text
+*.bmp binary
+*.tiff binary
+*.webp binary
+
+# Documentos
+*.pdf binary
+*.doc binary
+*.docx binary
+*.xls binary
+*.xlsx binary
+*.ppt binary
+*.pptx binary
+
+# Arquivos comprimidos
+*.zip binary
+*.tar binary
+*.gz binary
+*.bz2 binary
+*.7z binary
+*.rar binary
+
+# Fontes
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.otf binary
+*.eot binary
+
+# Vídeo e áudio
+*.mp4 binary
+*.avi binary
+*.mov binary
+*.wmv binary
+*.mp3 binary
+*.wav binary
+*.ogg binary
+
+# Configurações específicas para lingusdocs
+*.po text
+*.pot text
+
+# Configurações de merge para arquivos específicos
+# Não fazer merge automático em arquivos de changelog
+CHANGELOG.md merge=ours
+RELEASE.md merge=ours
+
+# Configurações para arquivos de dados
+# Arquivos CSV grandes devem usar LFS
+*.csv filter=lfs diff=lfs merge=lfs -text
+data/*.csv filter=lfs diff=lfs merge=lfs -text
+
+# Modelos de ML devem usar LFS
+models/*.pkl filter=lfs diff=lfs merge=lfs -text
+models/*.joblib filter=lfs diff=lfs merge=lfs -text
+models/*.h5 filter=lfs diff=lfs merge=lfs -text
+
+# Configurações para arquivos de backup
+*.sql.gz filter=lfs diff=lfs merge=lfs -text
+backups/* filter=lfs diff=lfs merge=lfs -text
+
+# Linguist - configurações para detecção de linguagem
+*.ipynb linguist-documentation
+docs/* linguist-documentation
+*.md linguist-documentation
+LICENSE linguist-documentation
+*.txt linguist-documentation
+
+# Marcar arquivos gerados como não importantes para estatísticas
+static/compiled/* linguist-generated
+dist/* linguist-generated
+build/* linguist-generated
+coverage/* linguist-generated
+
+# Configurações de diff específicas
+*.json diff=json
+*.css diff=css
+*.html diff=html
+
+# Tratamento especial para arquivos de configuração sensíveis
+.env export-ignore
+*.key export-ignore
+secrets.json export-ignore
+config/local.py export-ignore
+
+# Configurações para hooks do Git
+.githooks/* text eol=lf
+.husky/* text eol=lf
+
+# Arquivos de CI/CD
+.github/* text
+.travis.yml text
+.gitlab-ci.yml text
+azure-pipelines.yml text
+Jenkinsfile text
+
+# Configurações de IDE
+.vscode/* text
+.idea/* text linguist-generated
+
+# Logs - tratar como texto mas ignorar em exports
+*.log text export-ignore
+logs/* text export-ignore
