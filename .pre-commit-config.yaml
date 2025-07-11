@@ -1,0 +1,203 @@
+# Configuração do pre-commit para verificações automáticas
+repos:
+  # Hooks básicos do pre-commit
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      # Verificações gerais
+      - id: trailing-whitespace
+        name: Remover espaços em branco no final
+        description: Remove espaços em branco desnecessários
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+        name: Corrigir final de arquivo
+        description: Garantir que arquivos terminem com nova linha
+      - id: check-yaml
+        name: Verificar sintaxe YAML
+        description: Validar arquivos YAML
+        args: [--allow-multiple-documents]
+      - id: check-json
+        name: Verificar sintaxe JSON
+        description: Validar arquivos JSON
+      - id: check-toml
+        name: Verificar sintaxe TOML
+        description: Validar arquivos TOML
+      - id: check-xml
+        name: Verificar sintaxe XML
+        description: Validar arquivos XML
+      - id: check-added-large-files
+        name: Verificar arquivos grandes
+        description: Prevenir commit de arquivos muito grandes
+        args: [--maxkb=10240] # 10MB
+      - id: check-merge-conflict
+        name: Verificar conflitos de merge
+        description: Detectar marcadores de conflito
+      - id: check-case-conflict
+        name: Verificar conflitos de case
+        description: Verificar nomes que diferem apenas em case
+      - id: check-symlinks
+        name: Verificar symlinks
+        description: Verificar se symlinks estão válidos
+      - id: check-executables-have-shebangs
+        name: Verificar shebangs
+        description: Garantir que executáveis tenham shebang
+      - id: check-shebang-scripts-are-executable
+        name: Verificar permissões de scripts
+        description: Garantir que scripts com shebang sejam executáveis
+      - id: fix-byte-order-marker
+        name: Corrigir BOM
+        description: Remove byte order marker UTF-8
+      - id: mixed-line-ending
+        name: Verificar quebras de linha
+        description: Detectar tipos mistos de quebra de linha
+        args: [--fix=lf]
+
+  # Formatação de código Python com Black
+  - repo: https://github.com/psf/black
+    rev: 23.12.1
+    hooks:
+      - id: black
+        name: Formatação Black
+        description: Formatação automática de código Python
+        language_version: python3
+        args: [--line-length=100, --target-version=py39]
+
+  # Organização de imports com isort
+  - repo: https://github.com/pycqa/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        name: Organizar imports
+        description: Organizar e limpar imports Python
+        args: [--profile=black, --line-length=100]
+
+  # Linting com flake8
+  - repo: https://github.com/pycqa/flake8
+    rev: 7.0.0
+    hooks:
+      - id: flake8
+        name: Linting flake8
+        description: Verificação de estilo e qualidade de código
+        args: 
+          - --max-line-length=100
+          - --ignore=E203,W503,E501
+          - --select=E,W,F
+        additional_dependencies: [flake8-docstrings, flake8-import-order]
+
+  # Verificação de tipos com mypy
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.8.0
+    hooks:
+      - id: mypy
+        name: Verificação de tipos
+        description: Análise estática de tipos Python
+        args: [--ignore-missing-imports, --strict-optional]
+        additional_dependencies: [types-requests, types-PyYAML]
+
+  # Segurança com bandit
+  - repo: https://github.com/pycqa/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        name: Verificação de segurança
+        description: Análise de vulnerabilidades de segurança
+        args: [-r, --skip=B101,B601]
+        exclude: ^tests/
+
+  # Verificação de dependências
+  - repo: https://github.com/lucas-c/pre-commit-hooks-safety
+    rev: v1.3.2
+    hooks:
+      - id: python-safety-dependencies-check
+        name: Verificar dependências inseguras
+        description: Verificar vulnerabilidades em dependências
+
+  # Linting de YAML
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: Lint YAML
+        description: Verificação de qualidade de arquivos YAML
+        args: [-d, '{extends: default, rules: {line-length: {max: 120}, indentation: {spaces: 2}}}']
+
+  # Verificação de secrets
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        name: Detectar secrets
+        description: Detectar possíveis credenciais expostas
+        args: [--baseline, .secrets.baseline]
+        exclude: .*\.lock$|\.git/|\.pytest_cache/|\.mypy_cache/
+
+  # Verificação de docstrings
+  - repo: https://github.com/pycqa/pydocstyle
+    rev: 6.3.0
+    hooks:
+      - id: pydocstyle
+        name: Verificar docstrings
+        description: Verificar formato de docstrings Python
+        args: [--convention=google, --add-ignore=D100,D101,D102,D103,D104,D105]
+
+  # Formatação de arquivos Markdown
+  - repo: https://github.com/executablebooks/mdformat
+    rev: 0.7.17
+    hooks:
+      - id: mdformat
+        name: Formatação Markdown
+        description: Formatação automática de arquivos Markdown
+        args: [--wrap=100]
+        additional_dependencies: [mdformat-gfm, mdformat-black]
+
+  # Verificação de commits convencionais
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.0.0
+    hooks:
+      - id: conventional-pre-commit
+        name: Verificar formato de commit
+        description: Verificar se commit segue padrão convencional
+        stages: [commit-msg]
+
+  # Verificação específica do Streamlit
+  - repo: local
+    hooks:
+      - id: streamlit-imports
+        name: Verificar imports Streamlit
+        description: Verificar se imports do Streamlit estão corretos
+        entry: python
+        language: system
+        files: \.py$
+        args: [-c, "import streamlit; print('Streamlit imports OK')"]
+        pass_filenames: false
+
+      - id: check-requirements
+        name: Verificar requirements.txt
+        description: Verificar se requirements.txt está atualizado
+        entry: python
+        language: system
+        files: requirements\.txt$
+        args: [-c, "import pkg_resources; print('Requirements OK')"]
+        pass_filenames: false
+
+      - id: validate-data-files
+        name: Validar arquivos de dados
+        description: Verificar integridade de arquivos CSV/JSON
+        entry: python
+        language: system
+        files: \.(csv|json)$
+        args: [-c, "import pandas as pd, json, sys; [pd.read_csv(f) if f.endswith('.csv') else json.load(open(f)) for f in sys.argv[1:]]"]
+
+# Configurações globais
+default_stages: [commit, push]
+fail_fast: false
+minimum_pre_commit_version: 3.0.0
+
+# Configurações específicas por estágio
+ci:
+  autofix_commit_msg: 'ci: correções automáticas do pre-commit'
+  autofix_prs: true
+  autoupdate_branch: 'develop'
+  autoupdate_commit_msg: 'ci: atualização automática do pre-commit'
+  autoupdate_schedule: weekly
+  skip: [detect-secrets, python-safety-dependencies-check]
