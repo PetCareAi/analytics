@@ -1,0 +1,314 @@
+#!/bin/sh
+# Git hook script para validar mensagens de commit
+# Este script verifica se a mensagem de commit segue o padrão Conventional Commits
+
+# Cores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Arquivo da mensagem de commit
+commit_msg_file=$1
+commit_msg=$(cat "$commit_msg_file")
+
+echo "${BLUE}📝 Validando mensagem de commit...${NC}"
+
+# Função para imprimir erro e sair
+print_error() {
+    echo "${RED}❌ $1${NC}"
+    exit 1
+}
+
+# Função para imprimir sucesso
+print_success() {
+    echo "${GREEN}✅ $1${NC}"
+}
+
+# Função para imprimir aviso
+print_warning() {
+    echo "${YELLOW}⚠️ $1${NC}"
+}
+
+# Função para mostrar exemplo de commit válido
+show_commit_examples() {
+    echo ""
+    echo "${BLUE}Exemplos de commits válidos:${NC}"
+    echo "${GREEN}feat(auth): adicionar sistema de login salvo${NC}"
+    echo "${GREEN}fix(dashboard): corrigir bug na exibição de métricas${NC}"
+    echo "${GREEN}docs: atualizar README com instruções de instalação${NC}"
+    echo "${GREEN}style(ui): melhorar responsividade do dashboard${NC}"
+    echo "${GREEN}refactor(ml): otimizar algoritmos de clustering${NC}"
+    echo "${GREEN}test(pets): adicionar testes para CRUD de pets${NC}"
+    echo "${GREEN}chore(deps): atualizar dependências do projeto${NC}"
+    echo ""
+    echo "${BLUE}Formato: <tipo>[(escopo)]: <descrição>${NC}"
+    echo ""
+}
+
+# Verificar se é commit de merge
+is_merge_commit() {
+    echo "$commit_msg" | grep -q "^Merge "
+}
+
+# Verificar se é commit de revert
+is_revert_commit() {
+    echo "$commit_msg" | grep -q "^Revert "
+}
+
+# Verificar se é commit inicial
+is_initial_commit() {
+    echo "$commit_msg" | grep -q "^Initial commit"
+}
+
+# Verificar comprimento da mensagem
+check_message_length() {
+    # Primeira linha (subject)
+    subject_line=$(echo "$commit_msg" | head -n1)
+    subject_length=${#subject_line}
+    
+    if [ $subject_length -gt 100 ]; then
+        print_error "Primeira linha muito longa ($subject_length caracteres). Máximo: 100 caracteres"
+    fi
+    
+    if [ $subject_length -lt 10 ]; then
+        print_error "Primeira linha muito curta ($subject_length caracteres). Mínimo: 10 caracteres"
+    fi
+    
+    # Verificar se há linhas muito longas no corpo
+    echo "$commit_msg" | tail -n +2 | while IFS= read -r line; do
+        if [ ${#line} -gt 100 ]; then
+            print_warning "Linha no corpo muito longa (${#line} caracteres): $line"
+        fi
+    done
+}
+
+# Verificar formato Conventional Commits
+check_conventional_format() {
+    subject_line=$(echo "$commit_msg" | head -n1)
+    
+    # Padrão para Conventional Commits
+    # Formato: type(scope): description
+    # Exemplos: feat(auth): add login, fix: resolve bug, docs: update readme
+    pattern="^(build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test|security|deps|config|data|ml|ui|api|db)(\(.+\))?: .{1,}$"
+    
+    if ! echo "$subject_line" | grep -qE "$pattern"; then
+        print_error "Mensagem de commit não segue o padrão Conventional Commits"
+        echo ""
+        echo "${RED}Mensagem atual:${NC} $subject_line"
+        echo ""
+        echo "${BLUE}Tipos válidos:${NC}"
+        echo "  ${GREEN}feat${NC}     - Nova funcionalidade"
+        echo "  ${GREEN}fix${NC}      - Correção de bug"
+        echo "  ${GREEN}docs${NC}     - Documentação"
+        echo "  ${GREEN}style${NC}    - Formatação, sem mudança de código"
+        echo "  ${GREEN}refactor${NC} - Refatoração de código"
+        echo "  ${GREEN}perf${NC}     - Melhoria de performance"
+        echo "  ${GREEN}test${NC}     - Adição ou correção de testes"
+        echo "  ${GREEN}chore${NC}    - Tarefas de manutenção"
+        echo "  ${GREEN}ci${NC}       - Mudanças de CI/CD"
+        echo "  ${GREEN}build${NC}    - Mudanças no sistema de build"
+        echo "  ${GREEN}revert${NC}   - Reverter commit anterior"
+        echo "  ${GREEN}security${NC} - Correções de segurança"
+        echo "  ${GREEN}deps${NC}     - Atualização de dependências"
+        echo "  ${GREEN}config${NC}   - Mudanças de configuração"
+        echo "  ${GREEN}data${NC}     - Mudanças relacionadas a dados"
+        echo "  ${GREEN}ml${NC}       - Mudanças em modelos de ML"
+        echo "  ${GREEN}ui${NC}       - Mudanças na interface"
+        echo "  ${GREEN}api${NC}      - Mudanças na API"
+        echo "  ${GREEN}db${NC}       - Mudanças no banco de dados"
+        echo ""
+        echo "${BLUE}Escopos sugeridos:${NC}"
+        echo "  auth, dashboard, pets, users, analytics, reports, export, import, admin, config, tests, docs"
+        show_commit_examples
+        exit 1
+    fi
+}
+
+# Verificar tipo do commit
+check_commit_type() {
+    subject_line=$(echo "$commit_msg" | head -n1)
+    commit_type=$(echo "$subject_line" | sed -n 's/^\([a-z]*\).*/\1/p')
+    
+    case "$commit_type" in
+        feat)
+            # Feature commits devem ter escopo
+            if ! echo "$subject_line" | grep -q "(.*):"; then
+                print_warning "Commits do tipo 'feat' devem ter escopo. Ex: feat(auth): nova funcionalidade"
+            fi
+            ;;
+        fix)
+            # Fix commits devem referenciar issue se possível
+            if ! echo "$commit_msg" | grep -qE "(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved) #[0-9]+"; then
+                print_warning "Considere referenciar a issue relacionada. Ex: 'fixes #123'"
+            fi
+            ;;
+        breaking|BREAKING)
+            print_error "Use 'feat!' ou 'fix!' para breaking changes, não 'breaking'"
+            ;;
+    esac
+}
+
+# Verificar breaking changes
+check_breaking_changes() {
+    # Verificar se há indicação de breaking change
+    if echo "$commit_msg" | grep -q "BREAKING CHANGE:"; then
+        print_warning "Breaking change detectado - certifique-se de atualizar a versão adequadamente"
+    fi
+    
+    # Verificar se usa ! para breaking change
+    if echo "$commit_msg" | grep -qE "^[a-z]+(\(.+\))?!:"; then
+        print_warning "Breaking change detectado via '!' - certifique-se de documentar as mudanças"
+    fi
+}
+
+# Verificar palavras proibidas
+check_forbidden_words() {
+    subject_line=$(echo "$commit_msg" | head -n1)
+    
+    # Lista de palavras que devem ser evitadas
+    forbidden_words="wip|todo|fixme|hack|temporary|temp|debug"
+    
+    if echo "$subject_line" | grep -qiE "($forbidden_words)"; then
+        print_warning "Mensagem contém palavras que devem ser evitadas em commits finais"
+        echo "Palavras detectadas: $(echo "$subject_line" | grep -oiE "($forbidden_words)")"
+    fi
+}
+
+# Verificar se a mensagem está em português
+check_language() {
+    subject_line=$(echo "$commit_msg" | head -n1)
+    
+    # Extrair apenas a descrição (após o tipo e escopo)
+    description=$(echo "$subject_line" | sed 's/^[a-z]*(\.*)*: //')
+    
+    # Verificar se começa com letra minúscula (convenção)
+    first_char=$(echo "$description" | cut -c1)
+    if echo "$first_char" | grep -q "[A-Z]"; then
+        print_warning "Descrição deve começar com letra minúscula"
+    fi
+    
+    # Verificar se termina com ponto
+    if echo "$description" | grep -q "\.$"; then
+        print_warning "Descrição não deve terminar com ponto"
+    fi
+}
+
+# Verificar referências a issues/PRs
+check_references() {
+    # Verificar se há referências válidas
+    if echo "$commit_msg" | grep -qE "#[0-9]+"; then
+        print_success "Referência a issue/PR encontrada"
+    fi
+    
+    # Verificar se há co-autores
+    if echo "$commit_msg" | grep -q "Co-authored-by:"; then
+        print_success "Co-autores identificados"
+    fi
+}
+
+# Verificar estrutura da mensagem
+check_message_structure() {
+    line_count=$(echo "$commit_msg" | wc -l)
+    
+    if [ $line_count -gt 1 ]; then
+        # Verificar se há linha em branco após o subject
+        second_line=$(echo "$commit_msg" | sed -n '2p')
+        if [ -n "$second_line" ]; then
+            print_warning "Segunda linha deve estar em branco para separar subject do body"
+        fi
+        
+        # Verificar se o corpo está bem estruturado
+        body_start_line=3
+        if [ $line_count -gt 2 ]; then
+            echo "$commit_msg" | tail -n +$body_start_line | while IFS= read -r line; do
+                if [ ${#line} -gt 0 ] && [ ${#line} -lt 10 ]; then
+                    print_warning "Linha muito curta no corpo: '$line'"
+                fi
+            done
+        fi
+    fi
+}
+
+# Verificar se há assinatura GPG
+check_gpg_signature() {
+    if git config --get commit.gpgsign >/dev/null && [ "$(git config --get commit.gpgsign)" = "true" ]; then
+        if ! git verify-commit HEAD >/dev/null 2>&1; then
+            print_warning "Commit não está assinado com GPG"
+        else
+            print_success "Commit assinado com GPG"
+        fi
+    fi
+}
+
+# Função principal
+main() {
+    echo "${BLUE}📋 Validando mensagem: $(echo "$commit_msg" | head -n1)${NC}"
+    
+    # Verificar se é commit especial que deve ser ignorado
+    if is_merge_commit || is_revert_commit || is_initial_commit; then
+        print_success "Commit especial detectado - validação pulada"
+        exit 0
+    fi
+    
+    # Verificações principais
+    check_message_length
+    check_conventional_format
+    check_commit_type
+    check_breaking_changes
+    check_forbidden_words
+    check_language
+    check_message_structure
+    check_references
+    
+    # Verificações extras
+    check_gpg_signature
+    
+    print_success "Mensagem de commit válida!"
+}
+
+# Função para bypass em emergência
+emergency_bypass() {
+    if [ "$EMERGENCY_COMMIT" = "true" ]; then
+        print_warning "BYPASS DE EMERGÊNCIA ATIVADO!"
+        print_warning "Use apenas em situações críticas"
+        exit 0
+    fi
+}
+
+# Verificar se arquivo de mensagem existe
+if [ ! -f "$commit_msg_file" ]; then
+    print_error "Arquivo de mensagem de commit não encontrado"
+fi
+
+# Verificar se mensagem não está vazia
+if [ -z "$commit_msg" ] || [ "$commit_msg" = "" ]; then
+    print_error "Mensagem de commit está vazia"
+fi
+
+# Verificar bypass de emergência
+emergency_bypass
+
+# Verificar se deve pular verificações
+if [ "$SKIP_HOOKS" = "true" ]; then
+    print_warning "Hooks desabilitados via SKIP_HOOKS=true"
+    exit 0
+fi
+
+# Verificar se commitlint está disponível
+if command -v npx >/dev/null 2>&1 && [ -f "commitlint.config.js" ]; then
+    echo "${BLUE}🔧 Usando commitlint para validação...${NC}"
+    npx commitlint --edit "$commit_msg_file"
+    if [ $? -ne 0 ]; then
+        show_commit_examples
+        exit 1
+    fi
+    print_success "Commitlint passou"
+else
+    # Executar validação manual
+    main
+fi
+
+# Se chegou até aqui, tudo OK
+exit 0
