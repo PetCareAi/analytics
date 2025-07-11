@@ -1,0 +1,184 @@
+# Arquivo CODEOWNERS para definir responsáveis por revisão de código
+# Consulte: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Configuração global - todos os arquivos precisam de aprovação dos administradores
+* @joaosilva @mariasantos @pedrocosta
+
+# Arquivos de configuração e infraestrutura
+/.github/ @joaosilva @devops-team
+/.travis.yml @joaosilva @devops-team
+/docker* @joaosilva @devops-team
+/Dockerfile* @joaosilva @devops-team
+/.dockerignore @joaosilva @devops-team
+/kubernetes/ @joaosilva @devops-team
+/helm/ @joaosilva @devops-team
+
+# Configurações de CI/CD
+/.github/workflows/ @joaosilva @devops-team
+/.pre-commit-config.yaml @joaosilva @carloslima
+/commitlint.config.js @joaosilva @carloslima
+/.dependabot/ @joaosilva @devops-team
+/dependabot.yml @joaosilva @devops-team
+
+# Arquivos de segurança e compliance
+/SECURITY.md @joaosilva @security-team
+/.github/SECURITY.md @joaosilva @security-team
+/CODEOWNERS @joaosilva @mariasantos
+/.secrets.baseline @joaosilva @security-team
+
+# Documentação principal
+/README.md @mariasantos @ricardomendez @documentation-team
+/CONTRIBUTING.md @mariasantos @ricardomendez
+/CODE_OF_CONDUCT.md @mariasantos @ricardomendez
+/LICENSE @joaosilva @legal-team
+/CONTRIBUTORS.md @mariasantos @camilatorres
+/CHANGELOG.md @ricardomendez @release-team
+/Roadmap.md @joaosilva @mariasantos @product-team
+
+# Documentação técnica
+/docs/ @ricardomendez @documentation-team @pedrocosta
+/architecture.md @joaosilva @pedrocosta @tech-leads
+/release.md @ricardomendez @release-team
+/requisitos-funcionais.md @mariasantos @product-team @business-analysts
+
+# Código principal da aplicação
+/app.py @joaosilva @mariasantos @pedrocosta
+/main.py @joaosilva @mariasantos @pedrocosta
+/src/ @joaosilva @mariasantos @pedrocosta @backend-team
+
+# Configurações de banco de dados
+/config/database.py @joaosilva @anaoliveira @database-team
+/migrations/ @joaosilva @anaoliveira @database-team
+/alembic/ @joaosilva @anaoliveira @database-team
+/sql/ @joaosilva @anaoliveira @database-team
+
+# Autenticação e segurança
+/auth/ @joaosilva @anaoliveira @security-team
+/security/ @joaosilva @anaoliveira @security-team
+/components/auth.py @joaosilva @anaoliveira
+
+# Análises e Machine Learning
+/analytics/ @pedrocosta @robertoalves @ml-team
+/models/ml/ @pedrocosta @robertoalves @ml-team
+/algorithms/ @pedrocosta @robertoalves @ml-team
+/components/analytics.py @pedrocosta @robertoalves
+/notebooks/ @pedrocosta @robertoalves @fernandasouza @data-team
+
+# Interface do usuário e visualizações
+/components/ui/ @mariasantos @frontend-team
+/components/visualizations.py @mariasantos @pedrocosta @frontend-team
+/static/ @mariasantos @frontend-team
+/assets/ @mariasantos @frontend-team
+/themes/ @mariasantos @frontend-team
+
+# APIs e integrations
+/api/ @carloslima @backend-team
+/integrations/ @carloslima @anaoliveira @backend-team
+/webhooks/ @carloslima @backend-team
+
+# Testes
+/tests/ @luciafernandes @qa-team @joaosilva
+/tests/unit/ @luciafernandes @backend-team
+/tests/integration/ @luciafernandes @qa-team
+/tests/e2e/ @luciafernandes @qa-team
+/tests/performance/ @luciafernandes @performance-team
+/pytest.ini @luciafernandes @joaosilva
+/conftest.py @luciafernandes @joaosilva
+
+# Scripts e utilitários
+/scripts/ @joaosilva @devops-team
+/utils/ @carloslima @backend-team
+/tools/ @joaosilva @devops-team
+
+# Configurações de ambiente
+/.env* @joaosilva @devops-team @anaoliveira
+/config/ @joaosilva @anaoliveira @backend-team
+/settings/ @joaosilva @anaoliveira
+
+# Dependências
+/requirements*.txt @joaosilva @backend-team
+/setup.py @joaosilva @backend-team
+/pyproject.toml @joaosilva @backend-team
+/poetry.lock @joaosilva @backend-team
+/Pipfile* @joaosilva @backend-team
+/package.json @mariasantos @frontend-team
+/yarn.lock @mariasantos @frontend-team
+
+# Dados e backups
+/data/ @pedrocosta @data-team @database-team
+/backups/ @joaosilva @database-team @devops-team
+/exports/ @carloslima @data-team
+/imports/ @carloslima @data-team
+
+# Logs e monitoramento
+/logs/ @joaosilva @devops-team @monitoring-team
+/monitoring/ @joaosilva @devops-team @monitoring-team
+/alerts/ @joaosilva @devops-team
+
+# Frontend específico (se houver)
+/frontend/ @mariasantos @frontend-team
+/public/ @mariasantos @frontend-team
+/src/components/ @mariasantos @frontend-team
+/src/pages/ @mariasantos @frontend-team
+
+# Mobile (futuro)
+/mobile/ @mariasantos @mobile-team
+/ios/ @mariasantos @mobile-team
+/android/ @mariasantos @mobile-team
+/react-native/ @mariasantos @mobile-team
+
+# Release e deployment
+/release/ @ricardomendez @release-team @devops-team
+/deploy/ @joaosilva @devops-team
+/release-scripts/ @ricardomendez @release-team @devops-team
+
+# Hooks do Git
+/.githooks/ @joaosilva @devops-team
+/.husky/ @joaosilva @frontend-team
+
+# Configurações específicas de ferramentas
+/.vscode/ @mariasantos @dev-tools-team
+/.idea/ @joaosilva @dev-tools-team
+/.editorconfig @joaosilva @mariasantos
+/.gitignore @joaosilva @mariasantos
+/.gitattributes @joaosilva @devops-team
+
+# Linting e formatação
+/.flake8 @joaosilva @backend-team
+/.pylintrc @joaosilva @backend-team
+/setup.cfg @joaosilva @backend-team
+/.black @joaosilva @backend-team
+/.isort.cfg @joaosilva @backend-team
+/mypy.ini @joaosilva @backend-team
+
+# Configurações de terceiros
+/streamlit/ @mariasantos @joaosilva
+/.streamlit/ @mariasantos @joaosilva
+/supabase/ @anaoliveira @joaosilva
+
+# Arquivos específicos críticos
+/MANIFEST.in @joaosilva @release-team
+/Makefile @joaosilva @devops-team
+/.version @joaosilva @release-team
+
+# Definições de equipes para referência
+# (Não são processadas pelo GitHub, apenas para documentação)
+
+# Core Teams:
+# @tech-leads: @joaosilva @mariasantos @pedrocosta
+# @backend-team: @joaosilva @anaoliveira @carloslima
+# @frontend-team: @mariasantos
+# @ml-team: @pedrocosta @robertoalves
+# @data-team: @pedrocosta @robertoalves @fernandasouza
+# @qa-team: @luciafernandes
+# @devops-team: @joaosilva
+# @security-team: @joaosilva @anaoliveira
+# @database-team: @joaosilva @anaoliveira
+# @documentation-team: @ricardomendez
+# @release-team: @ricardomendez
+# @product-team: @mariasantos
+# @monitoring-team: @joaosilva
+
+# Fallback - se nenhuma regra específica se aplicar
+# Requer aprovação de pelo menos 2 tech leads
+/.* @joaosilva @mariasantos
