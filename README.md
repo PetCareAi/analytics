@@ -1,13 +1,20 @@
 <div align="center">
   <img width="1920" height="1080" alt="Cream and Pink Creative Pet Care Center Presentation" src="https://github.com/user-attachments/assets/9f20263b-59f7-44f6-9a81-6133185964e3" />
   
-  <h3>🐾 Transformando dados em vida: Análise inteligente para adoção responsável</h3>
+  <h1>🐾 PetCare AI</h1>
   
-  [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
-  [![Streamlit](https://img.shields.io/badge/Streamlit-1.31.1-red.svg)](https://streamlit.io)
-  [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-  [![Status](https://img.shields.io/badge/Status-Produção-success.svg)](https://github.com)
-  [![AI Powered](https://img.shields.io/badge/AI-Powered-purple.svg)](https://ai.google.dev/)
+  <h3>Transformando dados em vida: Análise inteligente para adoção responsável</h3>
+  
+  [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg?style=for-the-badge)](https://python.org)
+  [![Streamlit](https://img.shields.io/badge/Streamlit-1.31.1-red.svg?style=for-the-badge)](https://streamlit.io)
+  [![License](https://img.shields.io/badge/License-MIT-green.svg?style=for-the-badge)](LICENSE)
+  [![Status](https://img.shields.io/badge/Status-Produção-success.svg?style=for-the-badge)](https://github.com)
+  [![AI Powered](https://img.shields.io/badge/AI-Powered-purple.svg?style=for-the-badge)](https://ai.google.dev/)
+  
+  [![License](https://img.shields.io/badge/License-Proprietary-yellow?style=for-the-badge)](#licença)
+  [![Version](https://img.shields.io/badge/Version-1.0.0-blue?style=for-the-badge)](https://github.com)
+
+  [🌟 Demo Online](https://petcareai-crm.vercel.app) • [📚 Documentação](docs/) • [💬 Suporte](https://github.com/petcareai/crm/issues) • [🐛 Report Bug](https://github.com/petcareai/crm/issues/new)
 </div>
 
 ---
