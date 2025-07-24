@@ -14,7 +14,7 @@
     
   **Uma plataforma de análise inteligente que revoluciona o processo de adoção responsável de pets**
     
-  [🌟 Demo Online](https://petcareai-crm.vercel.app) • [📚 Documentação](docs/) • [💬 Suporte](https://github.com/petcareai/crm/issues) • [🐛 Report Bug](https://github.com/petcareai/crm/issues/new)
+  [🌟 Demo Online](https://petcareai.com.br) • [📚 Documentação](https://documentation.petcareai.com.br/) • [💬 Suporte](https://github.com/petcareai/analytics/issues) • [🐛 Report Bug](https://github.com/petcareai/analytics/issues/new)
 
 </div>
 
@@ -921,8 +921,8 @@ Entre em contato: enterprise@petcarescript.org
 
 | Tipo de Suporte | Canal | Resposta |
 |------------------|-------|----------|
-| **🐛 Bugs & Issues** | [GitHub Issues](https://github.com/PetCareAi/extension-for-devs/issues) | 24-48h |
-| **💬 Discussões** | [GitHub Discussions](https://github.com/PetCareAi/extension-for-devs/discussions) | 24h |
+| **🐛 Bugs & Issues** | [GitHub Issues](https://github.com/PetCareAi/analytics/issues) | 24-48h |
+| **💬 Discussões** | [GitHub Discussions](https://github.com/PetCareAi/analytics/discussions) | 24h |
 | **📧 Suporte Direto** | [support@petcareai.com.br](mailto:support@petcareai.com.br) | 24h |
 | **📖 Documentação** | [documentation.petcareai.com.br](https://documentation.petcareai.com.br) | Sempre |
 
@@ -951,6 +951,8 @@ Para situações críticas que impedem o funcionamento da clínica:
 💬 **WhatsApp**: [wa.me/5511999998888](https://wa.me/5511999998888)
 
 ### 🚀 Treinamentos e Workshops
+
+Oferecemos treinamentos gratuitos para maximizar o uso do sistema:
 
 #### 📅 Agenda de Treinamentos
 - **🟢 Básico**: Segundas-feiras às 19h (1h)
@@ -1028,6 +1030,21 @@ Para situações críticas que impedem o funcionamento da clínica:
 - **📱 Grupo WhatsApp**: [Comunidade PetCare Pro](https://chat.whatsapp.com/petcareai.com.br)
 - **💼 LinkedIn Groups**: [Veterinários PetCare Pro](https://linkedin.com/groups/petcareai.com.br)
 
+### 🔗 Links Úteis
+
+- **📖 [Documentação Oficial](https://docs.petcareai.com)**
+- **🏗️ [Arquitetura do Sistema](https://docs.petcareai.com/architecture)**
+- **🔗 [API Reference](https://docs.petcareai.com/api)**
+- **📱 [React Native Docs](https://docs.petcareai.com/react-native)**
+- **🖥️ [Electron Docs](https://docs.petcareai.com/electron)**
+
+### 📋 Recursos Adicionais
+
+- **🎨 [Design System](https://figma.com/petcare-design-system)**
+- **📊 [Analytics Dashboard](https://analytics.petcareai.com)**
+- **🐛 [Bug Tracker](https://github.com/PetCareAi/petcare-docs/issues)**
+- **💬 [Discord Community](https://discord.gg/petcare-ai)**
+
 ---
 
 ## 👥 Equipe de Desenvolvimento
@@ -1057,31 +1074,31 @@ Para situações críticas que impedem o funcionamento da clínica:
     <td align="center">
       <img src="https://github.com/avatar1.png" width="100px;" alt=""/>
       <br />
-      <sub><b>João Silva</b></sub>
+      <sub><b>Aluno1</b></sub>
       <br />
       <sub>Tech Lead & Full Stack Developer</sub>
       <br />
-      <a href="mailto:joao@petcarepro.com">📧</a>
+      <a href="mailto:aluno1@petcarepro.com">📧</a>
       <a href="https://linkedin.com/in/joao">💼</a>
     </td>
     <td align="center">
       <img src="https://github.com/avatar2.png" width="100px;" alt=""/>
       <br />
-      <sub><b>Maria Santos</b></sub>
+      <sub><b>Aluno2</b></sub>
       <br />
       <sub>UI/UX Designer & Frontend Developer</sub>
       <br />
-      <a href="mailto:maria@petcarepro.com">📧</a>
+      <a href="mailto:aluno2@petcarepro.com">📧</a>
       <a href="https://linkedin.com/in/maria">💼</a>
     </td>
     <td align="center">
       <img src="https://github.com/avatar3.png" width="100px;" alt=""/>
       <br />
-      <sub><b>Dr. Carlos Mendes</b></sub>
+      <sub><b>Aluno3</b></sub>
       <br />
       <sub>Veterinary Advisor & Product Owner</sub>
       <br />
-      <a href="mailto:carlos@petcarepro.com">📧</a>
+      <a href="mailto:aluno3@petcarepro.com">📧</a>
       <a href="https://linkedin.com/in/carlos">💼</a>
     </td>
   </tr>
@@ -1113,27 +1130,61 @@ Agradecemos a todos os [contribuidores](CONTRIBUTORS.md) que ajudaram a construi
 
 ---
 
+## 🤝 Contribuindo
+
+Contribuições são muito bem-vindas! 🎉
+
+### 🔀 Processo de Contribuição
+
+1. **🍴 Fork** o projeto
+2. **🌟 Clone** seu fork: `git clone https://github.com/SEU_USUARIO/petcare-docs.git`
+3. **🌿 Crie uma branch:** `git checkout -b feature/nova-funcionalidade`
+4. **✨ Faça suas alterações** seguindo os padrões do projeto
+5. **✅ Execute os testes:** `npm test`
+6. **📝 Commit suas mudanças:** `git commit -m 'feat: adiciona nova funcionalidade'`
+7. **🚀 Push para a branch:** `git push origin feature/nova-funcionalidade`
+8. **🔃 Abra um Pull Request**
+
+### 📏 Padrões de Código
+
+- **📝 Commits:** Seguir [Conventional Commits](https://www.conventionalcommits.org/)
+- **🎯 TypeScript:** Tipagem rigorosa obrigatória
+- **🎨 Styled Components:** Para todos os estilos
+- **📖 Documentação:** Comentários JSDoc quando necessário
+- **🧪 Testes:** Coverage mínima de 80%
+
+### 🐛 Reportando Bugs
+
+Use o [Issue Template](.github/ISSUE_TEMPLATE/bug_report.md):
+
+- ✅ Versão do Node.js e npm
+- ✅ Sistema operacional
+- ✅ Passos para reproduzir
+- ✅ Comportamento esperado vs atual
+- ✅ Screenshots (se aplicável)
+
+---
+
 ## 📜 Licença
 
 Este projeto está sob [licença proprietária](LICENSE) da **PetCareAi Ltda**.
 
 Para licenciamento e autorizações: **legal@petcareai.com.br**
 
-### 📋 Resumo da Licença
+### 📋 Resumo da Licença MIT
 
-✅ **Permitido**:
-- Uso comercial
-- Modificação
-- Distribuição
-- Uso privado
+✅ **Permitido:**
+- ✅ Uso comercial
+- ✅ Modificação
+- ✅ Distribuição
+- ✅ Uso privado
 
-❌ **Limitações**:
-- Responsabilidade
-- Garantia
+❌ **Limitações:**
+- ❌ Responsabilidade
+- ❌ Garantia
 
-⚠️ **Condições**:
-- Incluir aviso de licença
-- Incluir aviso de copyright
+📝 **Condições:**
+- 📝 Incluir licença e copyright
 
 ---
 
@@ -1190,36 +1241,91 @@ Agradecimento especial aos **500+ tutores** que participaram dos testes beta e a
 
 Gostou da extensão? Considere apoiar o desenvolvimento:
 
-- ⭐ **Star** no [GitHub](https://github.com/PetCareAi/extension-for-devs)
+- ⭐ **Star** no [GitHub](https://github.com/PetCareAi/analytics)
 - 🐦 **Compartilhe** nas redes sociais
 - 💰 **Doe** via [Buy me a coffee](https://buymeacoffee.com/petcareai)
 - 🤝 **Contribua** com código ou documentação
 
 ---
 
-## 📞 Contato
+## 🎯 Roadmap
 
-### 🏢 PetCare Analytics Team
+### 📊 Repositórios Atualizados
+- **25+ repositórios** agora incluídos na apresentação
+- **Informações detalhadas** de cada projeto com tecnologias específicas
+- **Status atualizado** de todos os repositórios (Produção, Beta, Desenvolvimento)
+- **Links diretos** para todos os repositórios GitHub
 
-- **🌐 Website**: [https://petcareai.com.br](https://petcareai.com.br)
-- **📧 Email**: contato@petcare-analytics.com
-- **📱 WhatsApp**: +55 (48) 99999-9999
-- **💬 Discord**: [PetCare Community](https://discord.gg/petcareai)
-- **🐦 Twitter**: [@PetCareAnalytics](https://twitter.com/petcare-ai)
-- **📘 LinkedIn**: [PetCare Analytics](https://linkedin.com/company/petcare-ai)
+### 🧠 Categoria IA & Machine Learning
+- **Ultra ML Pet Detection v6.0** - Sistema ultra-profissional com YOLO e MediaPipe
+- **PetCareAI Analytics** - Análise avançada com Machine Learning
+- **LLM AI Assistant** - Assistentes virtuais com Gemini AI
+- **Sistemas de Computer Vision** para análise veterinária
 
-### 🆘 Suporte Técnico
+### 📱 Aplicações Completas
+- **Apps Mobile**: React Native, Expo, Vue.js PWA
+- **Apps Desktop**: Electron, sistemas multiplataforma
+- **Plataformas Web**: Next.js, React, Angular, Vue.js
+- **APIs e Backend**: NestJS, Python, sistemas RESTful
 
-- **📋 Issues**: [GitHub Issues](https://github.com/PetCareAi/issues)
-- **📚 Documentação**: [docs.petcare-analytics.com](https://docs.petcareai.com.br)
-- **💬 Chat**: [Suporte em tempo real](https://petcareai.com/chat)
-- **📞 Telefone**: +55 (48) 3333-4444 (Seg-Sex, 9h-18h)
+### 🏢 Sistemas Empresariais
+- **ERP Completo** - Gestão empresarial integrada
+- **Sistemas de CRM** - Gestão de relacionamento com clientes
+- **Plataformas de Cybersecurity** - ISO 27001/27002
+- **Sistemas de Gestão de Projetos** - Scrum e Kanban
 
-### 🌍 Comunidade
+### ⚡ Melhorias Técnicas
+- **Animações aprimoradas** com Framer Motion
+- **SEO otimizado** com meta tags completas
+- **Performance melhorada** com lazy loading
+- **Responsividade aprimorada** para todos os dispositivos
 
-- **🗣️ Fórum**: [community.petcare-analytics.com](https://community.petcareai.com)
-- **📰 Blog**: [blog.petcare-analytics.com](https://blog.petcareai.com.br)
-- **📧 Newsletter**: [Inscreva-se aqui](https://petcare-analytics.com/newsletter)
+### ✅ Funcionalidades Implementadas
+
+- ✅ **Interface responsiva** para todos os dispositivos
+- ✅ **Componentes principais** (Header, Sidebar, CodeBlock)
+- ✅ **Sistema de roteamento** completo
+- ✅ **Documentação backend** detalhada
+- ✅ **Syntax highlighting** para códigos
+- ✅ **Deploy automático** na Vercel
+
+### 🚧 Em Desenvolvimento
+
+- 🚧 **Modo escuro** (Dark Mode)
+- 🚧 **Sistema de busca** na documentação
+- 🚧 **Comentários** nas páginas
+- 🚧 **Versionamento** da documentação
+- 🚧 **Integração** com API real
+
+### 📋 Roadmap Futuro
+
+- 📋 **Multi-idioma** (Português/Inglês)
+- 📋 **Offline support** (PWA)
+- 📋 **Exportação** para PDF
+- 📋 **Integração** com Notion
+- 📋 **Analytics** avançadas
+
+---
+
+## 📊 Status do Projeto
+
+### 📈 Métricas e Analytics
+
+### 📊 Estatísticas do Projeto
+
+- **⭐ Stars:** 150+
+- **🍴 Forks:** 25+
+- **👥 Contributors:** 8+
+- **📝 Commits:** 300+
+- **📄 Páginas:** 20+
+- **🌍 Usuários/mês:** 1,000+
+
+### 📱 Performance
+
+- **⚡ Lighthouse Score:** 95+
+- **🚀 First Contentful Paint:** <1.5s
+- **📊 Largest Contentful Paint:** <2.5s
+- **🎯 Cumulative Layout Shift:** <0.1
 
 ---
 
@@ -1233,38 +1339,13 @@ Gostou da extensão? Considere apoiar o desenvolvimento:
 
 ---
 
-## Contributors ✨
-
-Thanks go to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
-
-<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-<!-- prettier-ignore-start -->
-<!-- markdownlint-disable -->
-<table>
-  <tbody>
-    <tr>
-      <td align="center" valign="top" width="20%"><a href="http://twitter.com/vivek_jonam"><img src="https://avatars.githubusercontent.com/u/83369803?v=4" width="100px;" alt="Estevam Souza"/><br /><sub><b>Estevam Souza</b></sub></a><br /><a href="https://github.com/responsively-org/responsively-app/commits?author=estevam5s" title="Code">💻</a> <a href="https://github.com/responsively-org/responsively-app/commits?author=estevam5s" title="Tests">⚠️</a> <a href="#projectManagement-estevam5s" title="Project Management">📆</a></td>
-    </tr>
-  </tbody>
-</table>
-
----
-
-## Star History
-
-<a href="https://www.star-history.com/#PetCareAi/analytics&Date">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date" />
-   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date" />
- </picture>
-</a>
-
----
-
 <div align="center">
 
 ## 🎉 **Comece Agora!**
+
+<table>
+<tr>
+<td>
 
 ```bash
 # Instale PetCareScript em 10 segundos
@@ -1275,11 +1356,11 @@ echo 'show "🐾 Olá, PetCareScript!";' > hello.pcs
 pcs hello.pcs
 ```
 
-### 🌟 **Junte-se à Revolução da Programação Humana!**
+</td>
+</tr>
+</table>
 
-[![Get Started](https://img.shields.io/badge/🚀%20Get%20Started-Now-brightgreen?style=for-the-badge&logoColor=white)](https://language.petcareai.com.br/getting-started)
-[![Join Discord](https://img.shields.io/badge/💬%20Join-Discord-7289da?style=for-the-badge&logo=discord&logoColor=white)](https://discord.gg/petcarescript)
-[![Follow Twitter](https://img.shields.io/badge/🐦%20Follow-Twitter-1da1f2?style=for-the-badge&logo=twitter&logoColor=white)](https://twitter.com/petcarescript)
+**✨ É só isso! Seu ambiente PetCareScript está pronto para usar! ✨**
 
 ## 📱 Redes Sociais
 
@@ -1290,14 +1371,7 @@ pcs hello.pcs
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/company/petcareai)
 [![YouTube](https://img.shields.io/badge/YouTube-FF0000?style=for-the-badge&logo=youtube&logoColor=white)](https://youtube.com/petcareai)
 
-**Instagram**: [@petcarepro.br](https://instagram.com/petcareai.com.br)
-**LinkedIn**: [PetCare Pro](https://linkedin.com/company/petcareai.com.br)
-**Facebook**: [PetCare Pro Brasil](https://facebook.com/petcareai.com.br)
-**Twitter**: [@petcarepro_br](https://twitter.com/petcareai.com.br)
-
 </div>
-
----
 
 <div align="center">
   <h2>🚀 Pronto para Revolucionar o Cuidado Animal?</h2>
@@ -1313,27 +1387,17 @@ pcs hello.pcs
     <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn" />
   </a>
   
-  <br /><br />
-  
-  <p>
-    <em>"Transformando o cuidado animal através da tecnologia" 🐾</em><br />
-    <strong>© 2025 PetCareAI Organization - Todos os direitos reservados</strong>
-  </p>
 </div>
 
 ---
 
 <div align="center">
 
-### **Built with ❤️ for the Developer Community**
-
-**PetCareScript** - *Making programming human-readable, one keyword at a time.*
-
-### 🙏 Obrigado por escolher o PetCare Pro!
+## 🙏 Obrigado por escolher o PetCare Pro!
 
 **Juntos, estamos revolucionando a medicina veterinária no Brasil**
 
-Desenvolvido com ❤️ por veterinários, para veterinários
+*Desenvolvido com ❤️ por veterinários, para veterinários e a comunidade de desenvolvedores*
 
 <p>
   <img src="https://img.shields.io/badge/Made%20with-❤️-red?style=for-the-badge" alt="Made with Love">
@@ -1341,28 +1405,28 @@ Desenvolvido com ❤️ por veterinários, para veterinários
   <img src="https://img.shields.io/badge/Open%20Source-💪-blue?style=for-the-badge" alt="Open Source">
 </p>
 
-**🐾 Feito com ❤️ para o bem-estar dos pets brasileiros**
+## 🐾 Feito com ❤️ para o bem-estar dos pets brasileiros
 
-⭐ **Se este projeto ajudou você e seu pet, deixe uma estrela!** ⭐
+### ⭐ **Se este projeto ajudou você e seu pet, deixe uma estrela!** ⭐
 
-**🐾 PetCare AI Extension v1.0.1 Enhanced**
-
-*Desenvolvido com ❤️ para a comunidade de desenvolvedores*
-
+### 🚀 **Tecnologia**
 **Powered by Google Gemini 2.0 Flash | Built with 🤖 AI + 💻 Human Creativity**
 
-**© 2025 PetCareScript. Made with 🐾 in Brazil.**
+### 💫 **Missão**
+*"Transformando o cuidado animal através da tecnologia"* 🐾
 
-![Footer Image](https://via.placeholder.com/800x200/4527A0/ffffff?text=PetCare+Analytics+-+Transformando+Vidas+com+Tecnologia)
-
-**🐾 Desenvolvido com ❤️ para proteger e cuidar de nossos amigos de quatro patas**
-
-<sub>© 2025 PetCare Analytics. Todos os direitos reservados.</sub>
-
-[![Feito com amor](https://img.shields.io/badge/Feito%20com-❤️-red.svg)](https://github.com/petcare-analytics)
-[![Para pets](https://img.shields.io/badge/Para-🐾pets-blue.svg)](https://github.com/petcare-analytics)
-[![Open Source](https://img.shields.io/badge/Open-Source-green.svg)](https://opensource.org/)
-
-<p><small>© 2025 PetCareAi. Todos os direitos reservados.</small></p>
+**© 2025 PetCareAI Organization - Todos os direitos reservados**
 
 </div>
+
+---
+
+## Star History
+
+<a href="https://www.star-history.com/PetCareAi/analytics&Date">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=PetCareAi/analytics&type=Date" />
+ </picture>
+</a>

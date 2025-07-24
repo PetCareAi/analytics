@@ -1,859 +1,334 @@
-# Guia de Manutenção - PetCareAI Analytics
+Guia de Manutenção - PetCare AI Assistant
+👥 Equipe de Manutenção
+Mantenedor Principal
+* Estevam Souza - Diretor de TI e Arquiteto Principal
+    * GitHub: @estevamsouza
+    * Email: estevam.souza@petcareai.com.br
+    * Responsabilidades: Arquitetura, releases, decisões técnicas estratégicas, supervisão geral
+Mantenedores Adjuntos
+* Aluno1 - Frontend Developer
+    * GitHub: @aluno1
+    * Email: aluno1@petcareai.com.br
+    * Responsabilidades: Interface, componentes React, design system, experiência do usuário
+* Aluno2 - Backend Developer
+    * GitHub: @aluno2
+    * Email: aluno2@petcareai.com.br
+    * Responsabilidades: APIs, integrações, banco de dados, serviços backend
+* Aluno3 - Full Stack Developer & QA
+    * GitHub: @aluno3
+    * Email: aluno3@petcareai.com.br
+    * Responsabilidades: Testes, QA, reconhecimento de voz, performance, full stack
+📋 Responsabilidades dos Mantenedores
+🔄 Gerenciamento de Issues
+* Triagem: Analisar e categorizar novas issues em até 48h (Estevam + Aluno3)
+* Labeling: Aplicar labels apropriados (bug, feature, documentation, etc.) (Todos)
+* Priorização: Definir prioridades baseadas em impacto e urgência (Estevam)
+* Atribuição: Distribuir trabalho entre contribuidores (Estevam + Aluno3)
+* Acompanhamento: Monitorar progresso e oferecer suporte (Todos)
+🔍 Revisão de Pull Requests
+* Tempo de Resposta: Primeira revisão em até 72h
+* Code Review: Verificar qualidade, padrões e funcionalidade
+    * Frontend: Aluno1 + Estevam
+    * Backend: Aluno2 + Estevam
+    * Full Stack: Aluno3 + Estevam
+* Testing: Garantir que testes passem e cobertura seja adequada (Aluno3)
+* Documentation: Verificar se documentação foi atualizada (Aluno1 + Aluno2)
+* Approval: Aprovar ou solicitar mudanças com feedback claro
+🚀 Gerenciamento de Releases
+* Versionamento: Seguir Semantic Versioning (Estevam)
+* Changelog: Manter CHANGELOG.md atualizado (Estevam + Aluno1)
+* Tags: Criar tags git para cada release (Estevam)
+* Deploy: Coordenar deploys de produção (Estevam + Aluno2)
+* Comunicação: Anunciar releases para a comunidade (Estevam + Aluno1)
+📚 Manutenção da Documentação
+* Atualização: Manter docs atualizados com mudanças (Aluno1 + Aluno2)
+* Qualidade: Garantir clareza e precisão (Todos)
+* Exemplos: Manter exemplos de código funcionais (Aluno2 + Aluno3)
+* Tradução: Coordenar traduções quando necessário (Aluno1)
+🏷️ Sistema de Labels
+Tipos de Issue
+* bug 🐛 - Problemas de funcionamento
+* enhancement ✨ - Melhorias e novas funcionalidades
+* documentation 📖 - Relacionado à documentação
+* question ❓ - Dúvidas e perguntas
+* help-wanted 🆘 - Procurando por contribuidores
+* good-first-issue 👶 - Bom para iniciantes
+Prioridades
+* priority: critical 🔴 - Problemas críticos de produção
+* priority: high 🟡 - Alta prioridade
+* priority: medium 🟢 - Prioridade média
+* priority: low 🔵 - Baixa prioridade
+Áreas Técnicas
+* area: ui/ux 🎨 - Interface e experiência do usuário (Aluno1)
+* area: ai 🤖 - Funcionalidades de IA (Estevam)
+* area: voice 🎙️ - Reconhecimento de voz (Aluno3)
+* area: backend 🔧 - Serviços backend (Aluno2)
+* area: performance ⚡ - Performance e otimização (Aluno3)
+* area: security 🔒 - Segurança (Estevam + Aluno2)
+* area: accessibility ♿ - Acessibilidade (Aluno1 + Aluno3)
+Status
+* status: needs-triage 🔍 - Precisa ser analisado
+* status: blocked 🚧 - Bloqueado por dependência
+* status: in-progress 🔄 - Em desenvolvimento
+* status: ready-for-review 👀 - Pronto para revisão
+📊 Métricas e Monitoramento
+KPIs Principais
+* Tempo de Resposta: Média de tempo para primeira resposta em issues
+* Tempo de Resolução: Média de tempo para resolver bugs
+* Taxa de Conversão: % de PRs aceitos vs. rejeitados
+* Cobertura de Testes: % de código coberto por testes (Aluno3)
+* Performance: Core Web Vitals (Aluno3)
+Ferramentas de Monitoramento
+* GitHub Insights: Métricas nativas do GitHub (Estevam)
+* GitHub Actions: Status de CI/CD (Aluno2 + Aluno3)
+* Lighthouse CI: Performance monitoring (Aluno3)
+* ESLint/Prettier: Code quality (Aluno1)
+Relatórios Mensais
+## Relatório Mensal - [Mês/Ano]
 
-Este documento fornece diretrizes para mantenedores do projeto PetCareAI Analytics sobre como gerenciar e manter o projeto de forma efetiva.
+### Estatísticas
+- Issues abertas: X
+- Issues fechadas: Y
+- PRs mergidos: Z
+- Bugs encontrados: W
+- Performance score: Z%
 
-## 👥 Equipe de Manutenção
+### Contribuições por Área
+- Frontend (Aluno1): [resumo]
+- Backend (Aluno2): [resumo]  
+- QA/Testing (Aluno3): [resumo]
+- Arquitetura (Estevam): [resumo]
 
-### Roles e Responsabilidades
+### Destaques
+- [Lista de principais conquistas]
 
-#### 🏆 Project Lead
-- **Responsabilidades**:
-  - Visão geral e direção do projeto
-  - Decisões arquiteturais principais
-  - Aprovação de releases
-  - Gerenciamento da roadmap
-- **Acesso**: Admin total no repositório
-- **Contato**: lead@petcareai.com
+### Desafios
+- [Principais desafios enfrentados]
 
-#### 🔧 Core Maintainers
-- **Responsabilidades**:
-  - Review de código crítico
-  - Gerenciamento de releases
-  - Mentoria de contribuidores
-  - Manutenção de infraestrutura
-- **Acesso**: Write no repositório
-- **Mínimo**: 2 pessoas ativas
+### Próximos Passos
+- [Planos para o próximo mês]
+🔄 Processo de Release
+1. Preparação da Release (Estevam + Aluno2)
+# Atualizar branch main
+git checkout main
+git pull origin main
 
-#### 🤝 Community Maintainers
-- **Responsabilidades**:
-  - Triagem de issues
-  - Review de PRs menores
-  - Suporte à comunidade
-  - Documentação
-- **Acesso**: Triage no repositório
-
-### Processo de Onboarding
-
-#### Para Novos Mantenedores
-1. **Nomeação**: Por core maintainer existente
-2. **Período de Observação**: 3 meses como colaborador ativo
-3. **Votação**: Aprovação por maioria dos core maintainers
-4. **Onboarding**: Acesso gradual e mentoria
-
-#### Checklist de Onboarding
-- [ ] Acesso ao repositório configurado
-- [ ] Adicionado aos canais de comunicação
-- [ ] Documentação de processos revisada
-- [ ] Ferramentas e acessos configurados
-- [ ] Primeira review pair programming
-- [ ] Introdução à comunidade
-
-## 📋 Responsabilidades Diárias
-
-### Triagem de Issues
-```bash
-# Processo de triagem (diário)
-1. Revisar novas issues (label: needs-triage)
-2. Classificar por tipo: bug, feature, docs, etc.
-3. Definir prioridade: critical, high, medium, low
-4. Atribuir labels apropriados
-5. Responder ou atribuir a alguém
-```
-
-#### Labels do Sistema
-- **Tipo**: `bug`, `feature`, `docs`, `enhancement`
-- **Prioridade**: `critical`, `high`, `medium`, `low`
-- **Status**: `needs-triage`, `in-progress`, `blocked`, `ready`
-- **Área**: `ml`, `ui`, `backend`, `database`, `security`
-- **Dificuldade**: `good-first-issue`, `intermediate`, `advanced`
-
-### Review de Pull Requests
-
-#### Critérios de Review
-1. **Funcionalidade**: O código faz o que deveria?
-2. **Qualidade**: Segue padrões de código?
-3. **Testes**: Tem testes adequados?
-4. **Documentação**: Está documentado?
-5. **Performance**: Não degrada performance?
-6. **Segurança**: Não introduz vulnerabilidades?
-
-#### Processo de Review
-```markdown
-### Checklist de Review
-
-#### ✅ Código
-- [ ] Funcionalidade implementada corretamente
-- [ ] Código limpo e legível
-- [ ] Padrões de código seguidos
-- [ ] Não há código morto ou comentado
-
-#### ✅ Testes
-- [ ] Testes unitários adicionados/atualizados
-- [ ] Testes passam localmente
-- [ ] Cobertura de testes mantida/melhorada
-- [ ] Edge cases considerados
-
-#### ✅ Documentação
-- [ ] Docstrings atualizadas
-- [ ] README atualizado se necessário
-- [ ] Changelog atualizado
-- [ ] API docs atualizadas
-
-#### ✅ Performance
-- [ ] Sem degradação de performance
-- [ ] Queries otimizadas
-- [ ] Memory leaks verificados
-- [ ] Load testing se aplicável
-
-#### ✅ Segurança
-- [ ] Inputs validados
-- [ ] Outputs sanitizados
-- [ ] Sem hardcoded secrets
-- [ ] Dependencies verificadas
-```
-
-## 🚀 Gerenciamento de Releases
-
-### Ciclo de Release
-
-#### Release Schedule
-- **Major**: A cada 6 meses
-- **Minor**: A cada 2 meses
-- **Patch**: Conforme necessário (bugs críticos)
-- **Hotfix**: Imediato para vulnerabilidades
-
-#### Processo de Release
-
-##### 1. Preparação (1-2 semanas antes)
-```bash
 # Criar branch de release
-git checkout develop
-git checkout -b release/v2.1.0
+git checkout -b release/v1.x.x
 
-# Atualizar versões
-# - app.py (VERSION = "2.1.0")
-# - requirements.txt se necessário
-# - CHANGELOG.md
+# Atualizar versão no package.json
+npm version [patch|minor|major] --no-git-tag-version
 
-# Freeze de features
-# Apenas bug fixes a partir deste ponto
-```
+# Atualizar CHANGELOG.md
+# Adicionar entry para nova versão
+2. Testes de Release (Aluno3 + Todos)
+# Executar todos os testes
+npm test
 
-##### 2. Testing Phase (1 semana)
-```bash
-# Deploy para staging
-./deploy-staging.sh
+# Build de produção
+npm run build
 
-# Testes automatizados
-pytest tests/ --cov=app
+# Testes de integração
+npm run test:integration
 
-# Testes manuais
-./test-scenarios.sh
+# Testes E2E
+npm run test:e2e
 
-# Performance testing
-./performance-tests.sh
+# Análise de performance
+npm run analyze
+3. Validação por Área
+* Frontend (Aluno1): Interface responsiva, acessibilidade
+* Backend (Aluno2): APIs funcionando, integrações ativas
+* QA (Aluno3): Todos os testes passando, performance OK
+* Arquitetura (Estevam): Aprovação final da release
+4. Criação da Release (Estevam)
+# Commit das mudanças
+git add .
+git commit -m "chore: prepare release v1.x.x"
 
-# Security scan
-bandit -r app.py
-```
-
-##### 3. Release (Release day)
-```bash
 # Merge para main
 git checkout main
-git merge --no-ff release/v2.1.0
+git merge release/v1.x.x
 
 # Criar tag
-git tag -a v2.1.0 -m "Release v2.1.0"
-
-# Push
-git push origin main
-git push origin v2.1.0
-
-# Deploy para produção
-./deploy-production.sh
-
-# Merge de volta para develop
-git checkout develop
-git merge main
-```
-
-##### 4. Post-Release
-```bash
-# Comunicação
-# - GitHub Release notes
-# - Community announcement
-# - Documentation update
-
-# Monitoramento
-# - Error tracking
-# - Performance monitoring
-# - User feedback
-
-# Cleanup
-git branch -d release/v2.1.0
-```
-
-### Release Notes Template
-
-```markdown
-# Release v2.1.0 - [Nome do Release]
-
-## 🎯 Highlights
-
-Breve descrição das principais mudanças desta versão.
-
-## ✨ New Features
-
-- **[Área]**: Descrição da nova funcionalidade (#123)
-- **[Área]**: Outra funcionalidade importante (#456)
-
-## 🐛 Bug Fixes
-
-- **[Área]**: Correção de bug específico (#789)
-- **[Área]**: Outro bug corrigido (#012)
-
-## 🔄 Changes
-
-- **[Área]**: Mudança de comportamento (#345)
-
-## 🗑️ Deprecated
-
-- **[Área]**: Funcionalidade marcada para remoção
-
-## 🔒 Security
-
-- **[Área]**: Correção de vulnerabilidade
-- Atualização de dependências com vulnerabilidades
-
-## 📊 Metrics
-
-- **Performance**: Melhoria de X% na velocidade
-- **Size**: Redução de Y% no tamanho
-- **Tests**: Z% de cobertura de testes
-
-## 🙏 Contributors
-
-Agradecemos a todos que contribuíram para esta release:
-- @contributor1
-- @contributor2
-
-## 📋 Full Changelog
-
-https://github.com/PetCareAi/analytics/compare/v2.0.0...v2.1.0
-```
-
-## 🔧 Manutenção de Infraestrutura
-
-### Monitoramento
-
-#### Métricas Essenciais
-- **Uptime**: >99.5%
-- **Response Time**: <2s para dashboard
-- **Error Rate**: <0.1%
-- **User Satisfaction**: >4.0/5.0
-
-#### Ferramentas de Monitoramento
-```yaml
-# monitoring-stack.yml
-services:
-  prometheus:
-    image: prometheus/prometheus
-    ports:
-      - "9090:9090"
-  
-  grafana:
-    image: grafana/grafana
-    ports:
-      - "3000:3000"
-  
-  alertmanager:
-    image: prometheus/alertmanager
-    ports:
-      - "9093:9093"
-```
-
-### Backup e Recuperação
-
-#### Backup Strategy
-- **Database**: Backup diário incremental, semanal completo
-- **Code**: Replicação automática no GitHub
-- **Configs**: Backup semanal de configurações
-- **User Data**: Backup contínuo com retenção de 90 dias
-
-#### Disaster Recovery Plan
-1. **RTO** (Recovery Time Objective): 2 horas
-2. **RPO** (Recovery Point Objective): 1 hora
-3. **Backup Locations**: Multi-region
-4. **Testing**: Monthly DR drills
-
-### Atualizações de Dependências
-
-#### Schedule de Atualizações
-```bash
-# Atualizações de segurança (imediato)
-pip-audit --fix
-
-# Atualizações minor (semanal)
-pip-check-updates --minor
-
-# Atualizações major (mensal, com testes)
-pip-check-updates --major
-```
-
-#### Processo de Atualização
-1. **Security Updates**: Automático com CI/CD
-2. **Minor Updates**: Review semanal
-3. **Major Updates**: Planejamento trimestral
-4. **Testing**: Ambiente staging primeiro
-
-## 👥 Gerenciamento da Comunidade
-
-### Comunicação
-
-#### Canais de Comunicação
-- **GitHub Discussions**: Perguntas e discussões gerais
-- **Issues**: Bugs e feature requests
-- **Email**: maintainers@petcareai.com
-- **Social Media**: @petcareai (anúncios)
-
-#### Diretrizes de Comunicação
-- **Tempo de Resposta**: 24-48h para issues críticas
-- **Tom**: Profissional, helpful, inclusivo
-- **Idioma**: Português (primário), Inglês (secundário)
-- **Templates**: Usar templates padronizados
-
-### Suporte à Contribuidores
-
-#### Programa de Mentoria
-- **New Contributors**: Pair programming sessions
-- **Regular Contributors**: Code review feedback
-- **Advanced Contributors**: Architecture discussions
-
-#### Reconhecimento
-- **Monthly Highlights**: Top contributors
-- **Annual Awards**: Most valuable contributors
-- **Swag**: Camisetas, adesivos para contribuidores ativos
-
-## 📊 Métricas e Análises
-
-### KPIs do Projeto
-
-#### Saúde do Projeto
-- **Active Contributors**: >10 por mês
-- **Issue Resolution Time**: <7 dias (médio)
-- **PR Merge Time**: <3 dias (médio)
-- **Test Coverage**: >80%
-- **Documentation Coverage**: >90%
-
-#### Qualidade do Código
-- **Code Quality Score**: >8.0/10 (SonarQube)
-- **Technical Debt**: <5% (SonarQube)
-- **Security Vulnerabilities**: 0 críticas
-- **Performance Regressions**: 0
-
-#### Engajamento da Comunidade
-- **GitHub Stars**: Crescimento mensal
-- **Downloads**: Métricas de uso
-- **Community Size**: Participantes ativos
-- **Retention Rate**: Contribuidores que retornam
-
-### Ferramentas de Análise
-
-#### GitHub Analytics
-```bash
-# Script para coletar métricas
-./scripts/github-analytics.sh
-
-# Relatório mensal
-./scripts/monthly-report.sh
-
-# Análise de contribuidores
-./scripts/contributor-analysis.sh
-```
-
-#### Dashboard de Manutenção
-- **Grafana**: Métricas em tempo real
-- **GitHub Insights**: Estatísticas do repositório
-- **Custom Scripts**: Análises específicas
-
-## 🔄 Processos Automatizados
-
-### CI/CD Pipeline
-
-#### GitHub Actions Workflows
-
-##### Main CI Pipeline (`.github/workflows/ci.yml`)
-```yaml
-name: CI Pipeline
-
-on:
-  push:
-    branches: [ main, develop ]
-  pull_request:
-    branches: [ main ]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: [3.8, 3.9, 3.10, 3.11]
-
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Set up Python
-      uses: actions/setup-python@v3
-      with:
-        python-version: ${{ matrix.python-version }}
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install -r requirements-dev.txt
-
-    - name: Run tests
-      run: |
-        pytest tests/ --cov=app --cov-report=xml
-
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
-      with:
-        file: ./coverage.xml
-
-  security:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Run security scan
-      run: |
-        pip install bandit safety
-        bandit -r app.py
-        safety check
-
-  quality:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v3
-
-    - name: Quality checks
-      run: |
-        pip install flake8 black isort mypy
-        flake8 .
-        black --check .
-        isort --check-only .
-        mypy app.py
-```
-
-##### Dependency Updates (`.github/workflows/dependabot.yml`)
-```yaml
-name: Dependabot Auto-merge
-
-on:
-  pull_request:
-    types: [opened, synchronize]
-
-jobs:
-  auto-merge:
-    if: github.actor == 'dependabot[bot]'
-    runs-on: ubuntu-latest
-    steps:
-    - name: Auto-merge
-      uses: actions/github-script@v6
-      with:
-        script: |
-          github.rest.pulls.createReview({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            pull_number: context.issue.number,
-            event: 'APPROVE'
-          });
-          github.rest.pulls.merge({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            pull_number: context.issue.number,
-            merge_method: 'squash'
-          });
-```
-
-### Automações de Manutenção
-
-#### Issue Management
-```yaml
-# .github/workflows/issue-management.yml
-name: Issue Management
-
-on:
-  issues:
-    types: [opened, labeled]
-
-jobs:
-  triage:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Add to project
-      uses: actions/add-to-project@v0.3.0
-      with:
-        project-url: https://github.com/orgs/PetCareAi/projects/1
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Auto-assign labels
-      uses: actions/github-script@v6
-      with:
-        script: |
-          const labels = [];
-          const title = context.payload.issue.title.toLowerCase();
-          
-          if (title.includes('bug')) labels.push('bug');
-          if (title.includes('feature')) labels.push('enhancement');
-          if (title.includes('doc')) labels.push('documentation');
-          
-          if (labels.length > 0) {
-            github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: context.issue.number,
-              labels: labels
-            });
-          }
-```
-
-#### Stale Issues
-```yaml
-# .github/workflows/stale.yml
-name: Close stale issues
-
-on:
-  schedule:
-    - cron: "0 0 * * *"
-
-jobs:
-  stale:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/stale@v5
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-        stale-issue-message: |
-          Esta issue está marcada como stale porque não teve atividade recente.
-          Será fechada em 7 dias se não houver mais atividade.
-        stale-pr-message: |
-          Este PR está marcado como stale porque não teve atividade recente.
-          Será fechado em 7 dias se não houver mais atividade.
-        days-before-stale: 60
-        days-before-close: 7
-```
-
-## 🛠️ Ferramentas de Manutenção
-
-### Scripts Úteis
-
-#### Verificação de Saúde do Projeto
-```bash
-#!/bin/bash
-# scripts/health-check.sh
-
-echo "🔍 Verificando saúde do projeto..."
-
-# Verificar dependências
-echo "📦 Verificando dependências..."
-pip-audit --format=json > security-report.json
-
-# Verificar qualidade do código
-echo "🔍 Verificando qualidade do código..."
-flake8 . --format=json > quality-report.json
-
-# Verificar cobertura de testes
-echo "🧪 Verificando cobertura de testes..."
-pytest --cov=app --cov-report=json > coverage-report.json
-
-# Verificar performance
-echo "⚡ Verificando performance..."
-python -m cProfile -o profile.stats app.py
-
-# Relatório final
-echo "📊 Gerando relatório..."
-python scripts/generate-health-report.py
-```
-
-#### Cleanup de Branches
-```bash
-#!/bin/bash
-# scripts/cleanup-branches.sh
-
-echo "🧹 Limpando branches antigas..."
-
-# Deletar branches merged
-git branch --merged main | grep -v "main\|develop" | xargs -n 1 git branch -d
-
-# Deletar branches remotas órfãs
-git remote prune origin
-
-echo "✅ Cleanup concluído"
-```
-
-#### Análise de Contribuidores
-```bash
-#!/bin/bash
-# scripts/contributor-analysis.sh
-
-echo "👥 Analisando contribuidores..."
-
-# Top contribuidores por commits
-echo "🏆 Top 10 contribuidores:"
-git shortlog -sn | head -10
-
-# Contribuidores ativos no último mês
-echo "📅 Contribuidores ativos (último mês):"
-git log --since="1 month ago" --pretty=format:"%an" | sort | uniq -c | sort -nr
-
-# Primeira contribuição
-echo "🌟 Primeiras contribuições:"
-git log --reverse --pretty=format:"%an - %ad" --date=short | head -10
-```
-
-### Dashboard de Manutenção
-
-#### Configuração do Grafana
-```json
+git tag v1.x.x
+git push origin main --tags
+
+# Criar release no GitHub
+gh release create v1.x.x --title "v1.x.x" --notes-file RELEASE_NOTES.md
+5. Pós-Release
+* Atualizar documentação (Aluno1 + Aluno2)
+* Monitorar por issues (Aluno3)
+* Anunciar nos canais (Estevam + Aluno1)
+* Deletar branch de release (Estevam)
+🛠️ Ferramentas de Manutenção
+Scripts NPM
 {
-  "dashboard": {
-    "title": "PetCareAI Maintenance Dashboard",
-    "panels": [
-      {
-        "title": "Active Issues",
-        "type": "stat",
-        "targets": [
-          {
-            "expr": "github_issues_open_total"
-          }
-        ]
-      },
-      {
-        "title": "PR Merge Time",
-        "type": "graph",
-        "targets": [
-          {
-            "expr": "avg(github_pr_merge_time_hours)"
-          }
-        ]
-      },
-      {
-        "title": "Test Coverage",
-        "type": "gauge",
-        "targets": [
-          {
-            "expr": "test_coverage_percentage"
-          }
-        ]
-      }
-    ]
+  "scripts": {
+    "maintain:deps": "npm audit && npm outdated",
+    "maintain:clean": "rm -rf node_modules package-lock.json && npm install",
+    "maintain:analyze": "npm run build && npx webpack-bundle-analyzer build/static/js/*.js",
+    "maintain:security": "npm audit --audit-level moderate",
+    "maintain:test": "npm test -- --coverage",
+    "maintain:lint": "eslint src/ --fix"
   }
 }
-```
+Distribuição de Responsabilidades por Script
+* deps/security: Aluno2 + Estevam
+* analyze/performance: Aluno3
+* test/coverage: Aluno3
+* lint/code-quality: Aluno1
+🔧 Manutenção Preventiva
+Semanal
+* [ ] Revisar issues pendentes (Estevam + Aluno3)
+* [ ] Verificar PRs aguardando revisão (Todos)
+* [ ] Analisar métricas de performance (Aluno3)
+* [ ] Revisar dependências vulneráveis (Aluno2)
+* [ ] Validar builds e testes (Aluno3)
+Mensal
+* [ ] Atualizar dependências não-críticas (Aluno2)
+* [ ] Revisar e atualizar documentação (Aluno1 + Aluno2)
+* [ ] Limpar branches antigas (Estevam)
+* [ ] Gerar relatório mensal (Estevam + Aluno3)
+* [ ] Auditoria de código (Todos)
+Trimestral
+* [ ] Auditoria completa de segurança (Estevam + Aluno2)
+* [ ] Revisão da arquitetura (Estevam + Aluno3)
+* [ ] Planejamento de roadmap (Estevam + Todos)
+* [ ] Avaliação de performance geral (Aluno3)
+* [ ] Review de processos da equipe (Estevam)
+Anual
+* [ ] Revisão completa da documentação (Aluno1 + Aluno2)
+* [ ] Atualização de dependências major (Aluno2 + Estevam)
+* [ ] Revisão de licenças (Estevam)
+* [ ] Planejamento estratégico (Estevam + Todos)
+* [ ] Avaliação da equipe e processos (Estevam)
+🚨 Gerenciamento de Incidentes
+Classificação de Severidade
+1. S1 - Crítico: Sistema completamente inoperante
+2. S2 - Alto: Funcionalidade principal comprometida
+3. S3 - Médio: Funcionalidade secundária com problemas
+4. S4 - Baixo: Problemas menores ou cosméticos
+Processo de Resposta
+graph TD
+    A[Incidente Reportado] --> B[Classificar Severidade - Estevam/Aluno3]
+    B --> C{S1/S2?}
+    C -->|Sim| D[Resposta Imediata - Todos]
+    C -->|Não| E[Adicionar à Backlog - Aluno3]
+    D --> F[Investigar Causa - Área Responsável]
+    F --> G[Implementar Fix - Dev + Review]
+    G --> H[Deploy Hotfix - Estevam/Aluno2]
+    H --> I[Comunicar Resolução - Estevam/Aluno1]
+    E --> J[Priorizar na Sprint - Estevam]
+Escalação de Incidentes
+* Frontend Issues: Aluno1 → Estevam
+* Backend Issues: Aluno2 → Estevam
+* QA/Performance: Aluno3 → Estevam
+* Arquitetura/IA: Estevam (direto)
+📞 Canais de Comunicação
+Internos (Equipe)
+* Discord: Comunicação diária da equipe
+* GitHub: Issues, PRs e code reviews
+* Email: Comunicações formais e relatórios
+* WhatsApp: Comunicação rápida e emergências
+Externos (Comunidade)
+* GitHub Issues: Suporte técnico
+* Discord Público: Discussões da comunidade
+* Website: Comunicados oficiais
+* Email: Updates e newsletters
+📝 Documentação de Processos
+Templates de Issue
+## Bug Report Template
+**Descrição do Bug**
+[Descrição clara e concisa]
 
-## 📚 Documentação de Manutenção
+**Área Afetada**
+- [ ] Frontend (Aluno1)
+- [ ] Backend (Aluno2)
+- [ ] QA/Testing (Aluno3)
+- [ ] Arquitetura/IA (Estevam)
 
-### Runbooks
+**Passos para Reproduzir**
+1. Vá para '...'
+2. Clique em '....'
+3. Role para baixo até '....'
+4. Veja o erro
 
-#### Incident Response Runbook
-```markdown
-# Incident Response Runbook
+**Comportamento Esperado**
+[O que deveria acontecer]
 
-## Severity 1 (Critical)
-**Response Time**: Immediate
+**Screenshots**
+[Adicione screenshots se necessário]
 
-### Steps:
-1. **Acknowledge** - Respond within 15 minutes
-2. **Assess** - Determine impact and scope
-3. **Communicate** - Update status page
-4. **Investigate** - Root cause analysis
-5. **Fix** - Implement solution
-6. **Verify** - Confirm resolution
-7. **Post-mortem** - Document lessons learned
+**Ambiente**
+- OS: [e.g. iOS]
+- Browser: [e.g. chrome, safari]
+- Version: [e.g. 22]
+Checklist de PR por Área
+Frontend (Aluno1)
+* [ ] Componentes seguem design system
+* [ ] Interface é responsiva
+* [ ] Acessibilidade implementada
+* [ ] Testes de componente adicionados
+Backend (Aluno2)
+* [ ] APIs documentadas
+* [ ] Testes de integração passando
+* [ ] Validação de dados implementada
+* [ ] Performance otimizada
+QA/Testing (Aluno3)
+* [ ] Cobertura de testes adequada
+* [ ] Testes E2E funcionando
+* [ ] Performance validada
+* [ ] Regressões verificadas
+Geral (Todos)
+* [ ] Código segue padrões do projeto
+* [ ] Documentação atualizada
+* [ ] CHANGELOG atualizado
+* [ ] Build passa sem erros
+🎯 Metas da Equipe
+Por Desenvolvedor
+Estevam Souza (Líder Técnico)
+* Manter arquitetura robusta e escalável
+* Garantir qualidade das releases
+* Mentorar equipe de desenvolvimento
+* Tomar decisões técnicas estratégicas
+Aluno1 (Frontend)
+* Desenvolver interfaces intuitivas e acessíveis
+* Manter design system consistente
+* Otimizar experiência do usuário
+* Documentar componentes e padrões
+Aluno2 (Backend)
+* Desenvolver APIs robustas e documentadas
+* Manter integrações funcionando
+* Otimizar performance do backend
+* Garantir segurança dos dados
+Aluno3 (QA/Full Stack)
+* Manter cobertura de testes > 80%
+* Garantir qualidade das entregas
+* Monitorar performance da aplicação
+* Implementar automações de teste
+Objetivos Coletivos
+Curto Prazo (1-3 meses)
+* Manter tempo de resposta < 48h para issues
+* Alcançar 95% de uptime
+* Implementar todas as funcionalidades planejadas
+* Estabelecer processos de CI/CD completos
+Médio Prazo (3-6 meses)
+* Implementar métricas avançadas de monitoramento
+* Criar documentação técnica completa
+* Otimizar performance geral da aplicação
+* Estabelecer programa de testes automatizados
+Longo Prazo (6-12 meses)
+* Alcançar arquitetura totalmente escalável
+* Implementar recursos avançados de IA
+* Estabelecer programa de contributors externos
+* Lançar versão 2.0 com recursos inovadores
 
-### Contacts:
-- **On-call**: +55 11 9999-0000
-- **Escalation**: cto@petcareai.com
-```
+📞 Contatos da Equipe
+Líder Técnico: Estevam Souza 📧 estevam.souza@petcareai.com.br 💬 Discord: @estevamsouza 📱 WhatsApp: +55 (48) 9 8833-8777 (emergências)
+Frontend Developer: Aluno1 📧 aluno1@petcareai.com.br 💬 Discord: @aluno1
+Backend Developer: Aluno2 📧 aluno2@petcareai.com.br 💬 Discord: @aluno2
+QA/Full Stack: Aluno3 📧 aluno3@petcareai.com.br 💬 Discord: @aluno3
+Equipe Geral: team@petcareai.com.br 🌐 Website: https://petcareai.com.br/team 📊 Status: https://status.petcareai.com.br
 
-#### Deployment Runbook
-```markdown
-# Deployment Runbook
-
-## Pre-deployment
-- [ ] All tests passing
-- [ ] Security scan clean
-- [ ] Performance tests passed
-- [ ] Rollback plan ready
-
-## Deployment
-- [ ] Deploy to staging
-- [ ] Smoke tests
-- [ ] Deploy to production
-- [ ] Health checks
-
-## Post-deployment
-- [ ] Monitor for errors
-- [ ] Verify functionality
-- [ ] Update documentation
-- [ ] Communicate success
-```
-
-### Knowledge Base
-
-#### Common Issues
-
-##### Issue: High Memory Usage
-```markdown
-**Symptoms**: Application consuming excessive memory
-**Cause**: Usually large datasets not being garbage collected
-**Solution**: 
-1. Check for memory leaks in ML models
-2. Implement data pagination
-3. Add explicit garbage collection
-4. Monitor with memory profiler
-```
-
-##### Issue: Slow Dashboard Loading
-```markdown
-**Symptoms**: Dashboard takes >5 seconds to load
-**Cause**: Unoptimized queries or large datasets
-**Solution**:
-1. Implement caching
-2. Optimize database queries
-3. Add loading indicators
-4. Implement lazy loading
-```
-
-### Documentação de APIs Internas
-
-#### Maintenance API
-```python
-# Internal maintenance API endpoints
-
-@app.route('/api/maintenance/health')
-def health_check():
-    """System health check endpoint."""
-    return {
-        'status': 'healthy',
-        'version': get_version(),
-        'uptime': get_uptime(),
-        'dependencies': check_dependencies()
-    }
-
-@app.route('/api/maintenance/metrics')
-def get_metrics():
-    """Get system metrics."""
-    return {
-        'active_users': get_active_users(),
-        'response_time': get_avg_response_time(),
-        'error_rate': get_error_rate(),
-        'database_size': get_database_size()
-    }
-```
-
-## 🎓 Treinamento de Mantenedores
-
-### Programa de Onboarding
-
-#### Semana 1: Fundamentos
-- **Day 1-2**: Setup do ambiente e familiarização
-- **Day 3-4**: Revisão da arquitetura e código
-- **Day 5**: Primeira triagem de issues (shadowing)
-
-#### Semana 2: Práticas
-- **Day 1-2**: Revisão de PRs (com mentor)
-- **Day 3-4**: Gerenciamento de releases (observação)
-- **Day 5**: Incident response simulation
-
-#### Semana 3: Independência
-- **Day 1-5**: Atividades independentes com check-ins
-
-### Recursos de Aprendizado
-
-#### Documentação Obrigatória
-- [ ] Architecture Overview
-- [ ] Contributing Guidelines
-- [ ] Security Policies
-- [ ] Release Process
-- [ ] Code Style Guide
-
-#### Ferramentas Essenciais
-- [ ] GitHub (advanced features)
-- [ ] Git (advanced workflows)
-- [ ] CI/CD pipelines
-- [ ] Monitoring tools
-- [ ] Security scanners
-
-## 🔄 Evolução e Melhoria Contínua
-
-### Retrospectivas
-
-#### Monthly Retrospectives
-- **Formato**: Start/Stop/Continue
-- **Participantes**: Todos os mantenedores
-- **Duração**: 1 hora
-- **Output**: Action items com owners
-
-#### Quarterly Reviews
-- **Métricas**: Review de KPIs
-- **Processo**: Avaliação de eficiência
-- **Ferramentas**: Avaliação de stack
-- **Roadmap**: Ajustes na direção
-
-### Experimentação
-
-#### A/B Testing para Processos
-- **Release Frequency**: Testar cadências diferentes
-- **Review Process**: Diferentes abordagens
-- **Communication**: Canais e formatos
-- **Automation**: Níveis de automação
-
-### Feedback e Melhoria
-
-#### Canais de Feedback
-- **Mantenedores**: Slack interno
-- **Comunidade**: GitHub Discussions
-- **Usuários**: Formulários de feedback
-- **Métricas**: Análise quantitativa
-
-#### Implementação de Melhorias
-1. **Identificação**: Via feedback ou métricas
-2. **Planejamento**: Design da solução
-3. **Implementação**: Execução controlada
-4. **Avaliação**: Medição de impacto
-5. **Iteração**: Refinamento contínuo
-
----
-
-## 📞 Contatos de Emergência
-
-### Equipe Principal
-- **Project Lead**: lead@petcareai.com
-- **Security Team**: security@petcareai.com
-- **Infrastructure**: infra@petcareai.com
-
-### Serviços Críticos
-- **Hosting Provider**: [Contato do provedor]
-- **Database Provider**: [Contato Supabase]
-- **Monitoring**: [Contato do serviço]
-
-### Escalation Matrix
-1. **Level 1**: Community maintainers
-2. **Level 2**: Core maintainers
-3. **Level 3**: Project lead
-4. **Level 4**: External support
-
----
-
-**Importante**: Este documento é atualizado regularmente. Mantenedores devem revisar mensalmente e sugerir melhorias através de PRs.
-
-*Última atualização: 29/06/2025*
-*Próxima revisão: 29/07/2025*
+Última atualização: 24/07/2025 Próxima revisão: 24/09/2025 Versão do documento: 2.0 Revisado por: Estevam Souza, Aluno1, Aluno2, Aluno3

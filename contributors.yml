@@ -1,387 +1,168 @@
-# Contributors Configuration
-# PetCareAI Analytics - Sistema Avançado com IA
-# 
-# Este arquivo define configurações para reconhecimento de contribuidores
-# e gerenciamento automático de créditos no projeto.
+# PetCare AI Assistant - Contributors
+# Este arquivo lista todos os contribuidores do projeto PetCare AI Assistant
+# Formato baseado no All Contributors specification
 
-# Configurações gerais
-config:
-  version: "1.0"
-  last_updated: "2025-06-29"
-  auto_update: true
-  recognition_types:
-    - code
-    - documentation
-    - design
-    - testing
-    - translation
-    - community
-    - security
-    - infrastructure
+project:
+  name: "PetCareAi"
+  description: "Assistente de IA conversacional especializado no ecossistema PetCare AI"
+  repository: "https://github.com/PetCareAi/llm"
+  website: "https://petcareai.com.br"
+  license: "Proprietaria"
 
-# Template para README.md
-readme_template: |
-  ## 🙏 Contribuidores
+maintainers:
+  - name: "Estevam Souza"
+    role: "Project Lead & CTO"
+    email: "contato@petcareai.com.br"
+    github: "estevam5s"
+    linkedin: "estevam-souza"
+    avatar: "https://github.com/estevamsouza.png"
+    bio: "Diretor de TI da PetCare AI, especialista em IA e desenvolvimento full-stack"
+    location: "Florianópolis, SC, Brasil"
+    timezone: "America/Sao_Paulo"
+    languages: ["Portuguese", "English", "Spanish"]
+    skills: ["React", "TypeScript", "NestJS", "AI/ML", "Product Management"]
+    contributions:
+      - "💻 Code"
+      - "📖 Documentation"
+      - "🎨 Design"
+      - "🤔 Ideas"
+      - "👀 Review"
+      - "📢 Talks"
+      - "💼 Business Logic"
+      - "🔧 Infrastructure"
+    started: "2025-05-15"
+    commits: 127
+    lines_added: 15420
+    lines_removed: 2341
 
-  Agradecemos a todas as pessoas incríveis que contribuíram para este projeto:
+  - name: "Aluno1"
+    role: "Frontend Developer"
+    email: "aluno1@petcareai.com.br"
+    github: "aluno1"
+    avatar: "https://github.com/aluno1.png"
+    bio: "Desenvolvedor React especializado em aplicações conversacionais"
+    location: "Florianópolis, SC, Brasil"
+    contributions:
+      - "💻 Code"
+      - "🐛 Bug reports"
+      - "📱 Mobile Development"
+      - "⚡ Performance"
+    started: "2025-06-10"
+    commits: 45
+    lines_added: 3280
+    lines_removed: 420
 
-  <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
-  <!-- ALL-CONTRIBUTORS-LIST:END -->
+recognition:
+  hall_of_fame:
+    - name: "Estevam Souza"
+      achievement: "Founder & Architect"
+      date: "2025-08-05"
 
-  ### Tipos de Contribuição
+    - name: "Aluno1"
+      achievement: "Frontend Excellence Award"
+      date: "2025-08-05"
 
-  Este projeto segue a especificação [all-contributors](https://github.com/all-contributors/all-contributors).
-  Contribuições de qualquer tipo são bem-vindas!
+  monthly_highlights:
+    "2025-06":
+      contributor: "Aluno1"
+      reason: "Implementação excepcional da interface conversacional"
 
-# Configurações do all-contributors
-all_contributors:
-  # Configuração do bot
-  bot_name: "allcontributors[bot]"
-  commit_message: "docs(contributors): adicionar {{contributor}} como contribuidor para {{contributions}}"
-  commit_type: "docs"
-  
-  # Template customizado
-  contributorTemplate: |
-    <td align="center">
-      <a href="{{profile}}">
-        <img src="{{avatar}}" width="100px;" alt="{{name}}"/>
-        <br />
-        <sub><b>{{name}}</b></sub>
-      </a>
-      <br />
-      {{contributions}}
-    </td>
-  
-  # Configurações de badges
-  badge_template: "[![All Contributors](https://img.shields.io/badge/all_contributors-{{contributorCount}}-orange.svg?style=flat-square)](#contributors)"
-  
-  # Tipos de contribuição personalizados
-  contribution_types:
-    code:
-      symbol: "💻"
-      description: "Código"
-      link: "{{repoUrl}}/commits?author={{username}}"
-    
-    documentation:
-      symbol: "📖"
+    "2025-07":
+      contributor: "Estevam Souza"
+      reason: "Arquitetura robusta e liderança técnica"
+
+contribution_guidelines:
+  types:
+    - emoji: "💻"
+      code: "code"
+      description: "Contribuições de código"
+
+    - emoji: "📖"
+      code: "doc"
       description: "Documentação"
-      link: "{{repoUrl}}/commits?author={{username}}"
-    
-    design:
-      symbol: "🎨"
-      description: "Design"
-      link: "#design-{{username}}"
-    
-    testing:
-      symbol: "⚠️"
+
+    - emoji: "🎨"
+      code: "design"
+      description: "Design e UX"
+
+    - emoji: "🐛"
+      code: "bug"
+      description: "Relatórios de bugs"
+
+    - emoji: "💡"
+      code: "ideas"
+      description: "Ideias e sugestões"
+
+    - emoji: "👀"
+      code: "review"
+      description: "Revisão de código"
+
+    - emoji: "🧪"
+      code: "test"
       description: "Testes"
-      link: "{{repoUrl}}/commits?author={{username}}"
-    
-    translation:
-      symbol: "🌍"
-      description: "Tradução"
-      link: "#translation-{{username}}"
-    
-    community:
-      symbol: "💬"
-      description: "Comunidade"
-      link: "#community-{{username}}"
-    
-    security:
-      symbol: "🛡️"
-      description: "Segurança"
-      link: "#security-{{username}}"
-    
-    infrastructure:
-      symbol: "🚇"
+
+    - emoji: "📱"
+      code: "mobile"
+      description: "Desenvolvimento mobile"
+
+    - emoji: "♿"
+      code: "a11y"
+      description: "Acessibilidade"
+
+    - emoji: "🤖"
+      code: "ai"
+      description: "Melhorias de IA"
+
+    - emoji: "⚡"
+      code: "performance"
+      description: "Otimização de performance"
+
+    - emoji: "💼"
+      code: "business"
+      description: "Lógica de negócio"
+
+    - emoji: "🔧"
+      code: "infra"
       description: "Infraestrutura"
-      link: "{{repoUrl}}/commits?author={{username}}"
-    
-    maintenance:
-      symbol: "🚧"
-      description: "Manutenção"
-      link: "{{repoUrl}}/commits?author={{username}}"
-    
-    review:
-      symbol: "👀"
-      description: "Revisão"
-      link: "{{repoUrl}}/pulls?q=is%3Apr+reviewed-by%3A{{username}}"
-    
-    tutorial:
-      symbol: "✅"
-      description: "Tutoriais"
-      link: "#tutorial-{{username}}"
-    
-    talk:
-      symbol: "📢"
-      description: "Palestras"
-      link: "#talk-{{username}}"
-    
-    ideas:
-      symbol: "🤔"
-      description: "Ideias & Planejamento"
-      link: "#ideas-{{username}}"
-    
-    bug:
-      symbol: "🐛"
-      description: "Relatórios de Bug"
-      link: "{{repoUrl}}/issues?q=author%3A{{username}}"
-    
-    business:
-      symbol: "💼"
-      description: "Desenvolvimento de Negócios"
-      link: "#business-{{username}}"
-    
-    financial:
-      symbol: "💵"
-      description: "Suporte Financeiro"
-      link: "#financial-{{username}}"
-    
-    mentoring:
-      symbol: "🧑‍🏫"
-      description: "Mentoria"
-      link: "#mentoring-{{username}}"
-    
-    projectManagement:
-      symbol: "📆"
-      description: "Gerenciamento de Projeto"
-      link: "#projectManagement-{{username}}"
-    
-    research:
-      symbol: "🔬"
-      description: "Pesquisa"
-      link: "#research-{{username}}"
-    
-    userTesting:
-      symbol: "📓"
-      description: "Testes de Usuário"
-      link: "#userTesting-{{username}}"
 
-# Lista de contribuidores principais
-core_contributors:
-  - username: "petcare-lead"
-    name: "PetCareAI Lead Developer"
-    role: "Project Maintainer"
-    email: "lead@petcareai.com"
-    avatar: "https://avatars.githubusercontent.com/petcare-lead"
-    profile: "https://github.com/petcare-lead"
-    contributions:
-      - code
-      - documentation
-      - maintenance
-      - infrastructure
-    joined_date: "2025-04-01"
-    location: "São Paulo, BR"
-    bio: "Desenvolvedor principal do PetCareAI Analytics"
+statistics:
+  total_contributors: 2
+  core_team: 2
+  total_commits: 172
+  total_lines_added: 18700
+  total_lines_removed: 2761
+  languages_supported: 3
+  countries_represented: 1
+  active_since: "2025-05-15"
 
-  - username: "petcare-ml"
-    name: "PetCareAI ML Engineer"
-    role: "ML Engineer"
-    email: "ml@petcareai.com"
-    avatar: "https://avatars.githubusercontent.com/petcare-ml"
-    profile: "https://github.com/petcare-ml"
-    contributions:
-      - code
-      - research
-      - testing
-    joined_date: "2025-04-15"
-    location: "Rio de Janeiro, BR"
-    bio: "Especialista em Machine Learning e análise de dados"
+team_info:
+  size: "Small but mighty"
+  focus: "Quality over quantity"
+  collaboration_style: "Agile and innovative"
+  communication: "Daily standups and code reviews"
 
-# Configurações de reconhecimento automático
-auto_recognition:
-  # Reconhecimento por commits
-  commit_recognition:
-    enabled: true
-    minimum_commits: 5
-    exclude_bots: true
-    exclude_patterns:
-      - "Merge pull request"
-      - "Merge branch"
-      - "Update dependencies"
-    
-  # Reconhecimento por issues
-  issue_recognition:
-    enabled: true
-    minimum_issues: 3
-    types:
-      - "bug reports"
-      - "feature requests"
-      - "discussions"
-    
-  # Reconhecimento por pull requests
-  pr_recognition:
-    enabled: true
-    minimum_prs: 1
-    include_draft: false
-    
-  # Reconhecimento por reviews
-  review_recognition:
-    enabled: true
-    minimum_reviews: 5
+how_to_contribute:
+  getting_started:
+    - "Leia o CONTRIBUTING.md"
+    - "Escolha uma issue para trabalhar"
+    - "Faça fork do repositório"
+    - "Crie uma branch para sua feature"
+    - "Implemente suas mudanças"
+    - "Adicione testes se necessário"
+    - "Abra um Pull Request"
 
-# Badges e conquistas
-achievements:
-  first_contribution:
-    title: "Primeira Contribuição"
-    description: "Fez sua primeira contribuição ao projeto"
-    badge: "🌟"
-    
-  veteran_contributor:
-    title: "Contribuidor Veterano"
-    description: "Mais de 50 commits no projeto"
-    badge: "🏆"
-    requirements:
-      commits: 50
-    
-  documentation_hero:
-    title: "Herói da Documentação"
-    description: "Contribuiu significativamente para documentação"
-    badge: "📚"
-    requirements:
-      documentation_commits: 20
-    
-  bug_hunter:
-    title: "Caçador de Bugs"
-    description: "Reportou mais de 10 bugs válidos"
-    badge: "🐛"
-    requirements:
-      bug_reports: 10
-    
-  code_reviewer:
-    title: "Revisor de Código"
-    description: "Revisou mais de 25 pull requests"
-    badge: "👀"
-    requirements:
-      reviews: 25
-    
-  community_builder:
-    title: "Construtor da Comunidade"
-    description: "Ativo nas discussões da comunidade"
-    badge: "🤝"
-    requirements:
-      discussions: 50
+  recognition_process:
+    - "Contribuições são automaticamente reconhecidas"
+    - "Updates mensais no contributors.yml"
+    - "Hall of Fame para contribuições especiais"
+    - "Menções em release notes"
 
-# Configurações de notificação
-notifications:
-  # Notificar em novas contribuições
-  new_contributor:
-    enabled: true
-    channels:
-      - github_comment
-      - discord_webhook
-    message: "🎉 Bem-vindo(a) {{name}} como novo(a) contribuidor(a)!"
-    
-  # Notificar em marcos
-  milestones:
-    enabled: true
-    thresholds: [1, 5, 10, 25, 50, 100]
-    message: "🏆 {{name}} alcançou {{count}} contribuições!"
+contact:
+  community_manager: "estevam.souza@petcareai.com.br"
+  discord: "https://discord.gg/petcareai"
+  telegram: "https://t.me/petcareai"
+  website: "https://petcareai.com.br/contributors"
 
-# Configurações de exportação
-export:
-  formats:
-    - json
-    - csv
-    - markdown
-    
-  include_fields:
-    - username
-    - name
-    - contributions_count
-    - contribution_types
-    - joined_date
-    - last_contribution
-
-# Configurações de template
-templates:
-  contributor_profile: |
-    ### {{name}}
-    
-    **GitHub**: [@{{username}}]({{profile}})
-    **Contribuições**: {{contribution_types}}
-    **Desde**: {{joined_date}}
-    
-    {{bio}}
-    
-    #### Estatísticas
-    - **Total de contribuições**: {{contributions_count}}
-    - **Commits**: {{commits_count}}
-    - **Pull Requests**: {{prs_count}}
-    - **Issues**: {{issues_count}}
-    - **Reviews**: {{reviews_count}}
-  
-  monthly_report: |
-    ## Relatório Mensal de Contribuições - {{month}}/{{year}}
-    
-    ### Novos Contribuidores
-    {{new_contributors}}
-    
-    ### Contribuidores Mais Ativos
-    {{top_contributors}}
-    
-    ### Estatísticas Gerais
-    - **Total de contribuidores**: {{total_contributors}}
-    - **Novas contribuições**: {{new_contributions}}
-    - **Pull Requests merged**: {{merged_prs}}
-
-# Integrações
-integrations:
-  github:
-    enabled: true
-    token_env: "GITHUB_TOKEN"
-    auto_update_readme: true
-    auto_comment_on_pr: true
-    
-  discord:
-    enabled: false
-    webhook_env: "DISCORD_WEBHOOK"
-    channel: "contributors"
-    
-  slack:
-    enabled: false
-    webhook_env: "SLACK_WEBHOOK"
-    channel: "#contributors"
-
-# Configurações avançadas
-advanced:
-  # Cache para melhor performance
-  cache:
-    enabled: true
-    ttl: 3600  # 1 hora
-    
-  # Rate limiting para APIs
-  rate_limiting:
-    enabled: true
-    requests_per_hour: 1000
-    
-  # Backup de dados
-  backup:
-    enabled: true
-    frequency: "weekly"
-    retention: 12  # semanas
-
-# Metadados do arquivo
-metadata:
-  schema_version: "1.0"
-  generated_by: "PetCareAI Contributors Bot"
-  last_updated: "2025-06-29T00:00:00Z"
-  next_update: "2025-07-29T00:00:00Z"
-  
-# Comandos disponíveis para bots
-bot_commands:
-  add_contributor:
-    usage: "@all-contributors please add @username for code, docs"
-    description: "Adiciona um contribuidor"
-    
-  update_contributor:
-    usage: "@all-contributors please update @username to add design"
-    description: "Atualiza contribuições de um contribuidor"
-    
-  remove_contributor:
-    usage: "@all-contributors please remove @username"
-    description: "Remove um contribuidor (apenas mantenedores)"
-    
-  regenerate:
-    usage: "@all-contributors please regenerate"
-    description: "Regenera a lista de contribuidores"
+# Última atualização: 2025-07-24
+# Próxima revisão: 2025-08-24
+# Mantenedor: Estevam Souza

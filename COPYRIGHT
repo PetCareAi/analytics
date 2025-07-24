@@ -1,45 +1,17 @@
-# Copyright Notice
+Copyright (c) 2025 PetCareAi - Estevam Souza
 
-## PetCareAI Analytics
-**Sistema Avançado de Análise com Inteligência Artificial para Gestão de Pets**
+                            PETCAREAI
+                    Assistente de IA Conversacional
 
----
+================================================================================
 
-## 📄 Informações de Copyright
+DIREITOS AUTORAIS E PROPRIEDADE INTELECTUAL
 
-**Copyright © 2025 PetCareAI Analytics**  
-**Todos os direitos reservados.**
+Este software e toda documentação associada (doravante "Software") são
+propriedade de Estevam Souza e estão protegidos pelas leis de direitos autorais
+do Brasil e tratados internacionais de propriedade intelectual.
 
-### Proprietário do Software
-- **Nome**: PetCareAI Analytics
-- **Tipo**: Projeto Open Source
-- **Ano de Criação**: 2025
-- **Versão**: 2.0.0
-
-### Autores Principais
-- **Desenvolvedor Principal**: PetCareAI Team
-- **Arquitetura**: PetCareAI Development Team
-- **Design**: PetCareAI Design Team
-- **Documentação**: PetCareAI Community
-
-## 📋 Licenciamento
-
-Este software é licenciado sob os termos da **MIT License**.
-
-### Resumo da Licença MIT
-- ✅ **Uso Comercial**: Permitido
-- ✅ **Distribuição**: Permitida
-- ✅ **Modificação**: Permitida
-- ✅ **Uso Privado**: Permitido
-- ❗ **Responsabilidade**: Sem garantias
-- ❗ **Garantia**: Sem garantias expressas
-
-### Texto Completo da Licença
-
-```
-MIT License
-
-Copyright (c) 2025 PetCareAI Analytics
+LICENCIADO SOB MIT LICENSE
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -58,300 +30,143 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-```
 
-## 🔗 Dependências e Licenças de Terceiros
+================================================================================
 
-### Bibliotecas Python
+MARCAS REGISTRADAS E PROPRIEDADE COMERCIAL
 
-#### Streamlit
-- **Licença**: Apache License 2.0
-- **Copyright**: Copyright 2018-2023 Streamlit Inc.
-- **Uso**: Framework web principal
+"PetCareAi", o logotipo PetCare AI, e outras marcas relacionadas são marcas
+registradas ou marcas comerciais de Estevam Souza no Brasil e/ou outros países.
 
-#### Pandas
-- **Licença**: BSD 3-Clause License
-- **Copyright**: Copyright (c) 2008-2011, AQR Capital Management, LLC, Lambda Foundry, Inc. and PyData Development Team
-- **Uso**: Manipulação de dados
+O uso das marcas PetCare AI está sujeito às diretrizes de marca disponíveis em:
+https://petcareai.com.br/brand-guidelines
 
-#### NumPy
-- **Licença**: BSD License
-- **Copyright**: Copyright (c) 2005-2023, NumPy Developers
-- **Uso**: Computação numérica
+================================================================================
 
-#### Plotly
-- **Licença**: MIT License
-- **Copyright**: Copyright (c) 2016-2023 Plotly, Inc
-- **Uso**: Visualizações interativas
-
-#### Scikit-learn
-- **Licença**: BSD 3-Clause License
-- **Copyright**: Copyright (c) 2007-2023 The scikit-learn developers
-- **Uso**: Machine Learning
+CONTRIBUIÇÕES E DIREITOS DOS COLABORADORES
 
-#### Supabase Python Client
-- **Licença**: MIT License
-- **Copyright**: Copyright (c) 2021 Supabase
-- **Uso**: Cliente de banco de dados
+Ao contribuir para este projeto, você concorda que:
 
-### Lista Completa de Dependências
+1. Suas contribuições serão licenciadas sob a mesma licença MIT
+2. Você possui os direitos necessários para fazer a contribuição
+3. Suas contribuições não violam direitos de terceiros
+4. Você renuncia a quaisquer direitos morais sobre suas contribuições
 
-Para uma lista completa e atualizada de todas as dependências e suas licenças, execute:
+Contribuições significativas são reconhecidas no arquivo CONTRIBUTORS.yml
 
-```bash
-pip-licenses --format=markdown
-```
+================================================================================
 
-## 🎨 Assets e Recursos
-
-### Imagens e Ícones
-- **Logo**: Criado exclusivamente para o projeto
-- **Ícones**: Font Awesome (SIL OFL 1.1), Material Icons (Apache 2.0)
-- **Ilustrações**: Criações originais ou recursos de domínio público
+INTEGRAÇÃO COM SERVIÇOS DE TERCEIROS
 
-### Fontes
-- **Interface**: System fonts padrão
-- **Monospace**: Cascadia Code, Fira Code (SIL OFL 1.1)
+Este software integra com os seguintes serviços de terceiros:
 
-### Cores e Tema
-- **Paleta de Cores**: Criação original
-- **Tema Visual**: Design proprietário do PetCareAI
+Google Gemini API
+- Fornecedor: Google LLC
+- Termos: https://ai.google.dev/terms
+- Política de Privacidade: https://policies.google.com/privacy
 
-## 📊 Dados e Algoritmos
+Web Speech API
+- Fornecedor: Consórcio W3C / Navegadores
+- Especificação: https://w3c.github.io/speech-api/
 
-### Dados de Exemplo
-- **Dados Sintéticos**: Gerados algoritmicamente para demonstração
-- **Não contém dados reais** de pets ou pessoas
-- **Uso livre** para fins de teste e desenvolvimento
+O uso destes serviços está sujeito aos termos e condições de seus respectivos
+fornecedores.
 
-### Algoritmos de Machine Learning
-- **Implementação**: Baseada em algoritmos de domínio público
-- **Inovações**: Adaptações específicas para análise de pets
-- **Originalidade**: Combinações e otimizações proprietárias
+================================================================================
 
-## 🔒 Marca Registrada
+ISENÇÃO DE RESPONSABILIDADE VETERINÁRIA
 
-### Nome e Logo
-- **"PetCareAI Analytics"**: Marca não registrada
-- **Logo**: Design original do projeto
-- **Uso**: Permitido para referência ao projeto
+IMPORTANTE: Este software é uma ferramenta educacional e de suporte. NÃO
+substitui consultas veterinárias profissionais. As informações fornecidas
+pela inteligência artificial são apenas para fins informativos e não devem
+ser consideradas como aconselhamento médico veterinário.
 
-### Diretrizes de Uso da Marca
+Sempre consulte um veterinário licenciado para questões de saúde, diagnóstico
+ou tratamento de animais.
 
-#### ✅ Uso Permitido
-- Referência ao software em artigos e documentação
-- Links para o repositório oficial
-- Menção em listas de ferramentas utilizadas
-- Uso em contexto educacional
+================================================================================
 
-#### ❌ Uso Não Permitido
-- Criar produtos derivados com nome similar
-- Implicar endosso oficial sem permissão
-- Uso comercial da marca sem autorização
-- Modificar o logo mantendo elementos reconhecíveis
+CONFORMIDADE LEGAL
 
-## 🤝 Contribuições
+Este software está em conformidade com:
 
-### Direitos dos Contribuidores
-- **Retenção**: Contribuidores mantêm direitos autorais de suas contribuições
-- **Licenciamento**: Contribuições são licenciadas sob MIT (mesma do projeto)
-- **Atribuição**: Reconhecimento em CONTRIBUTORS.md
-- **Revogação**: Direito de remover contribuições mediante aviso
-
-### Acordo de Contribuição (CLA)
-Ao contribuir com este projeto, você concorda que:
-
-1. **Suas contribuições são originais** ou você tem direito de licenciá-las
-2. **Você licencia suas contribuições** sob a MIT License
-3. **Você não espera royalties** ou compensação pelas contribuições
-4. **Você entende que suas contribuições** podem ser modificadas ou removidas
-
-## 📜 Conformidade Legal
-
-### LGPD (Lei Geral de Proteção de Dados)
-- **Coleta de Dados**: Mínima e com propósito específico
-- **Consentimento**: Claro e informado quando aplicável
-- **Direitos**: Acesso, correção, exclusão disponíveis
-- **Segurança**: Medidas técnicas e organizacionais implementadas
-
-### GDPR (Regulamento Geral de Proteção de Dados)
-- **Conformidade**: Para usuários da União Europeia
-- **Base Legal**: Legítimo interesse e consentimento
-- **Transferências**: Adequadas quando aplicáveis
-- **DPO**: Contacto através de privacy@petcareai.com
-
-### Outras Jurisdições
-- **CCPA**: California Consumer Privacy Act (EUA)
-- **PIPEDA**: Personal Information Protection and Electronic Documents Act (Canadá)
-- **Outras**: Conformidade com leis locais aplicáveis
-
-## 🔍 Auditoria e Verificação
-
-### Verificação de Licenças
-```bash
-# Verificar licenças de dependências
-pip-licenses --format=table
-
-# Escanear por problemas de licença
-licensecheck --recursive .
-
-# Verificar compatibilidade
-license-compatibility-checker requirements.txt
-```
-
-### Auditoria de Copyright
-- **Verificação Manual**: Revisão periódica de arquivos
-- **Ferramentas Automáticas**: Scanners de copyright
-- **Documentação**: Manutenção de registros de direitos
-
-## 📞 Contato Legal
-
-### Para Questões de Copyright
-- **Email**: legal@petcareai.com
-- **Endereço**: [Endereço seria fornecido em ambiente real]
-- **Telefone**: [Telefone seria fornecido em ambiente real]
-
-### Para Questões de Marca
-- **Email**: trademark@petcareai.com
-- **Formulário**: https://petcareai.com/trademark-inquiry
-
-### Para Questões de Privacidade
-- **Email**: privacy@petcareai.com
-- **Política**: https://petcareai.com/privacy-policy
-
-## 🔄 Histórico de Mudanças
-
-### Versão 2.0.0 (29/06/2025)
-- **Adicionado**: Copyright inicial
-- **Estabelecido**: Licenciamento MIT
-- **Documentado**: Dependências de terceiros
-
-### Atualizações Futuras
-- **Revisão Anual**: Verificação de conformidade
-- **Atualizações de Dependências**: Monitoramento contínuo
-- **Mudanças Legais**: Adaptação a novas regulamentações
-
-## 🔗 Recursos Adicionais
-
-### Documentação Legal
-- [MIT License (Original)](https://opensource.org/licenses/MIT)
-- [Choose a License](https://choosealicense.com/)
-- [Open Source Initiative](https://opensource.org/)
-
-### Ferramentas de Compliance
-- [FOSSA](https://fossa.com/) - Análise de licenças
-- [Black Duck](https://www.blackducksoftware.com/) - Gestão de código aberto
-- [WhiteSource](https://www.whitesourcesoftware.com/) - Segurança e compliance
-
-### Organizações
-- [Software Freedom Conservancy](https://sfconservancy.org/)
-- [Free Software Foundation](https://www.fsf.org/)
-- [Open Source Initiative](https://opensource.org/)
-
-## ⚖️ Disclaimers
-
-### Disclaimer Geral
-```
-O SOFTWARE É FORNECIDO "COMO ESTÁ", SEM GARANTIA DE QUALQUER TIPO, 
-EXPRESSA OU IMPLÍCITA, INCLUINDO, MAS NÃO SE LIMITANDO ÀS GARANTIAS 
-DE COMERCIALIZAÇÃO, ADEQUAÇÃO A UM PROPÓSITO ESPECÍFICO E NÃO VIOLAÇÃO. 
-EM NENHUM CASO OS AUTORES OU DETENTORES DOS DIREITOS AUTORAIS SERÃO 
-RESPONSÁVEIS POR QUALQUER REIVINDICAÇÃO, DANOS OU OUTRA RESPONSABILIDADE, 
-SEJA EM AÇÃO DE CONTRATO, DELITO OU OUTRA FORMA, DECORRENTE DE, FORA DE 
-OU EM CONEXÃO COM O SOFTWARE OU O USO OU OUTRAS NEGOCIAÇÕES NO SOFTWARE.
-```
-
-### Disclaimer de Dados
-```
-Este software trabalha com dados relacionados a animais de estimação. 
-É responsabilidade do usuário garantir que:
-- Dados pessoais sejam tratados conforme legislação aplicável
-- Informações sensíveis sejam adequadamente protegidas
-- Políticas de privacidade sejam implementadas e seguidas
-- Consentimentos necessários sejam obtidos quando aplicável
-```
-
-### Disclaimer Médico/Veterinário
-```
-Este software é uma ferramenta de análise de dados e NÃO fornece 
-conselhos médicos ou veterinários. Qualquer decisão relacionada à 
-saúde ou bem-estar animal deve ser tomada com orientação profissional 
-qualificada. Os desenvolvedores não se responsabilizam por decisões 
-tomadas baseadas nas análises fornecidas pelo software.
-```
-
-## 📝 Arquivo de Notices
-
-### Third-Party Notices
-```
-Este produto inclui software desenvolvido por terceiros. 
-Consulte o arquivo NOTICE para informações detalhadas sobre 
-componentes de terceiros e suas respectivas licenças.
-```
-
-### Attribution Requirements
-Alguns componentes requerem atribuição específica:
-
-- **Plotly.js**: "Powered by Plotly.js"
-- **Font Awesome**: Ícones licenciados sob SIL OFL 1.1
-- **Material Icons**: © Google, Apache License 2.0
-
-## 🌍 Jurisdição e Lei Aplicável
-
-### Lei Aplicável
-- **Jurisdição Primária**: Brasil
-- **Lei**: Legislação brasileira
-- **Foro**: São Paulo, SP, Brasil
-
-### Disputas Internacionais
-- **Arbitragem**: Câmara de Comércio Internacional
-- **Mediação**: Preferencial antes de litígio
-- **Lei Aplicável**: Convenções internacionais quando aplicável
-
-## 📋 Checklist de Compliance
-
-### ✅ Copyright
-- [ ] Notices de copyright em todos os arquivos fonte
-- [ ] Licença MIT incluída no repositório
-- [ ] Dependências documentadas com suas licenças
-- [ ] Contribuições cobertas por CLA implícito
-
-### ✅ Marca Registrada
-- [ ] Diretrizes de uso da marca documentadas
-- [ ] Logo e nome protegidos adequadamente
-- [ ] Política de uso da marca comunicada
-
-### ✅ Privacidade
-- [ ] Política de privacidade implementada
-- [ ] Conformidade com LGPD/GDPR
-- [ ] Coleta mínima de dados
-- [ ] Direitos dos usuários respeitados
-
-### ✅ Segurança
-- [ ] Medidas de segurança implementadas
-- [ ] Vulnerabilidades monitoradas
-- [ ] Processo de resposta a incidentes definido
-- [ ] Atualizações de segurança regulares
-
-## 📚 Bibliografia e Referências
-
-### Legislação
-- Lei nº 13.709/2018 (LGPD) - Brasil
-- Regulation (EU) 2016/679 (GDPR) - União Europeia
-- Copyright Act - Diversos países
-
-### Padrões e Práticas
-- [SPDX License List](https://spdx.org/licenses/)
-- [Creative Commons](https://creativecommons.org/)
-- [Open Source Definition](https://opensource.org/osd)
-
----
-
-**IMPORTANTE**: Este documento de copyright é parte integral do software PetCareAI Analytics. Qualquer distribuição, modificação ou uso do software deve incluir este aviso de copyright e a licença MIT completa.
-
-Para questões específicas sobre direitos autorais, licenciamento ou uso comercial, entre em contato com nossa equipe legal através de legal@petcareai.com.
-
----
-
-*Última atualização: 29/06/2025*
-*Versão do documento: 1.0*
+- Lei Geral de Proteção de Dados (LGPD) - Lei 13.709/2018
+- Marco Civil da Internet - Lei 12.965/2014
+- Código de Defesa do Consumidor - Lei 8.078/1990
+- Lei de Software - Lei 9.609/1998
+
+================================================================================
+
+POLÍTICA DE PRIVACIDADE E DADOS
+
+O tratamento de dados pessoais neste software segue os princípios da LGPD:
+
+- Finalidade: Apenas para funcionamento do assistente de IA
+- Adequação: Compatível com a finalidade declarada
+- Necessidade: Limitação ao mínimo necessário
+- Livre acesso: Direitos dos titulares respeitados
+- Qualidade dos dados: Exatidão e atualização
+- Transparência: Informações claras e acessíveis
+- Segurança: Medidas técnicas e administrativas
+- Prevenção: Adoção de medidas preventivas
+- Não discriminação: Vedação de discriminação
+- Responsabilização: Demonstração de conformidade
+
+================================================================================
+
+LIMITAÇÕES E EXCLUSÕES
+
+O software é fornecido "como está" sem garantias de qualquer tipo. Em nenhuma
+circunstância os autores ou detentores de direitos autorais serão responsáveis
+por quaisquer danos diretos, indiretos, incidentais, especiais, exemplares ou
+consequenciais decorrentes do uso do software.
+
+================================================================================
+
+RESOLUÇÃO DE DISPUTAS
+
+Quaisquer disputas relacionadas a direitos autorais ou uso deste software
+serão resolvidas de acordo com as leis brasileiras, com foro na cidade de
+Florianópolis, Santa Catarina, Brasil.
+
+================================================================================
+
+CONTATO PARA QUESTÕES DE DIREITOS AUTORAIS
+
+Para questões relacionadas a direitos autorais, violações ou licenciamento:
+
+Estevam Souza
+Diretor de TI - PetCare AI
+Email: legal@petcareai.com.br
+Website: https://petcareai.com.br
+Endereço: Florianópolis, Santa Catarina, Brasil
+
+Para relatórios de violação de direitos autorais (DMCA):
+Email: contato@petcareai.com.br
+
+================================================================================
+
+ATUALIZAÇÕES E MODIFICAÇÕES
+
+Esta declaração de direitos autorais pode ser atualizada periodicamente.
+A versão mais atual estará sempre disponível no repositório oficial do projeto.
+
+Última atualização: 05 de Agosto de 2025
+Versão: 1.0.0
+
+================================================================================
+
+RECONHECIMENTOS ESPECIAIS
+
+Agradecimentos especiais às comunidades de código aberto que tornaram este
+projeto possível, aos beta testers, e à comunidade de tutores de pets que
+inspiraram o desenvolvimento desta solução.
+
+Dedicado a todos os animais de estimação e seus tutores dedicados.
+
+================================================================================
+
+                    Copyright (c) 2025 PetCare AI - Estevam Souza
+                              Todos os direitos reservados.
+
+                             🐾 Feito com amor para pets 🐾

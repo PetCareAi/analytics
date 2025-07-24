@@ -1,228 +1,326 @@
-# CITATION.cff
-# Este arquivo permite que outros pesquisadores e desenvolvedores citem adequadamente o projeto PetCareAI Analytics
-# Formato padrão Citation File Format (CFF) v1.2.0
+# CITATION.cff (Citation File Format)
+# This file provides citation information for the PetCare AI Assistant project
+# More info: https://citation-file-format.github.io/
 
 cff-version: 1.2.0
 message: "Se você usar este software, por favor cite-o usando os metadados deste arquivo."
 type: software
-title: "PetCareAI Analytics: Sistema Avançado de Análise com Inteligência Artificial para Gestão de Pets"
-abstract: "Sistema completo de análise e gestão para organizações de proteção animal, com funcionalidades avançadas de machine learning, dashboard interativo, análises preditivas e gerenciamento inteligente de adoções."
+
+title: "PetCare AI Assistant"
+abstract: >-
+  Um assistente de inteligência artificial conversacional especializado no
+  ecossistema PetCare AI. O sistema oferece chat inteligente com comando de voz,
+  ferramentas de IA para cuidados com pets, e interface responsiva moderna
+  construída com React.js e integração com Google Gemini 2.0 Flash.
 
 authors:
-  - family-names: "PetCareAI"
-    given-names: "Team"
-    email: "admin@petcare.com"
-    affiliation: "PetCareAI Organization"
+  - family-names: "Souza"
+    given-names: "Estevam"
     orcid: "https://orcid.org/0000-0000-0000-0000"
+    email: "estevam.souza@petcareai.com.br"
+    affiliation: "PetCare AI"
+    website: "https://petcareai.com.br"
+    city: "Florianópolis"
+    country: "BR"
+    role: "Project Lead & CTO"
 
-repository-code: "https://github.com/PetCareAi/analytics"
-url: "https://petcare-analytics.streamlit.app"
-repository-artifact: "https://github.com/PetCareAi/analytics/releases"
+  - family-names: "Aluno1"
+    given-names: "Developer"
+    email: "aluno1@petcareai.com.br"
+    affiliation: "PetCare AI"
+    city: "Florianópolis"
+    country: "BR"
+    role: "Frontend Developer"
 
-keywords:
-  - "pet management"
-  - "animal welfare"
-  - "machine learning"
-  - "data analytics"
-  - "adoption platform"
-  - "streamlit"
-  - "python"
-  - "supabase"
-  - "business intelligence"
-  - "predictive analytics"
-  - "animal rescue"
-  - "NGO management"
+  - family-names: "Aluno2"
+    given-names: "Developer"
+    email: "aluno2@petcareai.com.br"
+    affiliation: "PetCare AI"
+    city: "Florianópolis"
+    country: "BR"
+    role: "Backend Developer"
+
+  - family-names: "Aluno3"
+    given-names: "Developer"
+    email: "aluno3@petcareai.com.br"
+    affiliation: "PetCare AI"
+    city: "Florianópolis"
+    country: "BR"
+    role: "Full Stack Developer"
+
+version: "1.0.0"
+date-released: "2025-07-24"
+url: "https://github.com/PetCareAi/llm"
+repository-code: "https://github.com/PetCareAi/llm"
+repository-artifact: "https://github.com/PetCareAi/llm/releases"
 
 license: MIT
-license-url: "https://github.com/PetCareAi/analytics/blob/main/LICENSE"
+license-url: "https://github.com/PetCareAi/llm/blob/main/LICENSE"
 
-version: "2.0.0"
-date-released: "2025-01-27"
+keywords:
+  - "inteligência artificial"
+  - "assistente virtual"
+  - "cuidados com pets"
+  - "chat conversacional"
+  - "reconhecimento de voz"
+  - "React.js"
+  - "TypeScript"
+  - "Google Gemini"
+  - "interface responsiva"
+  - "pet care"
+  - "veterinária"
+  - "tecnologia"
 
+doi: "10.5281/zenodo.placeholder"
+
+# Informações adicionais sobre o projeto
 contact:
-  - family-names: "PetCareAI"
-    given-names: "Support Team"
-    email: "support@petcare.com"
+  - family-names: "Souza"
+    given-names: "Estevam"
+    email: "estevam.souza@petcareai.com.br"
+    website: "https://petcareai.com.br"
 
+# Referências relacionadas
+references:
+  - type: generic
+    title: "PetCare AI Ecosystem Documentation"
+    authors:
+      - family-names: "Souza"
+        given-names: "Estevam"
+    url: "https://documentation.petcareai.com.br"
+    year: 2025
+
+  - type: generic
+    title: "PetCare AI RESTful API"
+    authors:
+      - family-names: "Souza"
+        given-names: "Estevam"
+    url: "https://github.com/PetCareAi/PetCareAI-api-restful-Nest.JS"
+    year: 2025
+
+# Identifiers adicionais
+identifiers:
+  - type: url
+    value: "https://petcareai.com.br"
+    description: "Website oficial do projeto"
+
+  - type: url
+    value: "https://documentation.petcareai.com.br"
+    description: "Documentação técnica completa"
+
+  - type: other
+    value: "petcare-ai-assistant-v1.0.0"
+    description: "Identificador interno do projeto"
+
+# Preferred citation formats
 preferred-citation:
   type: software
-  title: "PetCareAI Analytics: Sistema Avançado de Análise com IA para Gestão de Pets"
+  title: "PetCare AI Assistant: Sistema de Chat Inteligente para Cuidados com Pets"
   authors:
-    - family-names: "PetCareAI"
-      given-names: "Team"
+    - family-names: "Souza"
+      given-names: "Estevam"
+    - family-names: "Aluno1"
+      given-names: "Developer"
+    - family-names: "Aluno2"
+      given-names: "Developer"
+    - family-names: "Aluno3"
+      given-names: "Developer"
   year: 2025
-  url: "https://github.com/PetCareAi/analytics"
-  version: "2.0.0"
+  version: "1.0.0"
+  url: "https://github.com/PetCareAi/llm"
 
-references:
-  - type: article
-    title: "Machine Learning Applications in Animal Welfare Management"
-    authors:
-      - family-names: "Smith"
-        given-names: "John"
-      - family-names: "Doe"
-        given-names: "Jane"
-    year: 2024
-    journal: "Journal of Animal Welfare Technology"
-    volume: 15
-    issue: 3
-    start: 145
-    end: 162
-    doi: "10.1000/182"
+# Como citar em diferentes formatos
+citation-formats:
+  apa: >-
+    Souza, E., Aluno1, D., Aluno2, D., & Aluno3, D. (2025). PetCare AI Assistant: 
+    Sistema de Chat Inteligente para Cuidados com Pets (Version 1.0.0) 
+    [Computer software]. https://github.com/PetCareAi/llm
 
-  - type: conference-paper
-    title: "Predictive Analytics for Pet Adoption Success"
-    authors:
-      - family-names: "Johnson"
-        given-names: "Mary"
-    year: 2024
-    conference:
-      name: "International Conference on Animal Technology"
-    start: 89
-    end: 94
-    doi: "10.1000/conference.2024.89"
+  ieee: >-
+    E. Souza, D. Aluno1, D. Aluno2, and D. Aluno3, "PetCare AI Assistant: 
+    Sistema de Chat Inteligente para Cuidados com Pets," version 1.0.0, 
+    Jul. 2025. [Online]. Available: https://github.com/PetCareAi/llm
 
-  - type: thesis
-    title: "Data-Driven Approaches to Animal Rescue Operations"
-    authors:
-      - family-names: "Brown"
-        given-names: "Robert"
-    year: 2023
-    institution:
-      name: "University of Animal Sciences"
-    thesis-type: "PhD thesis"
+  bibtex: |
+    @software{souza2025petcare,
+      title = {PetCare AI Assistant: Sistema de Chat Inteligente para Cuidados com Pets},
+      author = {Souza, Estevam and Aluno1, Developer and Aluno2, Developer and Aluno3, Developer},
+      year = {2025},
+      version = {1.0.0},
+      url = {https://github.com/PetCareAi/llm},
+      note = {Assistente de IA conversacional especializado em cuidados com pets}
+    }
 
-  - type: software
-    title: "Streamlit: The fastest way to build data apps"
-    authors:
-      - family-names: "Streamlit"
-        given-names: "Team"
-    year: 2024
-    url: "https://streamlit.io"
-    version: "1.31.1"
+# Contributions and acknowledgments
+contributors:
+  - family-names: "Comunidade"
+    given-names: "React Brasil"
+    type: "consultant"
 
-  - type: software
-    title: "Supabase: The Open Source Firebase Alternative"
-    authors:
-      - family-names: "Supabase"
-        given-names: "Team"
-    year: 2024
-    url: "https://supabase.com"
+  - family-names: "Veterinários"
+    given-names: "Consultores"
+    type: "consultant"
 
-identifiers:
-  - type: doi
-    value: "10.5281/zenodo.1234567"
-    description: "Software archive on Zenodo"
-  - type: swh
-    value: "swh:1:dir:abc123def456"
-    description: "Software Heritage identifier"
+# Team contributions
+team-contributions:
+  - author: "Estevam Souza"
+    contributions:
+      - "Project architecture"
+      - "AI integration"
+      - "Technical leadership"
+      - "Backend development"
+      - "Documentation"
 
-# Metadados adicionais para diferentes tipos de citação
-related-software:
-  - title: "Pandas"
-    type: "dependency"
-    url: "https://pandas.pydata.org"
-    version: ">=2.2.0"
-  - title: "Scikit-learn"
-    type: "dependency"
-    url: "https://scikit-learn.org"
-    version: ">=1.4.0"
-  - title: "Plotly"
-    type: "dependency"
-    url: "https://plotly.com/python"
-    version: ">=5.18.0"
+  - author: "Aluno1"
+    contributions:
+      - "Frontend development"
+      - "React components"
+      - "User interface design"
+      - "Mobile responsiveness"
 
+  - author: "Aluno2"
+    contributions:
+      - "Backend services"
+      - "API development"
+      - "Database integration"
+      - "Testing framework"
+
+  - author: "Aluno3"
+    contributions:
+      - "Full stack development"
+      - "Voice recognition integration"
+      - "Performance optimization"
+      - "Quality assurance"
+
+# Technical specifications
+programming-languages:
+  - "TypeScript"
+  - "JavaScript"
+  - "HTML"
+  - "CSS"
+
+operating-systems:
+  - "Windows"
+  - "macOS"
+  - "Linux"
+
+# Dependencies principais
+dependencies:
+  - name: "React"
+    version: "18.2.0"
+    type: "runtime"
+
+  - name: "TypeScript"
+    version: "4.7.4"
+    type: "development"
+
+  - name: "Styled Components"
+    version: "6.0.7"
+    type: "runtime"
+
+  - name: "Framer Motion"
+    version: "10.16.4"
+    type: "runtime"
+
+# Funding and support
 funding:
-  - agency: "Fundação Nacional de Proteção Animal"
-    award-number: "FNPA-2024-001"
-    award-title: "Desenvolvimento de Tecnologias para Bem-Estar Animal"
+  - type: "self-funded"
+    description: "Projeto desenvolvido com recursos próprios da PetCare AI"
 
-commit: "a1b2c3d4e5f6g7h8i9j0"
+# Usage statistics (when available)
+usage-stats:
+  downloads: 0
+  forks: 0
+  stars: 0
 
-# Informações sobre como contribuir
-contributing:
-  guidelines: "https://github.com/PetCareAi/analytics/blob/main/CONTRIBUTING.md"
-  code-of-conduct: "https://github.com/PetCareAi/analytics/blob/main/CODE_OF_CONDUCT.md"
+# Academic and research context
+research-context:
+  field: "Computer Science"
+  subfield: "Human-Computer Interaction"
+  keywords:
+    - "Conversational AI"
+    - "Voice User Interface"
+    - "Pet Care Technology"
+    - "React.js Applications"
 
-# Informações sobre documentação
-documentation:
-  - type: "user-guide"
-    url: "https://github.com/PetCareAi/analytics/wiki/User-Guide"
-  - type: "api-reference"
-    url: "https://github.com/PetCareAi/analytics/wiki/API-Reference"
-  - type: "developer-guide"
-    url: "https://github.com/PetCareAi/analytics/wiki/Developer-Guide"
+# Quality assurance
+quality-assurance:
+  - type: "testing"
+    description: "Unit tests, integration tests, e2e tests"
 
-# Tags e categorias para descoberta
-categories:
-  - "Animal Welfare"
-  - "Data Analytics"
-  - "Machine Learning"
-  - "Business Intelligence"
-  - "Non-Profit Technology"
+  - type: "code-review"
+    description: "Revisão de código por pares"
 
-# Informações sobre o ecossistema
-ecosystem:
-  - name: "PetCareAI Mobile App"
-    url: "https://github.com/PetCareAi/mobile"
-    description: "Aplicativo móvel complementar"
-  - name: "PetCareAI API"
-    url: "https://github.com/PetCareAi/api"
-    description: "API RESTful para integrações"
+  - type: "security-audit"
+    description: "Auditoria de segurança automatizada"
 
-# Status do projeto
-status: "active"
-development-status: "stable"
+# Related publications (if any)
+related-publications: []
 
-# Informações sobre releases
-release-notes: "https://github.com/PetCareAi/analytics/releases/tag/v2.0.0"
+# Data availability
+data-availability: "not-applicable"
 
-# Métricas e estatísticas
-metrics:
-  lines-of-code: 5000
-  test-coverage: 85
-  documentation-coverage: 90
-  
-# Tecnologias principais utilizadas
-technologies:
-  - "Python 3.8+"
-  - "Streamlit 1.31.1"
-  - "Supabase"
-  - "Pandas"
-  - "Scikit-learn"
-  - "Plotly"
-  - "NumPy"
-  - "SciPy"
+# Ethics and responsible AI
+ethics-statement: >-
+  Este software foi desenvolvido seguindo princípios de IA responsável.
+  As informações fornecidas pela IA são apenas para fins educacionais e
+  não substituem consultas veterinárias profissionais. O sistema não
+  armazena dados pessoais dos usuários e respeita a privacidade.
 
-# Casos de uso principais
-use-cases:
-  - "Gestão de pets em ONGs"
-  - "Análise preditiva de adoções"
-  - "Dashboard executivo para organizações"
-  - "Relatórios de performance e KPIs"
-  - "Sistema de recomendação de pets"
+# Environmental impact
+environmental-impact:
+  carbon-footprint: "low"
+  description: "Aplicação frontend com baixo impacto de servidor"
 
-# Requisitos mínimos do sistema
-system-requirements:
-  python: ">=3.8"
-  memory: "4GB RAM"
-  storage: "2GB free space"
-  network: "Internet connection required"
-
-# Informações sobre localização
-localization:
-  primary-language: "pt-BR"
-  supported-languages:
-    - "pt-BR"
-    - "en-US"
-
-# Acessibilidade
+# Accessibility
 accessibility:
-  wcag-compliance: "AA"
-  screen-reader-support: true
-  keyboard-navigation: true
+  wcag-compliance: "partial"
+  features:
+    - "Keyboard navigation"
+    - "Screen reader support"
+    - "Voice input"
+    - "Responsive design"
 
-# Segurança
-security:
-  vulnerability-reporting: "security@petcare.com"
-  security-policy: "https://github.com/PetCareAi/analytics/security/policy"
+# Internationalization
+languages-supported:
+  - code: "pt-BR"
+    name: "Português (Brasil)"
+    coverage: "100%"
+
+# Version history highlights
+version-history:
+  - version: "1.0.0"
+    date: "2025-07-24"
+    description: "Lançamento inicial com chat IA e reconhecimento de voz"
+
+  - version: "0.9.0"
+    date: "2025-06-25"
+    description: "Beta release com funcionalidades principais"
+
+# Future plans
+roadmap:
+  - feature: "PWA support"
+    planned-version: "1.1.0"
+
+  - feature: "Multi-language support"
+    planned-version: "1.2.0"
+
+  - feature: "Offline mode"
+    planned-version: "2.0.0"
+
+# Community and support
+community:
+  documentation: "https://documentation.petcareai.com.br"
+  support: "estevam.souza@petcareai.com.br"
+  discussions: "https://github.com/PetCareAi/llm/discussions"
+  issues: "https://github.com/PetCareAi/llm/issues"
+
+# Team information
+team-info:
+  size: 4
+  locations: ["Florianópolis, SC, Brasil"]
+  development-model: "Agile"
+  collaboration-tools: ["GitHub", "Discord", "Slack"]
+
+# Last updated
+last-updated: "2025-07-24"

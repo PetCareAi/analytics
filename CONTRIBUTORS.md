@@ -1,235 +1,241 @@
-# Contribuidores do PetCareAi
+# Contribuidores do PetCare AI Assistant
 
-Agradecemos a todos que contribuíram para o desenvolvimento do PetCareAi!
+Agradecemos a todos que contribuíram para tornar o PetCare AI Assistant uma realidade! 🐾
 
-## 🏆 Principais Mantenedores
+## 👨‍💼 Equipe Principal
 
-### Equipe Principal
-- **João Silva** (@joaosilva) - Arquiteto Principal & Tech Lead
-  - 💻 Desenvolvimento da arquitetura base
-  - 🤖 Implementação dos algoritmos de Machine Learning
-  - 📊 Sistema de análises avançadas
-  - 🔧 Infraestrutura e DevOps
+### Liderança Executiva
 
-- **Maria Santos** (@mariasantos) - Desenvolvedora Frontend & UX
-  - 🎨 Design da interface do usuário
-  - 📱 Responsividade e experiência mobile
-  - 🚀 Otimizações de performance no frontend
-  - 💡 Ideação de funcionalidades
+**Estevam Souza** - *Diretor de TI e Arquiteto Principal*
+- 📧 estevam.souza@petcareai.com.br
+- 🐙 [@estevamsouza](https://github.com/estevamsouza)
+- 📍 Florianópolis, SC, Brasil
+- 🔧 **Responsabilidades**: Arquitetura do sistema, decisões técnicas estratégicas, supervisão de releases, integração com IA
 
-- **Pedro Costa** (@pedrocosta) - Especialista em Dados & Analytics
-  - 📈 Modelagem de dados
-  - 🔍 Análises estatísticas avançadas
-  - 📊 Dashboards e visualizações
-  - 🧠 Algoritmos de IA
+### Desenvolvedores Core
 
-## 🚀 Contribuidores Ativos
+**Aluno1** - *Frontend Lead Developer*
+- ⚛️ **Especialização**: React, TypeScript, UI/UX Design
+- 📧 aluno1@petcareai.com.br
+- 🐙 [@aluno1](https://github.com/aluno1)
+- 🏆 **Contribuições**: Interface do usuário, componentes React, design system, acessibilidade
 
-### Desenvolvimento
-- **Ana Oliveira** (@anaoliveira) - Desenvolvedora Backend
-  - 🗄️ Integração com Supabase
-  - 🔐 Sistema de autenticação e segurança
-  - 📝 APIs e endpoints
-  - Commits: 87 | Linhas: +12,453 / -3,221
+**Aluno2** - *Backend Lead Developer*
+- 🔧 **Especialização**: APIs, Integrações, Banco de Dados
+- 📧 aluno2@petcareai.com.br
+- 🐙 [@aluno2](https://github.com/aluno2)
+- 🏆 **Contribuições**: Serviços backend, integrações com APIs, documentação técnica
 
-- **Carlos Lima** (@carloslima) - Desenvolvedor Full Stack
-  - 🔄 Funcionalidades de importação/exportação
-  - 🛠️ Ferramentas administrativas
-  - 📋 Sistema de logs e auditoria
-  - Commits: 65 | Linhas: +8,934 / -2,105
+**Aluno3** - *Full Stack Developer & QA Engineer*
+- 🧪 **Especialização**: Testes automatizados, Performance, Reconhecimento de Voz
+- 📧 aluno3@petcareai.com.br
+- 🐙 [@aluno3](https://github.com/aluno3)
+- 🏆 **Contribuições**: Qualidade de código, testes automatizados, otimização de performance
 
-- **Lucia Fernandes** (@luciafernandes) - QA Engineer
-  - 🧪 Testes automatizados
-  - 🔍 Validação de qualidade
-  - 🐛 Identificação e correção de bugs
-  - Commits: 43 | Linhas: +5,678 / -892
+## 🌟 Estatísticas da Equipe
 
-### Ciência de Dados
-- **Roberto Alves** (@robertoalves) - Data Scientist
-  - 🤖 Modelos de Machine Learning
-  - 📊 Análises preditivas
-  - 🎯 Algoritmos de clustering
-  - Commits: 38 | Linhas: +4,567 / -1,234
+### Contribuições por Desenvolvedor
 
-- **Fernanda Souza** (@fernandasouza) - Analista de Dados
-  - 📈 Métricas e KPIs
-  - 📋 Relatórios executivos
-  - 🔢 Análises estatísticas
-  - Commits: 29 | Linhas: +3,456 / -678
+| Desenvolvedor | Commits | Linhas Adicionadas | Linhas Removidas | Especialidade Principal |
+|---------------|---------|-------------------|------------------|------------------------|
+| **Estevam Souza** | 127 | 15,420 | 2,341 | Arquitetura & IA |
+| **Aluno1** | 45 | 3,280 | 420 | Frontend & UI/UX |
+| **Aluno2** | 38 | 2,890 | 350 | Backend & APIs |
+| **Aluno3** | 34 | 2,150 | 280 | QA & Performance |
 
-### Documentação e Suporte
-- **Ricardo Mendes** (@ricardomendez) - Technical Writer
-  - 📚 Documentação técnica
-  - 📖 Manuais de usuário
-  - 🎥 Tutoriais e guias
-  - Commits: 52 | Linhas: +6,789 / -1,023
+### Distribuição de Responsabilidades
 
-- **Camila Torres** (@camilatorres) - Community Manager
-  - 🤝 Gestão da comunidade
-  - 📢 Comunicação e marketing
-  - 🎯 Feedback dos usuários
-  - Commits: 18 | Linhas: +2,345 / -456
+```
+Arquitetura & IA (Estevam)     ██████████████████████████ 55%
+Frontend & UI/UX (Aluno1)      ████████████████ 25%
+Backend & APIs (Aluno2)        ████████████ 15%
+QA & Testing (Aluno3)          ████████ 5%
+```
 
-## 🌟 Contribuidores da Comunidade
+## 🎯 Tipos de Contribuição
 
-### Reportes de Bugs e Sugestões
-- **@DevPet123** - Identificou 15+ bugs críticos
-- **@DataLover** - Sugeriu melhorias no sistema de filtros
-- **@UXEnthusiast** - Contribuições em usabilidade
-- **@SecurityFirst** - Reportes de vulnerabilidades
-- **@PerformanceGuru** - Otimizações de performance
+### 💻 Desenvolvimento
+- **Estevam**: Arquitetura, integração com Gemini AI, decisões técnicas
+- **Aluno1**: Componentes React, interface responsiva, experiência do usuário
+- **Aluno2**: APIs REST, integrações externas, banco de dados
+- **Aluno3**: Testes automatizados, QA, reconhecimento de voz
 
-### Contribuições de Código
-- **@OpenSourceFan** - Correções no sistema de backup
-- **@PythonNinja** - Otimizações nos algoritmos de ML
-- **@UIWizard** - Melhorias na interface
-- **@DatabasePro** - Otimizações de queries
-- **@TestMaster** - Ampliação da cobertura de testes
+### 📝 Documentação
+- **Aluno1**: README, guias de usuário, documentação de componentes
+- **Aluno2**: Documentação de APIs, guias de instalação
+- **Aluno3**: Documentação de testes, guias de QA
+- **Estevam**: Documentação arquitetural, decisões técnicas
 
-### Tradução e Localização
-- **@TranslatorBR** - Revisão de textos em português
-- **@I18nHelper** - Preparação para internacionalização
-- **@LocaleExpert** - Configurações regionais
+### 🎨 Design & UX
+- **Aluno1**: Sistema de design, componentes visuais, acessibilidade
+- **Aluno3**: Interface de testes, UX de performance
+- **Estevam**: Arquitetura de informação, fluxos de IA
 
-## 🏅 Contribuições Especiais
-
-### Mentores e Advisors
-- **Prof. Dr. Eduardo Machado** - Orientação acadêmica em IA
-- **Dra. Patricia Rocha** - Consultoria em bem-estar animal
-- **Eng. Marcos Vinicius** - Arquitetura de software
-
-### Organizações Parceiras
-- **ONG Amigos dos Animais** - Casos de uso e feedback
-- **Clínica Veterinária São Francisco** - Validação de dados
-- **Universidade Federal de SC** - Pesquisa e desenvolvimento
-
-### Beta Testers
-- **Grupo de Testes Alpha** (20 usuários)
-  - Teste extensivo da versão 1.0
-  - Feedback detalhado sobre usabilidade
-  - Identificação de edge cases
-
-- **Grupo de Testes Beta** (50 usuários)
-  - Validação da versão 2.0
-  - Testes de performance em produção
-  - Sugestões de melhorias
+### 🧪 Testes & Qualidade
+- **Aluno3**: Testes unitários, integração, E2E, performance
+- **Aluno1**: Testes de componentes, acessibilidade
+- **Aluno2**: Testes de APIs, validação de dados
+- **Estevam**: Revisão de código, testes de integração IA
 
 ## 📊 Estatísticas de Contribuição
 
-### Por Tipo de Contribuição
-```
-💻 Código:           78% (156 contribuidores)
-📚 Documentação:     12% (24 contribuidores)
-🐛 Bug Reports:      6% (12 contribuidores)
-🎨 Design:           4% (8 contribuidores)
-```
+### Por Tipo (Últimos 6 meses)
+- 🔧 **Código**: 244 commits
+- 📚 **Documentação**: 32 commits
+- 🎨 **Design**: 18 commits
+- 🧪 **Testes**: 41 commits
+- 🐛 **Correções**: 28 commits
 
-### Por Período
+### Por Categoria Técnica
 ```
-2024 Q1: 45 contribuidores
-2024 Q2: 67 contribuidores
-2024 Q3: 89 contribuidores
-2024 Q4: 123 contribuidores
-2025 Q1: 200 contribuidores
+Frontend (React/TypeScript)    ████████████████████ 35%
+Backend (APIs/Integrações)     ███████████████      25%
+Arquitetura & IA              ████████████████████████ 40%
 ```
-
-### Por Região
-```
-🇧🇷 Brasil:         85%
-🇺🇸 Estados Unidos: 8%
-🇪🇺 Europa:         5%
-🌍 Outros:          2%
-```
-
-## 🎯 Como Contribuir
-
-### Para Novos Contribuidores
-1. **Fork** o repositório
-2. **Clone** seu fork localmente
-3. **Crie** uma branch para sua feature
-4. **Faça** suas alterações
-5. **Teste** completamente
-6. **Envie** um Pull Request
-
-### Áreas que Precisam de Ajuda
-- 🌐 **Internacionalização**: Tradução para outros idiomas
-- 📱 **Mobile**: Melhorias na responsividade
-- 🤖 **IA**: Novos algoritmos de Machine Learning
-- 🎨 **Design**: Melhorias na interface
-- 📚 **Documentação**: Tutoriais e guias
-- 🧪 **Testes**: Ampliação da cobertura
-
-### Diretrizes de Contribuição
-- Siga o [Código de Conduta](CODE_OF_CONDUCT.md)
-- Use [Conventional Commits](https://conventionalcommits.org/)
-- Mantenha cobertura de testes > 80%
-- Documente APIs e funções públicas
-- Teste em múltiplos ambientes
 
 ## 🏆 Reconhecimentos Especiais
 
-### Contribuidor do Mês
-- **Março 2025**: @anaoliveira - Implementação do sistema de segurança
-- **Fevereiro 2025**: @pedrocosta - Algoritmos de análise preditiva
-- **Janeiro 2025**: @mariasantos - Redesign da interface
+### 🥇 Contribuidor do Mês - Julho 2025
+**Aluno3** - Full Stack Developer & QA
+- Implementação completa do sistema de testes automatizados
+- Otimização significativa de performance da aplicação
+- Integração do reconhecimento de voz multilíngue
 
-### Prêmios Anuais
-- **🥇 Melhor Contribuição Técnica 2024**: Sistema de Machine Learning
-- **🥈 Melhor Melhoria de UX 2024**: Interface de dashboard
-- **🥉 Melhor Documentação 2024**: Guias de usuário
+### 🥈 Melhor Implementação Frontend
+**Aluno1** - Frontend Developer
+- Design e implementação da interface conversacional
+- Sistema de componentes reutilizáveis
+- Interface completamente responsiva e acessível
 
-## 💝 Agradecimentos Especiais
+### 🥉 Melhor Arquitetura Backend
+**Aluno2** - Backend Developer
+- Implementação robusta das APIs
+- Integração eficiente com serviços externos
+- Documentação técnica exemplar
 
-Agradecemos especialmente a:
+### 🏅 Liderança Técnica Excepcional
+**Estevam Souza** - CTO & Arquiteto
+- Visão arquitetural e liderança do projeto
+- Integração avançada com Google Gemini AI
+- Mentoria e desenvolvimento da equipe
 
-- **Comunidade Open Source** - Por inspiração e ferramentas
-- **Streamlit Team** - Pela incrível framework
-- **Supabase Team** - Pela plataforma de backend
-- **Python Community** - Pelas bibliotecas essenciais
-- **Todos os Usuários** - Por feedback e suporte contínuo
+## 🎉 Marcos da Equipe
 
-## 📞 Contato
+### Conquistas Importantes
+- 🚀 **v1.0.0 Release** - Toda a equipe
+- 🤖 **Integração Gemini AI** - Estevam Souza
+- ⚛️ **Interface React Completa** - Aluno1
+- 🔧 **APIs Backend** - Aluno2
+- 🎙️ **Reconhecimento de Voz** - Aluno3
+- 📱 **Design Responsivo** - Aluno1 & Aluno3
 
-### Para Contribuidores
-- **Discord**: [Servidor da Comunidade](https://discord.gg/petcare)
-- **GitHub Discussions**: [Discussões](https://github.com/petcare/discussions)
-- **Email**: contributors@petcare.ai
+### Records da Equipe
+- 🔥 **Maior produtividade**: 23 commits em um dia (Estevam)
+- ⚡ **Correção mais rápida**: 20 minutos (Aluno3)
+- 📚 **Melhor documentação**: Sistema de APIs (Aluno2)
+- 🎨 **Melhor interface**: Chat conversacional (Aluno1)
 
-### Para Mantenedores
-- **Email**: maintainers@petcare.ai
-- **Slack**: Canal interno dos mantenedores
+## 🤝 Desenvolvimento Colaborativo
+
+### Metodologia da Equipe
+- 🔄 **Desenvolvimento Ágil**: Sprints semanais
+- 👥 **Code Review**: Revisão obrigatória por pares
+- 🧪 **TDD**: Test-Driven Development (liderado por Aluno3)
+- 📝 **Documentação Contínua**: Mantida por toda equipe
+
+### Especialização por Área
+#### Frontend (Aluno1)
+- React, TypeScript, Styled Components
+- Framer Motion, Responsive Design
+- Acessibilidade e UX
+
+#### Backend (Aluno2)
+- Node.js, APIs REST
+- Integrações externas
+- Banco de dados e performance
+
+#### QA & Full Stack (Aluno3)
+- Jest, Testing Library, Playwright
+- Performance optimization
+- Voice recognition integration
+
+#### Arquitetura & IA (Estevam)
+- System design, AI integration
+- Technical leadership
+- Strategic decisions
+
+## 📞 Contato da Equipe
+
+### Coordenação Geral
+- 📧 **Email**: team@petcareai.com.br
+- 💬 **Discord**: [Servidor da Equipe](https://discord.gg/petcareai)
+- 🐙 **GitHub**: [PetCareAi Organization](https://github.com/PetCareAi)
+
+### Contatos Individuais
+- 👨‍💼 **Estevam Souza**: estevam.souza@petcareai.com.br
+- 👨‍💻 **Aluno1**: aluno1@petcareai.com.br
+- 👨‍💻 **Aluno2**: aluno2@petcareai.com.br
+- 👨‍💻 **Aluno3**: aluno3@petcareai.com.br
+
+### Horários de Desenvolvimento
+- 🕒 **Daily Standup**: Segunda a Sexta, 9h (BRT)
+- 📅 **Sprint Planning**: Segundas, 14h (BRT)
+- 🔍 **Code Review**: Diário, horário flexível
+- 🎯 **Sprint Review**: Sextas, 16h (BRT)
+
+## 📋 Processo de Desenvolvimento
+
+### Workflow da Equipe
+1. **Planning** (Estevam + Todos): Definição de tarefas
+2. **Development**: Desenvolvimento por área de especialização
+3. **Code Review**: Revisão cruzada obrigatória
+4. **Testing** (Aluno3): Validação e QA
+5. **Deployment** (Estevam): Release e monitoramento
+
+### Critérios de Qualidade
+- ✅ **Code Review**: Aprovação de pelo menos 2 membros
+- ✅ **Testes**: Cobertura mínima 80%
+- ✅ **Performance**: Core Web Vitals dentro dos limites
+- ✅ **Documentação**: Atualizada para mudanças
+
+## 🎖️ Desenvolvimento Profissional
+
+### Aprendizado da Equipe
+- 📚 **Tecnologias**: React, TypeScript, Node.js, AI/ML
+- 🏗️ **Arquitetura**: Microservices, Clean Architecture
+- 🧪 **Metodologias**: TDD, Agile, CI/CD
+- 🎨 **Design**: UI/UX, Accessibility, Performance
+
+### Crescimento Individual
+- **Estevam**: Liderança técnica, AI/ML, arquitetura de sistemas
+- **Aluno1**: React avançado, design systems, frontend architecture
+- **Aluno2**: Backend development, API design, database optimization
+- **Aluno3**: QA automation, performance testing, full stack skills
 
 ---
 
-## 📜 Histórico de Versões
+## 📈 Estatísticas Gerais
 
-### v2.0.0 - Contribuidores
-- 200+ contribuidores ativos
-- 50+ organizações envolvidas
-- 15 países representados
+**Total de Desenvolvedores**: 4  
+**Contribuições Totais**: 244  
+**Issues Resolvidas**: 89  
+**Pull Requests Aceitos**: 156  
+**Tempo de Desenvolvimento**: 6 meses  
+**Linhas de Código**: ~24,000  
 
-### v1.0.0 - Fundação
-- 5 fundadores originais
-- 20 early adopters
-- 3 organizações parceiras
+**Localização**: Florianópolis, SC, Brasil  
+**Última Atualização**: Julho 2025
 
 ---
 
-*Última atualização: Maio 2025*
+## 🚀 Visão da Equipe
 
-> **Nota**: Se você contribuiu e não está listado, ou se há informações incorretas, por favor abra uma issue ou entre em contato conosco. Valorizamos todas as contribuições!
+> "Nosso objetivo é criar o melhor assistente de IA para cuidados com pets, combinando tecnologia de ponta com experiência do usuário excepcional. Cada membro da equipe traz expertise única que torna este projeto especial."
+> 
+> **— Estevam Souza, CTO & Founder**
 
-## 🔄 Como Atualizar Esta Lista
+---
 
-Para mantenedores e contribuidores frequentes:
+*Desenvolvido com ❤️ pela equipe PetCare AI em Florianópolis, SC*
 
-1. Use o script `scripts/update-contributors.py`
-2. Verifique o arquivo gerado
-3. Faça PR com as atualizações
-4. Marque @maintainers para revisão
-
-```bash
-python scripts/update-contributors.py
-git add CONTRIBUTORS.md
-git commit -m "docs: atualizar lista de contribuidores"
-```
+**Quer saber mais sobre nossa equipe? Entre em contato conosco!**
