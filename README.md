@@ -613,58 +613,51 @@ webhook_config = {
 ## 📁 Estrutura do Projeto
 
 ```
-petcare-analytics/
-├── 📁 app.py                    # Aplicação principal
-├── 📁 requirements.txt          # Dependências Python
-├── 📁 README.md                 # Documentação principal
-├── 📁 setup-sistema-.js         # Script de instalação
-├── 📁 .env.example              # Exemplo de variáveis de ambiente
-├── 📁 Dockerfile               # Container Docker
-├── 📁 docker-compose.yml       # Orquestração Docker
-├── 📁 assets/                  # Recursos estáticos
-│   ├── 📄 logo.png
-│   ├── 📄 favicon.ico
-│   └── 📁 images/
-├── 📁 data/                    # Dados e banco de dados
-│   ├── 📄 petcare.db
-│   ├── 📄 backups/
-│   └── 📄 imports/
-├── 📁 models/                  # Modelos de ML treinados
-│   ├── 📄 adoption_predictor.pkl
-│   ├── 📄 behavior_clusters.pkl
-│   └── 📄 anomaly_detector.pkl
-├── 📁 exports/                 # Arquivos exportados
-│   ├── 📄 reports/
-│   └── 📄 data_exports/
-├── 📁 config/                  # Configurações
-│   ├── 📄 database.py
-│   ├── 📄 ml_config.py
-│   └── 📄 ai_config.py
-├── 📁 utils/                   # Utilitários
-│   ├── 📄 data_processing.py
-│   ├── 📄 ml_helpers.py
-│   ├── 📄 export_helpers.py
-│   └── 📄 security.py
-├── 📁 api/                     # API endpoints
-│   ├── 📄 pets.py
-│   ├── 📄 analytics.py
-│   ├── 📄 ai.py
-│   └── 📄 auth.py
-├── 📁 tests/                   # Testes automatizados
-│   ├── 📄 test_app.py
-│   ├── 📄 test_ml.py
-│   ├── 📄 test_api.py
-│   └── 📄 test_integrations.py
-├── 📁 docs/                    # Documentação adicional
-│   ├── 📄 API.md
-│   ├── 📄 DEPLOYMENT.md
-│   ├── 📄 CONTRIBUTING.md
-│   └── 📄 CHANGELOG.md
-└── 📁 scripts/                 # Scripts de manutenção
-    ├── 📄 backup.py
-    ├── 📄 migration.py
-    ├── 📄 cleanup.py
-    └── 📄 setup_admin.py
+📁 analytics/
+├── 🪝 .githooks/                          # Scripts de automação Git customizados
+│   ├── 🪝 commit-msg                          # Hook para validação de mensagens de commit
+│   ├── 🪝 pre-commit                          # Hook executado antes de cada commit
+│   └── 🪝 pre-push                            # Hook executado antes de cada push
+├── 📦 assets/                             # Recursos da aplicação (imagens, ícones, etc)
+│   ├── 🖼️ adaptive-icon.png                   # Imagem PNG otimizada
+│   ├── 🖼️ favicon.png                         # Imagem PNG otimizada
+│   ├── 🖼️ icon-page.png                       # Imagem PNG otimizada
+│   ├── 🖼️ icon.jpeg                           # Imagem JPEG comprimida
+│   ├── 🖼️ logo.jpg                            # Imagem JPEG comprimida
+│   └── 🖼️ splash-icon.png                     # Imagem PNG otimizada
+├── ⚙️ config/                             # Arquivos de configuração
+│   └── 🐍 database.py                         # Script Python
+├── 📜 CHANGELOG.md                        # Histórico detalhado de mudanças e versões
+├── 📜 LICENSE                             # Licença de uso e distribuição do software
+├── 📖 README.md                           # Documentação principal e guia de introdução
+├── 📝 .editorconfig                       # Configuração de formatação entre editores
+├── ⚙️ .gitattributes                      # Atributos específicos de arquivos no Git
+├── 🚫 .gitignore                          # Arquivos e pastas ignorados pelo Git
+├── ⚙️ .markdownlint.yml                   # Configuração YAML
+├── 🪝 .pre-commit-config.yaml             # Configuração de hooks pre-commit
+├── 🔧 .travis.yml                         # Configuração do Travis CI
+├── 🏷️ .version                            # Número da versão atual do projeto
+├── 🐍 app.py                              # Script Python
+├── 📝 ARCHITECTURE.md                     # Documentação em Markdown
+├── 🏗️ BUILDING.md                         # Instruções detalhadas para build do projeto
+├── 📚 citation.cff                        # Formato de citação para trabalhos acadêmicos
+├── 📜 CODE_OF_CONDUCT.md                  # Código de conduta da comunidade
+├── 👥 CODEOWNERS                          # Definição de responsáveis por áreas do código
+├── 📝 commitlint.config.js                # Regras para validação de commits
+├── ⚙️ configure.sh                        # Script de configuração do ambiente
+├── 🤝 CONTRIBUTING.md                     # Guia para contribuidores do projeto
+├── 👥 CONTRIBUTORS.md                     # Lista de pessoas que contribuíram
+├── 👥 contributors.yml                    # Dados estruturados dos contribuidores
+├── ©️ COPYRIGHT                           # Informações de direitos autorais
+├── 🛠️ MAINTAINING.md                      # Guia para mantenedores do projeto
+├── 🔨 Makefile                            # Automação de build e tarefas do projeto
+├── 📋 MANIFEST.in                         # Especificação de arquivos para distribuição
+├── 🚀 release.md                          # Notas e planejamento de releases
+├── 🗺️ Roadmap.md                          # Planejamento e cronograma de funcionalidades
+├── 🛡️ SECURITY.md                         # Política de segurança e vulnerabilidades
+├── ⚡ struct.js                           # Script JavaScript
+├── 📝 TODO.md                             # Lista de tarefas pendentes e melhorias
+└── 🔧 TROUBLESHOOTING.md                  # Guia de resolução de problemas comuns
 ```
 
 ### 🔧 Scripts Úteis
