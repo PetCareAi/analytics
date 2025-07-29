@@ -8,6 +8,8 @@
 │   ├── 🪝 commit-msg                          # Hook para validação de mensagens de commit
 │   ├── 🪝 pre-commit                          # Hook executado antes de cada commit
 │   └── 🪝 pre-push                            # Hook executado antes de cada push
+├── 🔧 .github/                            # Configuração GitHub Actions e templates
+│   └── 🔧 workflows/                          # Workflows de automação
 ├── 📦 assets/                             # Recursos da aplicação (imagens, ícones, etc)
 │   ├── 🖼️ adaptive-icon.png                   # Imagem PNG otimizada
 │   ├── 🖼️ favicon.png                         # Imagem PNG otimizada
@@ -39,11 +41,17 @@
 ├── 👥 CONTRIBUTORS.md                     # Lista de pessoas que contribuíram
 ├── 👥 contributors.yml                    # Dados estruturados dos contribuidores
 ├── ©️ COPYRIGHT                           # Informações de direitos autorais
+├── 🤖 dependabot.yml                      # Configuração do Dependabot para atualizações
+├── 📝 git-build-commit.md                 # Documentação em Markdown
+├── 💾 install.sh                          # Script de instalação automática
 ├── 🛠️ MAINTAINING.md                      # Guia para mantenedores do projeto
 ├── 🔨 Makefile                            # Automação de build e tarefas do projeto
 ├── 📋 MANIFEST.in                         # Especificação de arquivos para distribuição
 ├── 🚀 release.md                          # Notas e planejamento de releases
+├── 📋 requisitos-funcionais.md            # Especificação dos requisitos funcionais
+├── 📋 requisitos.md                       # Documentação de requisitos do sistema
 ├── 🗺️ Roadmap.md                          # Planejamento e cronograma de funcionalidades
+├── 🚀 run.sh                              # Script para execução da aplicação
 ├── 🛡️ SECURITY.md                         # Política de segurança e vulnerabilidades
 ├── ⚡ struct.js                           # Script JavaScript
 ├── 📝 TODO.md                             # Lista de tarefas pendentes e melhorias
