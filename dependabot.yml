@@ -1,0 +1,117 @@
+# Configuração do Dependabot para PetCare Analytics
+# Automatiza atualizações de dependências Python
+
+version: 2
+updates:
+  # Atualizações para dependências Python
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/Sao_Paulo"
+
+    # Configurações de pull requests
+    open-pull-requests-limit: 5
+
+    # Configurar reviewers automaticamente
+    reviewers:
+      - "admin"
+
+    # Configurar assignees
+    assignees:
+      - "admin"
+
+    # Prefixo para commits e PRs
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+
+    # Agrupar atualizações menores
+    groups:
+      # Grupo para dependências de análise de dados
+      data-analysis:
+        patterns:
+          - "pandas"
+          - "numpy"
+          - "scipy"
+          - "matplotlib"
+          - "seaborn"
+          - "plotly"
+
+      # Grupo para machine learning
+      machine-learning:
+        patterns:
+          - "scikit-learn"
+          - "statsmodels"
+          - "textblob"
+          - "wordcloud"
+
+      # Grupo para web framework
+      web-framework:
+        patterns:
+          - "streamlit"
+          - "streamlit-*"
+
+      # Grupo para banco de dados
+      database:
+        patterns:
+          - "supabase"
+          - "psycopg2*"
+          - "sqlalchemy"
+
+      # Grupo para utilitários
+      utilities:
+        patterns:
+          - "python-dotenv"
+          - "openpyxl"
+          - "xlsxwriter"
+          - "pillow"
+          - "requests"
+
+    # Ignorar atualizações específicas se necessário
+    ignore:
+      # Ignorar atualizações major do Python
+      - dependency-name: "python"
+        update-types: ["version-update:semver-major"]
+
+      # Ignorar versões específicas problemáticas
+      # - dependency-name: "streamlit"
+      #   versions: ["1.29.0"]
+
+    # Permitir apenas updates de segurança para algumas dependências críticas
+    # allow:
+    #   - dependency-type: "direct"
+    #     update-type: "security"
+
+  # Atualizações para Actions do GitHub
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "America/Sao_Paulo"
+
+    open-pull-requests-limit: 3
+
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+  # Atualizações para Docker (se houver Dockerfile)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "07:00"
+      timezone: "America/Sao_Paulo"
+
+    open-pull-requests-limit: 2
+
+    commit-message:
+      prefix: "docker"
+      include: "scope"
