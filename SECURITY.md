@@ -2,6 +2,7 @@
 
 ## 🛡️ Versões Suportadas
 
+
 Atualmente oferecemos suporte de segurança para as seguintes versões do PetCare AI Assistant:
 
 | Versão | Suporte de Segurança |
